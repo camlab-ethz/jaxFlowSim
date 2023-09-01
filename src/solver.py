@@ -6,16 +6,18 @@ from src.anastomosis import solveAnastomosis
 from src.boundary_conditions import setInletBC, setOutletBC
 from src.junctions import joinVessels
 from src.utils import pressureSA, waveSpeedSA
+import src.initialise as ini
+
 
 @jax.jit
 def calculateDeltaT(vessels, Ccfl):
     dt = 1.0
-    for v in vessels:
+    for i in range(len(vessels)):
         Smax = 0.0
-        for j in range(v.M):
-            _lambda = jnp.abs(v.u[j] + v.c[j])
+        for j in range(ini.VCS[i].M):
+            _lambda = jnp.abs(vessels[i].u[j] + vessels[i].c[j])
             Smax = jax.lax.cond(Smax < _lambda, lambda: _lambda, lambda: Smax)
-        vessel_dt = v.dx * Ccfl / Smax
+        vessel_dt = ini.VCS[i].dx * Ccfl / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
     return dt
 
@@ -51,11 +53,11 @@ def calculateDeltaT(vessels, Ccfl):
 def solveModel(vessels, edges, blood, dt, current_time):
     for j in np.arange(0,edges.edges.shape[0],1):
         i = edges.edges[j,0]-1
-        vessels[i].Q, vessels[i].A, vessels[i].P, vessels[i].c = solveVessel(vessels[i], blood, dt, current_time)
+        vessels[i].Q, vessels[i].A, vessels[i].P, vessels[i].c = solveVessel(vessels[i], i, blood, dt, current_time)
         vessels[i].u = vessels[i].Q / vessels[i].A
 
-        if vessels[i].outlet != "none":
-            vessels[i] = setOutletBC(dt, vessels[i])
+        if ini.VCS[i].outlet != "none":
+            vessels[i] = setOutletBC(dt, vessels[i], i)
 
         elif edges.inlets[j,0] == 2:
             d1_i = edges.inlets[j,1]
@@ -71,28 +73,26 @@ def solveModel(vessels, edges, blood, dt, current_time):
             p2_i = edges.outlets[j,2]
             d = edges.outlets[j,3]
             vessels[i], vessels[p1_i], vessels[d] = jax.lax.cond(jnp.maximum(p1_i, p2_i) == i,
-                                                                lambda: solveAnastomosis(vessels[i], vessels[p1_i], vessels[d]),
+                                                                lambda: solveAnastomosis(vessels[i], vessels[p1_i], vessels[d], i, p1_i, d),
                                                                 lambda: (vessels[i], vessels[p1_i], vessels[d]))
                  
     return vessels
 
 
-@jax.jit
-def solveVessel(vessel, blood, dt, current_time):
-    if vessel.inlet:
-        vessel = setInletBC(current_time, dt, vessel)
+@partial(jax.jit, static_argnums=1)
+def solveVessel(vessel, i, blood, dt, current_time):
+    if ini.VCS[i].inlet:
+        vessel = setInletBC(i, current_time, dt, vessel)
 
-    return muscl(vessel.dU, vessel.U00A, vessel.UM1A, vessel.U00Q, 
-                                vessel.UM1Q, vessel.A, vessel.Q, vessel.M, 
-                                 dt, vessel.dx, vessel.invDx, vessel.halfDx, 
-                                 vessel.gamma_ghost, vessel.viscT, vessel.wallE, vessel.s_A0, 
-                                 vessel.s_inv_A0, vessel.beta, vessel.gamma, vessel.Pext, 
-                                 blood)
+    return muscl(i, vessel.dU, vessel.U00A, vessel.UM1A, vessel.U00Q, 
+                                vessel.UM1Q, vessel.A, vessel.Q, dt,  blood)
 
 
 #@jax.jit
-@partial(jax.jit, static_argnums=7)
-def muscl(dU, U00A, UM1A, U00Q, UM1Q, A, Q, M, dt, dx, invDx, halfDx, gamma_ghost, viscT, wallE, s_A0, s_inv_A0, beta, gamma, Pext, b):
+@partial(jax.jit, static_argnums=(0,8,))
+def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
+    #v = ini.VCS[i]
+    M = ini.VCS[i].M
     vA = jnp.zeros(M+2)
     vQ = jnp.zeros(M+2)
     vA = vA.at[0].set(U00A)
@@ -104,21 +104,21 @@ def muscl(dU, U00A, UM1A, U00Q, UM1Q, A, Q, M, dt, dx, invDx, halfDx, gamma_ghos
     vA = vA.at[1:M+1].set(A)
     vQ = vQ.at[1:M+1].set(Q)
 
-    slopesA = computeLimiter(M, vA, invDx, dU)
-    slopesQ = computeLimiter(M, vQ, invDx, dU)
+    slopesA = computeLimiter(M, vA, ini.VCS[i].invDx, dU)
+    slopesQ = computeLimiter(M, vQ, ini.VCS[i].invDx, dU)
 
-    slopeA_halfDx = slopesA * halfDx
-    slopeQ_halfDX = slopesQ * halfDx
+    slopeA_halfDx = slopesA * ini.VCS[i].halfDx
+    slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
 
     Al = vA + slopeA_halfDx
     Ar = vA - slopeA_halfDx
-    Ql = vQ + slopeQ_halfDX
-    Qr = vQ - slopeQ_halfDX
+    Ql = vQ + slopeQ_halfDx
+    Qr = vQ - slopeQ_halfDx
 
-    Fl = computeFlux(gamma_ghost, Al, Ql, M)
-    Fr = computeFlux(gamma_ghost, Ar, Qr, M)
+    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql, M)
+    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr, M)
 
-    dxDt = jnp.float64(dx) / jnp.float64(dt)
+    dxDt = jnp.float64(ini.VCS[i].dx) / jnp.float64(dt)
     one = jnp.float64(1.0)
     
     invDxDt = one / jnp.float64(dxDt)
@@ -136,30 +136,31 @@ def muscl(dU, U00A, UM1A, U00Q, UM1Q, A, Q, M, dt, dx, invDx, halfDx, gamma_ghos
     uStar = uStar.at[0,M+1].set(uStar[0,M])
     uStar = uStar.at[1,M+1].set(uStar[1,M])
 
-    slopesA = computeLimiterIdx(M, uStar, 0, invDx, dU)
-    slopesQ = computeLimiterIdx(M, uStar, 1, invDx, dU)
+    slopesA = computeLimiterIdx(M, uStar, 0, ini.VCS[i].invDx, dU)
+    slopesQ = computeLimiterIdx(M, uStar, 1, ini.VCS[i].invDx, dU)
 
-    Al = uStar[0,0:M+2] + slopesA * halfDx
-    Ar = uStar[0,0:M+2] - slopesA * halfDx
-    Ql = uStar[1,0:M+2] + slopesQ * halfDx
-    Qr = uStar[1,0:M+2] - slopesQ * halfDx
+    Al = uStar[0,0:M+2] + slopesA * ini.VCS[i].halfDx
+    Ar = uStar[0,0:M+2] - slopesA * ini.VCS[i].halfDx
+    Ql = uStar[1,0:M+2] + slopesQ * ini.VCS[i].halfDx
+    Qr = uStar[1,0:M+2] - slopesQ * ini.VCS[i].halfDx
 
-    Fl = computeFlux(gamma_ghost, Al, Ql, M)
-    Fr = computeFlux(gamma_ghost, Ar, Qr, M)
+    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql, M)
+    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr, M)
 
-    flux = jnp.zeros((2,M+3))
+    flux = jnp.zeros((2,M+2))
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
     flux = flux.at[1,0:M+1].set(0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1])))
 
+    #jax.debug.breakpoint()
     A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1])))
     Q = Q.at[0:M].set(0.5*(Q[0:M] + uStar[1,1:M+1] + invDxDt * (flux[1, 0:M] - flux[1, 1:M+1])))
 
     s_A = jnp.sqrt(A)
-    Si = - viscT * Q / A - wallE * (s_A - s_A0) * A
+    Si = - ini.VCS[i].viscT * Q / A - ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A
     Q = Q + dt * Si
 
-    P = pressureSA(s_A * s_inv_A0, beta, Pext)
-    c = waveSpeedSA(s_A, gamma)
+    P = pressureSA(s_A * ini.VCS[i].s_inv_A0, ini.VCS[i].beta, ini.VCS[i].Pext)
+    c = waveSpeedSA(s_A, ini.VCS[i].gamma)
 
     #if (v.wallVa[0] != 0.0).astype(bool):
     #mask = v.wallVa != 0.0
@@ -176,6 +177,8 @@ def muscl(dU, U00A, UM1A, U00Q, UM1Q, A, Q, M, dt, dx, invDx, halfDx, gamma_ghos
 
     #u = Q / A
 
+    #jax.debug.breakpoint()
+    #jax.debug.print("a")
     return Q, A, P, c
 
 #@jax.jit

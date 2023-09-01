@@ -7,6 +7,7 @@ from src.boundary_conditions import updateGhostCells
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
 import time
+import src.initialise as ini
 
 
 def runSimulation_opt(input_filename, verbose=False):
@@ -22,7 +23,7 @@ def runSimulation_opt(input_filename, verbose=False):
     makeResultsFolder(data, input_filename)
 
     Ccfl = float(data["solver"]["Ccfl"])
-    heart = vessels[0].heart
+    heart = ini.VCS[0].heart
     total_time = data["solver"]["cycles"] * float(heart.cardiac_T)
 
     

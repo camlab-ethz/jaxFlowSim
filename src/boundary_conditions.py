@@ -3,17 +3,19 @@ import jax.numpy as jnp
 from jax import lax
 from src.utils import pressure
 from functools import partial
+import src.initialise as ini
 
-@jax.jit
-def setInletBC(t, dt, v):
-    h = v.heart
+#@jax.jit
+@partial(jax.jit, static_argnums=0)
+def setInletBC(i, t, dt, v):
+    h = ini.VCS[i].heart
 
     if h.inlet_type == "Q":
         v.Q = v.Q.at[0].set(inputFromData(t, h))
     else:
         v.P = v.P.at[0].set(inputFromData(t, h))
 
-    return inletCompatibility(dt, v, h)
+    return inletCompatibility(i, dt, v, h)
 
 @partial(jax.jit, static_argnums=1)
 def inputFromData(t, h):
@@ -32,12 +34,13 @@ def inputFromData(t, h):
 
     return qu
 
-@jax.jit
-def inletCompatibility(dt, v, h):
+#@jax.jit
+@partial(jax.jit, static_argnums=(0,3,))
+def inletCompatibility(i, dt, v, h):
     W11, W21 = riemannInvariants(0, v)
     W12, W22 = riemannInvariants(1, v)
 
-    W11 += (W12 - W11) * (v.c[0] - v.u[0]) * dt * v.invDx
+    W11 += (W12 - W11) * (v.c[0] - v.u[0]) * dt * ini.VCS[i].invDx
     W21 = 2.0 * v.Q[0] / v.A[0] - W11
 
     v.u = v.u.at[0].set(inverseRiemannInvariants(W11, W21)[0])
@@ -45,9 +48,9 @@ def inletCompatibility(dt, v, h):
 
     if h.inlet_type == "Q":
         v.A = v.A.at[0].set(v.Q[0] / v.u[0])
-        v.P = v.P.at[0].set(pressure(v.A[0], v.A0[0], v.beta[0], v.Pext))
+        v.P = v.P.at[0].set(pressure(v.A[0], ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext))
     else:
-        v.A = v.A.at[0].set(areaFromPressure(v.P[0], v.A0[0], v.beta[0], v.Pext))
+        v.A = v.A.at[0].set(areaFromPressure(v.P[0], ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext))
         v.Q = v.Q.at[0].set(v.u[0] * v.A[0])
 
     return v
@@ -70,23 +73,25 @@ def inverseRiemannInvariants(W1, W2):
 def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
-@jax.jit
-def setOutletBC(dt, v):
-    if v.outlet == "reflection":
+#@jax.jit
+@partial(jax.jit, static_argnums=2)
+def setOutletBC(dt, v, i):
+    if ini.VCS[i].outlet == "reflection":
         v.P = v.P.at[-1].set(2.0 * v.P[-2] - v.P[-3])
-        v = outletCompatibility(dt, v)
-    elif v.outlet == "wk3":
+        v = outletCompatibility(dt, v, i)
+    elif ini.VCS[i].outlet == "wk3":
         v = threeElementWindkessel(dt, v)
 
     return v
 
-@jax.jit
-def outletCompatibility(dt, v):
-    W1M1, W2M1 = riemannInvariants(v.M - 2, v)
-    W1M, W2M = riemannInvariants(v.M-1, v)
+#@jax.jit
+@partial(jax.jit, static_argnums=2)
+def outletCompatibility(dt, v, i):
+    W1M1, W2M1 = riemannInvariants(ini.VCS[i].M - 2, v)
+    W1M, W2M = riemannInvariants(ini.VCS[i].M-1, v)
 
-    W2M += (W2M1 - W2M) * (v.u[-1] + v.c[-1]) * dt / v.dx
-    W1M = v.W1M0 - v.Rt * (W2M - v.W2M0)
+    W2M += (W2M1 - W2M) * (v.u[-1] + v.c[-1]) * dt / ini.VCS[i].dx
+    W1M = v.W1M0 - ini.VCS[i].Rt * (W2M - v.W2M0)
 
     v.u = v.u.at[-1].set(inverseRiemannInvariants(W1M, W2M)[0])
     v.c = v.c.at[-1].set(inverseRiemannInvariants(W1M, W2M)[1])

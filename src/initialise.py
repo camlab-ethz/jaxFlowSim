@@ -4,10 +4,8 @@ import yaml
 import os.path
 import shutil
 from src.utils import waveSpeed, pressureSA
-from src.components import Heart, Blood, Vessel, Edges
-
-
-
+from src.components import Heart, Blood, Vessel, Vessel_const, Edges
+VCS = None
 
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
@@ -169,21 +167,24 @@ def buildBlood(blood_data):
 
 
 def buildArterialNetwork(network, blood, jump):
-    vessels = [buildVessel(1, network[0], blood, jump)]
+    vessel0, vessel_const0 = buildVessel(1, network[0], blood, jump)
+    vessels = [vessel0]
+    vessels_const = [vessel_const0]
     edges = np.zeros((len(network), 3), dtype=np.int32)
-    ID = int(vessels[0].ID)
-    sn = int(vessels[0].sn)
-    tn = int(vessels[0].tn)
+    ID = int(vessels_const[0].ID)
+    sn = int(vessels_const[0].sn)
+    tn = int(vessels_const[0].tn)
     edges[0, 0] = ID
     edges[0, 1] = sn
     edges[0, 2] = tn
 
     for i in range(1, len(network)):
-        vessel = buildVessel(i + 1, network[i], blood, jump)
+        vessel, vessel_const = buildVessel(i + 1, network[i], blood, jump)
         vessels.append(vessel)
-        ID = int(vessel.ID)
-        sn = int(vessel.sn)
-        tn = int(vessel.tn)
+        vessels_const.append(vessel_const)
+        ID = int(vessel_const.ID)
+        sn = int(vessel_const.sn)
+        tn = int(vessel_const.tn)
         edges[i, 0] = ID
         edges[i, 1] = sn
         edges[i, 2] = tn
@@ -192,7 +193,7 @@ def buildArterialNetwork(network, blood, jump):
     outlets = np.zeros((len(network),4), dtype=np.int32)
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
-        if vessels[i].outlet == "none":
+        if vessels_const[i].outlet == "none":
             t = edges[j,2]
             inlets[j,0] = jnp.where(edges[:, 1] == t,jnp.ones_like(edges[:,1]), jnp.zeros_like(edges[:,1])).sum().astype(int)
             outlets[j,0] = jnp.where(edges[:, 2] == t,jnp.ones_like(edges[:,2]), jnp.zeros_like(edges[:,2])).sum().astype(int)
@@ -209,10 +210,9 @@ def buildArterialNetwork(network, blood, jump):
                 outlets[j,1] = jnp.minimum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][0]
                 outlets[j,2] = jnp.maximum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][1]
                 outlets[j,3] = jnp.where(edges[:, 1] == t)[0][0]
-            
 
-
-
+    global VCS 
+    VCS = vessels_const
     return vessels, Edges(edges, inlets, outlets)
 
 
@@ -334,14 +334,12 @@ def buildVessel(ID, vessel_data, blood, jump):
     out_c_name = f"{vessel_name}_c.out"
     out_P_name = f"{vessel_name}_P.out"
 
-    return Vessel(
-                  A, Q, u, c, P,
+    return Vessel( A, Q, u, c, P,
                   A_t, Q_t, u_t, c_t, P_t,
                   A_l, Q_l, u_l, c_l, P_l,
                   W1M0, W2M0,
                   U00A, U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q,
-                  dU,
-                  Pcn,
+                  dU), Vessel_const(Pcn,
                   vessel_name, ID, sn, tn, inlet, heart,
                   M, dx, invDx, halfDx,
                   beta, gamma, s_15_gamma, gamma_ghost,
