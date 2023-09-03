@@ -2,14 +2,15 @@ import jax
 import jax.numpy as jnp
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
+import src.initialise as ini
 
 @jax.jit
-def solveConjunction(b, v1, v2):
+def solveConjunction(v1, v2):
     U0 = jnp.array([v1.u[-1], v2.u[0], jnp.sqrt(jnp.sqrt(v1.A[-1])), jnp.sqrt(jnp.sqrt(v2.A[0]))])
 
     k1 = v1.s_15_gamma[-1]
     k2 = v2.s_15_gamma[0]
-    k3 = b.rho
+    k3 = ini.BLOOD.rho
     k = jnp.array([k1, k2, k3])
 
     J = calculateJacobianConjunction(v1, v2, U0, k)

@@ -10,6 +10,6 @@ input_filename = "test/aspirator/aspirator.yml"
 #input_filename = "test/adan56/adan56.yml"
 conv_ceil = 0.001
 
-config.update('jax_disable_jit', True)
+#config.update('jax_disable_jit', True)
 
 runSimulation(input_filename, verbose=True, out_files=True, conv_ceil=False)

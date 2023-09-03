@@ -53,29 +53,6 @@ tree_util.register_pytree_node(Blood,
 
 #@jax.dataclass
 class Vessel:
-    label: str
-    ID: int
-    sn: int
-    tn: int
-    inlet: bool
-    heart: Heart
-    M: int
-    dx: float
-    invDx: float
-    halfDx: float
-    beta: jnp.ndarray
-    gamma: jnp.ndarray
-    s_15_gamma: jnp.ndarray
-    gamma_ghost: jnp.ndarray
-    A0: jnp.ndarray
-    s_A0: jnp.ndarray
-    inv_A0: jnp.ndarray
-    s_inv_A0: jnp.ndarray
-    Pext: float
-    viscT: float
-    wallE: np.ndarray
-    wallVa: np.ndarray
-    wallVb: np.ndarray
     A: jnp.ndarray
     Q: jnp.ndarray
     u: jnp.ndarray
@@ -122,23 +99,26 @@ class Vessel:
     Pc: float
     outlet: str
 
-    def __init__(self, A, Q, u, c, P, A_t, Q_t, u_t, c_t, 
-                 P_t, A_l, Q_l, u_l, c_l, P_l, W1M0, W2M0, U00A, 
+    def __init__(self, A, Q, u, c, P, 
+                 #A_t, Q_t, u_t, c_t, P_t, 
+                 #A_l, Q_l, u_l, c_l, P_l, 
+                 P_t, P_l, 
+                 W1M0, W2M0, U00A, 
                  U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q,  dU):
         self.A = A
         self.Q = Q
         self.u = u
         self.c = c
         self.P = P
-        self.A_t = A_t
-        self.Q_t = Q_t
-        self.u_t = u_t
-        self.c_t = c_t
+        #self.A_t = A_t
+        #self.Q_t = Q_t
+        #self.u_t = u_t
+        #self.c_t = c_t
         self.P_t = P_t
-        self.A_l = A_l
-        self.Q_l = Q_l
-        self.u_l = u_l
-        self.c_l = c_l
+        #self.A_l = A_l
+        #self.Q_l = Q_l
+        #self.u_l = u_l
+        #self.c_l = c_l
         self.P_l = P_l
         self.W1M0 = W1M0
         self.W2M0 = W2M0
@@ -153,10 +133,11 @@ class Vessel:
         self.dU = dU
     
     def _tree_flatten(self):
-        children = (self.A, self.Q, self.u, self.c, self.P, self.A_t, 
-                    self.Q_t, self.u_t, self.c_t, self.P_t, self.A_l, 
-                    self.Q_l, self.u_l, self.c_l, self.P_l, self.W1M0, 
-                    self.W2M0, self.U00A, self.U00Q, self.U01A, 
+        children = (self.A, self.Q, self.u, self.c, self.P, 
+                    self.P_t, self.P_l, 
+                    #self.A_t, self.Q_t, self.u_t, self.c_t, self.P_t, 
+                    #self.A_l, self.Q_l, self.u_l, self.c_l, self.P_l, 
+                    self.W1M0, self.W2M0, self.U00A, self.U00Q, self.U01A, 
                     self.U01Q, self.UM1A, self.UM1Q, self.UM2A, self.UM2Q, 
                     self.dU,
                    )

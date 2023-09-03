@@ -5,7 +5,15 @@ import os.path
 import shutil
 from src.utils import waveSpeed, pressureSA
 from src.components import Heart, Blood, Vessel, Vessel_const, Edges
+
 VCS = None
+CCFL = None
+HEART = None
+TOTAL_TIME = None
+CONV_TOLL = None
+EDGES = None
+BLOOD = None
+JUMP = None
 
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
@@ -163,11 +171,12 @@ def buildBlood(blood_data):
     rho = blood_data["rho"]
     rho_inv = 1.0 / rho
 
-    return Blood(mu, rho, rho_inv)
+    global BLOOD
+    BLOOD = Blood(mu, rho, rho_inv)
 
 
-def buildArterialNetwork(network, blood, jump):
-    vessel0, vessel_const0 = buildVessel(1, network[0], blood, jump)
+def buildArterialNetwork(network):
+    vessel0, vessel_const0 = buildVessel(1, network[0], BLOOD, JUMP)
     vessels = [vessel0]
     vessels_const = [vessel_const0]
     edges = np.zeros((len(network), 3), dtype=np.int32)
@@ -179,7 +188,7 @@ def buildArterialNetwork(network, blood, jump):
     edges[0, 2] = tn
 
     for i in range(1, len(network)):
-        vessel, vessel_const = buildVessel(i + 1, network[i], blood, jump)
+        vessel, vessel_const = buildVessel(i + 1, network[i], BLOOD, JUMP)
         vessels.append(vessel)
         vessels_const.append(vessel_const)
         ID = int(vessel_const.ID)
@@ -213,7 +222,11 @@ def buildArterialNetwork(network, blood, jump):
 
     global VCS 
     VCS = vessels_const
-    return vessels, Edges(edges, inlets, outlets)
+    global EDGES
+    EDGES = Edges(edges, inlets, outlets)
+    global HEART
+    HEART = vessels_const[0].heart
+    return vessels
 
 
 def buildVessel(ID, vessel_data, blood, jump):
@@ -248,16 +261,16 @@ def buildVessel(ID, vessel_data, blood, jump):
     inv_A0 = jnp.zeros(M, dtype=jnp.float64)
     dU = jnp.zeros((2, M + 2), dtype=jnp.float64)
     s_inv_A0 = jnp.zeros(M, dtype=jnp.float64)
-    Q_t = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #Q_t = jnp.zeros((jump, 6), dtype=jnp.float64)
     P_t = jnp.zeros((jump, 6), dtype=jnp.float64)
-    A_t = jnp.zeros((jump, 6), dtype=jnp.float64)
-    u_t = jnp.zeros((jump, 6), dtype=jnp.float64)
-    c_t = jnp.zeros((jump, 6), dtype=jnp.float64)
-    Q_l = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #A_t = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #u_t = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #c_t = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #Q_l = jnp.zeros((jump, 6), dtype=jnp.float64)
     P_l = jnp.zeros((jump, 6), dtype=jnp.float64)
-    A_l = jnp.zeros((jump, 6), dtype=jnp.float64)
-    u_l = jnp.zeros((jump, 6), dtype=jnp.float64)
-    c_l = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #A_l = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #u_l = jnp.zeros((jump, 6), dtype=jnp.float64)
+    #c_l = jnp.zeros((jump, 6), dtype=jnp.float64)
     s_15_gamma = jnp.zeros(M, dtype=jnp.float64)
     gamma_ghost = jnp.zeros(M + 2, dtype=jnp.float64)
 
@@ -335,9 +348,9 @@ def buildVessel(ID, vessel_data, blood, jump):
     out_P_name = f"{vessel_name}_P.out"
 
     return Vessel( A, Q, u, c, P,
-                  A_t, Q_t, u_t, c_t, P_t,
-                  A_l, Q_l, u_l, c_l, P_l,
-                  W1M0, W2M0,
+                  #A_t, Q_t, u_t, c_t, P_t,
+                  #A_l, Q_l, u_l, c_l, P_l,
+                  P_t, P_l, W1M0, W2M0,
                   U00A, U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q,
                   dU), Vessel_const(Pcn,
                   vessel_name, ID, sn, tn, inlet, heart,
@@ -438,7 +451,6 @@ def buildHeart(vessel_data):
         input_data = loadInletData(vessel_data["inlet file"])
         cardiac_period = input_data[-1, 0]
         inlet_number = vessel_data["inlet number"]
-
         return True, Heart(inlet_type, cardiac_period, input_data, inlet_number)
     else:
         return False, Heart("none", 0.0, jnp.zeros((1, 2)), 0)
@@ -463,3 +475,11 @@ def parseCommandline():
     conv_ceil = True
 
     return input_filename, verbose, out_files, conv_ceil
+
+def buildConst(Ccfl, total_time, conv_toll):
+    global CCFL
+    CCFL = Ccfl
+    global TOTAL_TIME
+    TOTAL_TIME = total_time * float(HEART.cardiac_T)
+    global CONV_TOLL
+    CONV_TOLL = conv_toll

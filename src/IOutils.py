@@ -16,10 +16,10 @@ def saveTempDatas(t, vessels, counter):
 @partial(jit, static_argnums=(3))
 def saveTempData(t, v, counter, i):
     v.P_t = v.P_t.at[counter, :].set([t, v.P[0], v.P[ini.VCS[i].node2], v.P[ini.VCS[i].node3], v.P[ini.VCS[i].node4], v.P[-1]])
-    v.A_t = v.A_t.at[counter, :].set([t, v.A[0], v.A[ini.VCS[i].node2], v.A[ini.VCS[i].node3], v.A[ini.VCS[i].node4], v.A[-1]])
-    v.Q_t = v.Q_t.at[counter, :].set([t, v.Q[0], v.Q[ini.VCS[i].node2], v.Q[ini.VCS[i].node3], v.Q[ini.VCS[i].node4], v.Q[-1]])
-    v.u_t = v.u_t.at[counter, :].set([t, v.u[0], v.u[ini.VCS[i].node2], v.u[ini.VCS[i].node3], v.u[ini.VCS[i].node4], v.u[-1]])
-    v.c_t = v.c_t.at[counter, :].set([t, v.c[0], v.c[ini.VCS[i].node2], v.c[ini.VCS[i].node3], v.c[ini.VCS[i].node4], v.c[-1]])
+    #v.A_t = v.A_t.at[counter, :].set([t, v.A[0], v.A[ini.VCS[i].node2], v.A[ini.VCS[i].node3], v.A[ini.VCS[i].node4], v.A[-1]])
+    #v.Q_t = v.Q_t.at[counter, :].set([t, v.Q[0], v.Q[ini.VCS[i].node2], v.Q[ini.VCS[i].node3], v.Q[ini.VCS[i].node4], v.Q[-1]])
+    #v.u_t = v.u_t.at[counter, :].set([t, v.u[0], v.u[ini.VCS[i].node2], v.u[ini.VCS[i].node3], v.u[ini.VCS[i].node4], v.u[-1]])
+    #v.c_t = v.c_t.at[counter, :].set([t, v.c[0], v.c[ini.VCS[i].node2], v.c[ini.VCS[i].node3], v.c[ini.VCS[i].node4], v.c[-1]])
 
     return v
 
@@ -32,11 +32,11 @@ def transferTempToLasts(vessels):
 
 @jit
 def transferTempToLast(v):
-    v.A_l = v.A_t
+    #v.A_l = v.A_t
     v.P_l = v.P_t
-    v.Q_l = v.Q_t
-    v.u_l = v.u_t
-    v.c_l = v.c_t
+    #v.Q_l = v.Q_t
+    #v.u_l = v.u_t
+    #v.c_l = v.c_t
 
     return v
 
@@ -74,18 +74,18 @@ def writeResults(vessels):
 
 def writeResult(v, i):
     lastP = v.P_l
-    lastQ = v.Q_l
-    lastA = v.A_l
-    lastc = v.c_l
-    lastu = v.u_l
-    lasts = [lastP, lastQ, lastA, lastc, lastu]
+    #lastQ = v.Q_l
+    #lastA = v.A_l
+    #lastc = v.c_l
+    #lastu = v.u_l
+    lasts = [lastP]#, lastQ, lastA, lastc, lastu]
 
     resP = ini.VCS[i].last_P_name
-    resQ = ini.VCS[i].last_Q_name
-    resA = ini.VCS[i].last_A_name
-    resc = ini.VCS[i].last_c_name
-    resu = ini.VCS[i].last_u_name
-    ress = [resP, resQ, resA, resc, resu]
+    #resQ = ini.VCS[i].last_Q_name
+    #resA = ini.VCS[i].last_A_name
+    #resc = ini.VCS[i].last_c_name
+    #resu = ini.VCS[i].last_u_name
+    ress = [resP]#, resQ, resA, resc, resu]
 
     for a, b in zip(ress, lasts):
         host_callback.call(lambda x: np.savetxt(a, x), b)

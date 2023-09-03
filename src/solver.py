@@ -10,14 +10,14 @@ import src.initialise as ini
 
 
 @jax.jit
-def calculateDeltaT(vessels, Ccfl):
+def calculateDeltaT(vessels):
     dt = 1.0
     for i in range(len(vessels)):
         Smax = 0.0
         for j in range(ini.VCS[i].M):
             _lambda = jnp.abs(vessels[i].u[j] + vessels[i].c[j])
             Smax = jax.lax.cond(Smax < _lambda, lambda: _lambda, lambda: Smax)
-        vessel_dt = ini.VCS[i].dx * Ccfl / Smax
+        vessel_dt = ini.VCS[i].dx * ini.CCFL / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
     return dt
 
@@ -49,29 +49,31 @@ def calculateDeltaT(vessels, Ccfl):
 #                 
 #    return vessels
 
-@partial(jax.jit, static_argnums=1)
-def solveModel(vessels, edges, blood, dt, current_time):
-    for j in np.arange(0,edges.edges.shape[0],1):
-        i = edges.edges[j,0]-1
-        vessels[i].Q, vessels[i].A, vessels[i].P, vessels[i].c = solveVessel(vessels[i], i, blood, dt, current_time)
+
+#@partial(jax.jit, static_argnums=1)
+@jax.jit
+def solveModel(vessels, dt, current_time):
+    for j in np.arange(0,ini.EDGES.edges.shape[0],1):
+        i = ini.EDGES.edges[j,0]-1
+        vessels[i].Q, vessels[i].A, vessels[i].P, vessels[i].c = solveVessel(vessels[i], i, dt, current_time)
         vessels[i].u = vessels[i].Q / vessels[i].A
 
         if ini.VCS[i].outlet != "none":
             vessels[i] = setOutletBC(dt, vessels[i], i)
 
-        elif edges.inlets[j,0] == 2:
-            d1_i = edges.inlets[j,1]
-            d2_i = edges.inlets[j,2]
-            vessels[i], vessels[d1_i], vessels[d2_i] = joinVessels(blood, vessels[i], vessels[d1_i], vessels[d2_i])
+        elif ini.EDGES.inlets[j,0] == 2:
+            d1_i = ini.EDGES.inlets[j,1]
+            d2_i = ini.EDGES.inlets[j,2]
+            vessels[i], vessels[d1_i], vessels[d2_i] = joinVessels(vessels[i], vessels[d1_i], vessels[d2_i])
 
-        elif edges.outlets[j,0] == 1:
-            d_i = edges.outlets[j,1]
-            vessels[i], vessels[d_i] = joinVessels(blood, vessels[i], vessels[d_i])
+        elif ini.EDGES.outlets[j,0] == 1:
+            d_i = ini.EDGES.outlets[j,1]
+            vessels[i], vessels[d_i] = joinVessels(vessels[i], vessels[d_i])
 
-        elif edges.outlets[j,0] == 2:
-            p1_i = edges.outlets[j,1]
-            p2_i = edges.outlets[j,2]
-            d = edges.outlets[j,3]
+        elif ini.EDGES.outlets[j,0] == 2:
+            p1_i = ini.EDGES.outlets[j,1]
+            p2_i = ini.EDGES.outlets[j,2]
+            d = ini.EDGES.outlets[j,3]
             vessels[i], vessels[p1_i], vessels[d] = jax.lax.cond(jnp.maximum(p1_i, p2_i) == i,
                                                                 lambda: solveAnastomosis(vessels[i], vessels[p1_i], vessels[d], i, p1_i, d),
                                                                 lambda: (vessels[i], vessels[p1_i], vessels[d]))
@@ -80,17 +82,17 @@ def solveModel(vessels, edges, blood, dt, current_time):
 
 
 @partial(jax.jit, static_argnums=1)
-def solveVessel(vessel, i, blood, dt, current_time):
+def solveVessel(vessel, i, dt, current_time):
     if ini.VCS[i].inlet:
         vessel = setInletBC(i, current_time, dt, vessel)
 
     return muscl(i, vessel.dU, vessel.U00A, vessel.UM1A, vessel.U00Q, 
-                                vessel.UM1Q, vessel.A, vessel.Q, dt,  blood)
+                                vessel.UM1Q, vessel.A, vessel.Q, dt)
 
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0,8,))
-def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
+@partial(jax.jit, static_argnums=(0,))
+def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt):
     #v = ini.VCS[i]
     M = ini.VCS[i].M
     vA = jnp.zeros(M+2)
@@ -104,8 +106,8 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
     vA = vA.at[1:M+1].set(A)
     vQ = vQ.at[1:M+1].set(Q)
 
-    slopesA = computeLimiter(M, vA, ini.VCS[i].invDx, dU)
-    slopesQ = computeLimiter(M, vQ, ini.VCS[i].invDx, dU)
+    slopesA = computeLimiter(vA, ini.VCS[i].invDx, dU)
+    slopesQ = computeLimiter(vQ, ini.VCS[i].invDx, dU)
 
     slopeA_halfDx = slopesA * ini.VCS[i].halfDx
     slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
@@ -115,8 +117,8 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
     Ql = vQ + slopeQ_halfDx
     Qr = vQ - slopeQ_halfDx
 
-    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql, M)
-    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr, M)
+    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql)
+    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr)
 
     dxDt = jnp.float64(ini.VCS[i].dx) / jnp.float64(dt)
     one = jnp.float64(1.0)
@@ -136,16 +138,16 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
     uStar = uStar.at[0,M+1].set(uStar[0,M])
     uStar = uStar.at[1,M+1].set(uStar[1,M])
 
-    slopesA = computeLimiterIdx(M, uStar, 0, ini.VCS[i].invDx, dU)
-    slopesQ = computeLimiterIdx(M, uStar, 1, ini.VCS[i].invDx, dU)
+    slopesA = computeLimiterIdx(uStar, 0, ini.VCS[i].invDx, dU)
+    slopesQ = computeLimiterIdx(uStar, 1, ini.VCS[i].invDx, dU)
 
     Al = uStar[0,0:M+2] + slopesA * ini.VCS[i].halfDx
     Ar = uStar[0,0:M+2] - slopesA * ini.VCS[i].halfDx
     Ql = uStar[1,0:M+2] + slopesQ * ini.VCS[i].halfDx
     Qr = uStar[1,0:M+2] - slopesQ * ini.VCS[i].halfDx
 
-    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql, M)
-    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr, M)
+    Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql)
+    Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr)
 
     flux = jnp.zeros((2,M+2))
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
@@ -266,9 +268,10 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt, b):
 #
 #    return v
 
-@partial(jax.jit, static_argnums=3)
-def computeFlux(gamma_ghost, A, Q, M):
-    Flux = jnp.zeros((2,M+2))
+#@partial(jax.jit, static_argnums=3)
+@jax.jit
+def computeFlux(gamma_ghost, A, Q):
+    Flux = jnp.zeros((2,A.size))
     Flux = Flux.at[0,:].set(Q)
     Flux = Flux.at[1,:].set(Q * Q / A + gamma_ghost * A * jnp.sqrt(A))
 
@@ -289,17 +292,18 @@ def superBee(dU):
 
     return maxMod(s1, s2)
 
-@partial(jax.jit, static_argnums=0)
-def computeLimiter(M, U, invDx, dU):
-    dU = dU.at[0, 1:M+1].set((U[1:M+1] - U[:M]) * invDx)
-    dU = dU.at[1, 0:M].set(dU[0, 1:M+1])
+#@partial(jax.jit, static_argnums=0)
+@jax.jit
+def computeLimiter(U, invDx, dU):
+    dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
+    dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
     return superBee(dU)
 
-@partial(jax.jit, static_argnums=0)
-def computeLimiterIdx(M, U, idx, invDx, dU):
+@jax.jit
+def computeLimiterIdx(U, idx, invDx, dU):
     U = U[idx, :]
-    dU = dU.at[0, 1:M+1].set((U[1:M+1] - U[:M]) * invDx)
-    dU = dU.at[1, 0:M].set(dU[0, 1:M+1])
+    dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
+    dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
     return superBee(dU)
