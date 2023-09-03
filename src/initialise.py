@@ -259,7 +259,6 @@ def buildVessel(ID, vessel_data, blood, jump):
     wallVa = np.zeros(M, dtype=jnp.float64)
     wallVb = np.zeros(M, dtype=jnp.float64)
     inv_A0 = jnp.zeros(M, dtype=jnp.float64)
-    dU = jnp.zeros((2, M + 2), dtype=jnp.float64)
     s_inv_A0 = jnp.zeros(M, dtype=jnp.float64)
     #Q_t = jnp.zeros((jump, 6), dtype=jnp.float64)
     P_t = jnp.zeros((jump, 6), dtype=jnp.float64)
@@ -347,12 +346,18 @@ def buildVessel(ID, vessel_data, blood, jump):
     out_c_name = f"{vessel_name}_c.out"
     out_P_name = f"{vessel_name}_P.out"
 
+    #sim_dat = jnp.zeros((5,M))
+    #sim_dat[0,:] = A
+    #sim_dat[0,:] = Q
+    #sim_dat[0,:] = u
+    #sim_dat[0,:] = c
+    #sim_dat[0,:] = P
     return Vessel( A, Q, u, c, P,
                   #A_t, Q_t, u_t, c_t, P_t,
                   #A_l, Q_l, u_l, c_l, P_l,
                   P_t, P_l, W1M0, W2M0,
                   U00A, U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q,
-                  dU), Vessel_const(Pcn,
+                  ), Vessel_const(Pcn,
                   vessel_name, ID, sn, tn, inlet, heart,
                   M, dx, invDx, halfDx,
                   beta, gamma, s_15_gamma, gamma_ghost,

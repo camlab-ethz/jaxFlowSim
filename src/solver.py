@@ -86,13 +86,13 @@ def solveVessel(vessel, i, dt, current_time):
     if ini.VCS[i].inlet:
         vessel = setInletBC(i, current_time, dt, vessel)
 
-    return muscl(i, vessel.dU, vessel.U00A, vessel.UM1A, vessel.U00Q, 
+    return muscl(i, vessel.U00A, vessel.UM1A, vessel.U00Q, 
                                 vessel.UM1Q, vessel.A, vessel.Q, dt)
 
 
 #@jax.jit
 @partial(jax.jit, static_argnums=(0,))
-def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt):
+def muscl(i, U00A, UM1A, U00Q, UM1Q, A, Q, dt):
     #v = ini.VCS[i]
     M = ini.VCS[i].M
     vA = jnp.zeros(M+2)
@@ -106,8 +106,8 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt):
     vA = vA.at[1:M+1].set(A)
     vQ = vQ.at[1:M+1].set(Q)
 
-    slopesA = computeLimiter(vA, ini.VCS[i].invDx, dU)
-    slopesQ = computeLimiter(vQ, ini.VCS[i].invDx, dU)
+    slopesA = computeLimiter(vA, ini.VCS[i].invDx)
+    slopesQ = computeLimiter(vQ, ini.VCS[i].invDx)
 
     slopeA_halfDx = slopesA * ini.VCS[i].halfDx
     slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
@@ -138,8 +138,8 @@ def muscl(i, dU, U00A, UM1A, U00Q, UM1Q, A, Q, dt):
     uStar = uStar.at[0,M+1].set(uStar[0,M])
     uStar = uStar.at[1,M+1].set(uStar[1,M])
 
-    slopesA = computeLimiterIdx(uStar, 0, ini.VCS[i].invDx, dU)
-    slopesQ = computeLimiterIdx(uStar, 1, ini.VCS[i].invDx, dU)
+    slopesA = computeLimiterIdx(uStar, 0, ini.VCS[i].invDx)
+    slopesQ = computeLimiterIdx(uStar, 1, ini.VCS[i].invDx)
 
     Al = uStar[0,0:M+2] + slopesA * ini.VCS[i].halfDx
     Ar = uStar[0,0:M+2] - slopesA * ini.VCS[i].halfDx
@@ -294,15 +294,17 @@ def superBee(dU):
 
 #@partial(jax.jit, static_argnums=0)
 @jax.jit
-def computeLimiter(U, invDx, dU):
+def computeLimiter(U, invDx):
+    dU = jnp.zeros((2, U.size))
     dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
     return superBee(dU)
 
 @jax.jit
-def computeLimiterIdx(U, idx, invDx, dU):
+def computeLimiterIdx(U, idx, invDx):
     U = U[idx, :]
+    dU = jnp.zeros((2, U.size))
     dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     dU = dU.at[1, 0:-1].set(dU[0, 1:])
     

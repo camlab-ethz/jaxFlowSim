@@ -104,7 +104,7 @@ class Vessel:
                  #A_l, Q_l, u_l, c_l, P_l, 
                  P_t, P_l, 
                  W1M0, W2M0, U00A, 
-                 U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q,  dU):
+                 U00Q, U01A, U01Q, UM1A, UM1Q, UM2A, UM2Q):
         self.A = A
         self.Q = Q
         self.u = u
@@ -130,7 +130,6 @@ class Vessel:
         self.UM1Q = UM1Q
         self.UM2A = UM2A
         self.UM2Q = UM2Q
-        self.dU = dU
     
     def _tree_flatten(self):
         children = (self.A, self.Q, self.u, self.c, self.P, 
@@ -139,7 +138,6 @@ class Vessel:
                     #self.A_l, self.Q_l, self.u_l, self.c_l, self.P_l, 
                     self.W1M0, self.W2M0, self.U00A, self.U00Q, self.U01A, 
                     self.U01Q, self.UM1A, self.UM1Q, self.UM2A, self.UM2Q, 
-                    self.dU,
                    )
         aux_data = {}
         return (children, aux_data)
