@@ -71,6 +71,7 @@ def simulation_loop(vessels):
         vessels = updateGhostCells(vessels)
         #jax.debug.breakpoint()
 
+        
         (vessels,counter) = jax.lax.cond(current_time >= timepoints[counter], 
                                          lambda: (saveTempDatas(current_time,vessels,counter),counter+1), 
                                          lambda: (vessels,counter))

@@ -14,6 +14,10 @@ CONV_TOLL = None
 EDGES = None
 BLOOD = None
 JUMP = None
+MESH_SIZE_TOT = None
+MESH_SIZES = None
+NUM_VESSELS = None
+
 
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
@@ -226,6 +230,45 @@ def buildArterialNetwork(network):
     EDGES = Edges(edges, inlets, outlets)
     global HEART
     HEART = vessels_const[0].heart
+
+    mesh_size = 0 
+    for v in vessels_const:
+        mesh_size += v.M
+
+    global MESH_SIZE_TOT
+    MESH_SIZE_TOT = mesh_size
+    global NUM_VESSELS
+    NUM_VESSELS = len(vessels)
+    global MESH_SIZES
+    MESH_SIZES = jnp.zeros(len(vessels))
+    sim_dat = jnp.zeros((5, MESH_SIZE_TOT))
+    sim_dat_aux = jnp.zeros((10, NUM_VESSELS))
+    
+    
+    mesh_count = 0
+
+    for i in range(len(vessels)):
+        new_mesh_count = mesh_count + vessels_const[i].M
+        MESH_SIZES = MESH_SIZES.at[i].set(MESH_SIZES[i-1] + vessels_const[i].M)
+
+        sim_dat = sim_dat.at[0,mesh_count:new_mesh_count].set(vessels[i].u)
+        sim_dat = sim_dat.at[1,mesh_count:new_mesh_count].set(vessels[i].Q)
+        sim_dat = sim_dat.at[2,mesh_count:new_mesh_count].set(vessels[i].A)
+        sim_dat = sim_dat.at[3,mesh_count:new_mesh_count].set(vessels[i].c)
+        sim_dat = sim_dat.at[4,mesh_count:new_mesh_count].set(vessels[i].P)
+        sim_dat_aux = sim_dat_aux.at[0:mesh_count].set(vessels[i].W1M0)
+        sim_dat_aux = sim_dat_aux.at[1:mesh_count].set(vessels[i].W2M0)
+        sim_dat_aux = sim_dat_aux.at[2:mesh_count].set(vessels[i].U00A)
+        sim_dat_aux = sim_dat_aux.at[3:mesh_count].set(vessels[i].U00Q)
+        sim_dat_aux = sim_dat_aux.at[4:mesh_count].set(vessels[i].U01A)
+        sim_dat_aux = sim_dat_aux.at[5:mesh_count].set(vessels[i].U01Q)
+        sim_dat_aux = sim_dat_aux.at[6:mesh_count].set(vessels[i].UM1A)
+        sim_dat_aux = sim_dat_aux.at[7:mesh_count].set(vessels[i].UM1Q)
+        sim_dat_aux = sim_dat_aux.at[8:mesh_count].set(vessels[i].UM2A)
+        sim_dat_aux = sim_dat_aux.at[9:mesh_count].set(vessels[i].UM2Q)
+
+        mesh_count = new_mesh_count
+
     return vessels
 
 
@@ -346,12 +389,6 @@ def buildVessel(ID, vessel_data, blood, jump):
     out_c_name = f"{vessel_name}_c.out"
     out_P_name = f"{vessel_name}_P.out"
 
-    #sim_dat = jnp.zeros((5,M))
-    #sim_dat[0,:] = A
-    #sim_dat[0,:] = Q
-    #sim_dat[0,:] = u
-    #sim_dat[0,:] = c
-    #sim_dat[0,:] = P
     return Vessel( A, Q, u, c, P,
                   #A_t, Q_t, u_t, c_t, P_t,
                   #A_l, Q_l, u_l, c_l, P_l,
