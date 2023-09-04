@@ -4,16 +4,16 @@ import src.initialise as ini
 
 
 @jax.jit
-def calcNorms(vessels):
-    norms = jnp.zeros(len(vessels))
-    for i, v in enumerate(vessels):
-        err = v.P_l[:, 3] - v.P_t[:, 3]
+def calcNorms(P_t, P_l):
+    norms = jnp.zeros(ini.NUM_VESSELS,dtype=jnp.float64)
+    for i in range(ini.NUM_VESSELS):
+        err = P_l[:, i*5 + 2] - P_t[:, i*5 + 2]
         norms = norms.at[i].set(jnp.sqrt(jnp.sum(err**2)))
     return norms
 
 @jax.jit
-def computeConvError(vessels):
-    current_norms = calcNorms(vessels)
+def computeConvError(P_t, P_l):
+    current_norms = calcNorms(P_t, P_l)
     maxnorm = jnp.max(current_norms)
     return maxnorm
 

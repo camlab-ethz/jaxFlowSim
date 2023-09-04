@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from jax import jit
 from jax.experimental import host_callback
 from functools import partial
@@ -6,22 +7,24 @@ import src.initialise as ini
 
 
 @jit
-def saveTempDatas(t, vessels, counter):
-    for i in range(0,len(vessels)):
-        vessels[i] = saveTempData(t, vessels[i], counter, i)
+def saveTempDatas(P):
+    P_t_temp = jnp.zeros(5*ini.NUM_VESSELS)
+    for i in range(ini.NUM_VESSELS):
+        start = ini.MESH_SIZES[i]
+        end = ini.MESH_SIZES[i+1]
+        P_t_temp = P_t_temp.at[i*5:(i+1)*5].set(saveTempData(i, P[start:end]))
     
-    return vessels
+    return P_t_temp
 
 #@jit
-@partial(jit, static_argnums=(3))
-def saveTempData(t, v, counter, i):
-    v.P_t = v.P_t.at[counter, :].set([t, v.P[0], v.P[ini.VCS[i].node2], v.P[ini.VCS[i].node3], v.P[ini.VCS[i].node4], v.P[-1]])
+@partial(jit, static_argnums=(0))
+def saveTempData(i, P):
+    return [P[0], P[ini.VCS[i].node2], P[ini.VCS[i].node3], P[ini.VCS[i].node4], P[-1]]
     #v.A_t = v.A_t.at[counter, :].set([t, v.A[0], v.A[ini.VCS[i].node2], v.A[ini.VCS[i].node3], v.A[ini.VCS[i].node4], v.A[-1]])
     #v.Q_t = v.Q_t.at[counter, :].set([t, v.Q[0], v.Q[ini.VCS[i].node2], v.Q[ini.VCS[i].node3], v.Q[ini.VCS[i].node4], v.Q[-1]])
     #v.u_t = v.u_t.at[counter, :].set([t, v.u[0], v.u[ini.VCS[i].node2], v.u[ini.VCS[i].node3], v.u[ini.VCS[i].node4], v.u[-1]])
     #v.c_t = v.c_t.at[counter, :].set([t, v.c[0], v.c[ini.VCS[i].node2], v.c[ini.VCS[i].node3], v.c[ini.VCS[i].node4], v.c[-1]])
 
-    return v
 
 @jit
 def transferTempToLasts(vessels):
