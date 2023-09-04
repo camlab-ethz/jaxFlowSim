@@ -46,8 +46,8 @@ def simulation_loop(sim_dat, sim_dat_aux):
     passed_cycles = 0
     counter = 0
     timepoints = np.linspace(0, ini.HEART.cardiac_T, ini.JUMP)
-    P_t = jnp.zeros((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
-    P_l = jnp.zeros((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
+    P_t = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
+    P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     dt = 0 
 
     @jax.jit
