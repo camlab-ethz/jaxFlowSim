@@ -48,7 +48,7 @@ def simulation_loop(sim_dat, sim_dat_aux):
     timepoints = np.linspace(0, ini.HEART.cardiac_T, ini.JUMP)
     P_t = jnp.zeros((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     P_l = jnp.zeros((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
-    dt = 0 #calculateDeltaT(sim_dat[0,:], sim_dat[3,:])
+    dt = 0 
 
     @jax.jit
     def cond_fun(args):
