@@ -127,8 +127,8 @@ def solveVessel(i,u0, u1, Q, A, c0, c1, U00Q, U00A, UM1Q, UM1A, dt, t):
 def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     #v = ini.VCS[i]
     M = ini.VCS[i].M
-    vA = jnp.zeros(M+2, dtype=jnp.float64)
-    vQ = jnp.zeros(M+2, dtype=jnp.float64)
+    vA = jnp.empty(M+2, dtype=jnp.float64)
+    vQ = jnp.empty(M+2, dtype=jnp.float64)
     vA = vA.at[0].set(U00A)
     vA = vA.at[-1].set(UM1A)
 
@@ -157,11 +157,11 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     
     invDxDt = one / jnp.float64(dxDt)
 
-    flux = jnp.zeros((2,M+2), dtype=jnp.float64)
+    flux = jnp.empty((2,M+2), dtype=jnp.float64)
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
     flux = flux.at[1,0:M+1].set(0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1])))
 
-    uStar = jnp.zeros((2,M+2), dtype=jnp.float64)
+    uStar = jnp.empty((2,M+2), dtype=jnp.float64)
     uStar = uStar.at[0,1:M+1].set(vA[1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1]))
     uStar = uStar.at[1,1:M+1].set(vQ[1:M+1] + invDxDt * (flux[1, 0:M] - flux[1, 1:M+1]))
 
@@ -181,11 +181,10 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql)
     Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr)
 
-    flux = jnp.zeros((2,M+2), dtype=jnp.float64)
+    flux = jnp.empty((2,M+2), dtype=jnp.float64)
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
     flux = flux.at[1,0:M+1].set(0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1])))
 
-    #jax.debug.breakpoint()
     A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1])))
     Q = Q.at[0:M].set(0.5*(Q[0:M] + uStar[1,1:M+1] + invDxDt * (flux[1, 0:M] - flux[1, 1:M+1])))
 
@@ -215,7 +214,7 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
 
 @jax.jit
 def computeFlux(gamma_ghost, A, Q):
-    Flux = jnp.zeros((2,A.size), dtype=jnp.float64)
+    Flux = jnp.empty((2,A.size), dtype=jnp.float64)
     Flux = Flux.at[0,:].set(Q)
     Flux = Flux.at[1,:].set(Q * Q / A + gamma_ghost * A * jnp.sqrt(A))
 
@@ -238,7 +237,7 @@ def superBee(dU):
 
 @jax.jit
 def computeLimiter(U, invDx):
-    dU = jnp.zeros((2, U.size), dtype=jnp.float64)
+    dU = jnp.empty((2, U.size), dtype=jnp.float64)
     dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
@@ -247,7 +246,7 @@ def computeLimiter(U, invDx):
 @jax.jit
 def computeLimiterIdx(U, idx, invDx):
     U = U[idx, :]
-    dU = jnp.zeros((2, U.size), dtype=jnp.float64)
+    dU = jnp.empty((2, U.size), dtype=jnp.float64)
     dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
