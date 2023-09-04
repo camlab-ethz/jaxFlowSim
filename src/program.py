@@ -42,7 +42,6 @@ def runSimulation_opt(input_filename, verbose=False):
     #writeResults(vessels)
 
 def simulation_loop(sim_dat, sim_dat_aux):
-    jax.checking_leaks()
     current_time = 0.0
     passed_cycles = 0
     counter = 0
@@ -53,15 +52,15 @@ def simulation_loop(sim_dat, sim_dat_aux):
 
     @jax.jit
     def cond_fun(args):
-        sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt, P_t, P_l = args
+        _, _, current_time, _, _, passed_cycles, dt, P_t, P_l = args
         err = computeConvError(P_t, P_l)
-        def fun1():
+        def printConvErrorWrapper():
             printConvError(err)
             return False
         ret = jax.lax.cond((passed_cycles + 1 > 1)*(checkConvergence(err))*
                            ((current_time - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
                             (current_time - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
-                            fun1,
+                            printConvErrorWrapper,
                             lambda: True)
         return ret
 
