@@ -240,36 +240,36 @@ def buildArterialNetwork(network):
     global NUM_VESSELS
     NUM_VESSELS = len(vessels)
     global MESH_SIZES
-    MESH_SIZES = jnp.zeros(len(vessels))
-    sim_dat = jnp.zeros((5, MESH_SIZE_TOT))
-    sim_dat_aux = jnp.zeros((10, NUM_VESSELS))
+    MESH_SIZES = np.zeros(len(vessels)+1,dtype=np.int32)
+    sim_dat = jnp.zeros((5, MESH_SIZE_TOT), dtype=jnp.float64)
+    sim_dat_aux = jnp.zeros((10, NUM_VESSELS), dtype=jnp.float64)
     
     
     mesh_count = 0
 
     for i in range(len(vessels)):
         new_mesh_count = mesh_count + vessels_const[i].M
-        MESH_SIZES = MESH_SIZES.at[i].set(MESH_SIZES[i-1] + vessels_const[i].M)
+        MESH_SIZES[i+1] = new_mesh_count
 
         sim_dat = sim_dat.at[0,mesh_count:new_mesh_count].set(vessels[i].u)
         sim_dat = sim_dat.at[1,mesh_count:new_mesh_count].set(vessels[i].Q)
         sim_dat = sim_dat.at[2,mesh_count:new_mesh_count].set(vessels[i].A)
         sim_dat = sim_dat.at[3,mesh_count:new_mesh_count].set(vessels[i].c)
         sim_dat = sim_dat.at[4,mesh_count:new_mesh_count].set(vessels[i].P)
-        sim_dat_aux = sim_dat_aux.at[0:mesh_count].set(vessels[i].W1M0)
-        sim_dat_aux = sim_dat_aux.at[1:mesh_count].set(vessels[i].W2M0)
-        sim_dat_aux = sim_dat_aux.at[2:mesh_count].set(vessels[i].U00A)
-        sim_dat_aux = sim_dat_aux.at[3:mesh_count].set(vessels[i].U00Q)
-        sim_dat_aux = sim_dat_aux.at[4:mesh_count].set(vessels[i].U01A)
-        sim_dat_aux = sim_dat_aux.at[5:mesh_count].set(vessels[i].U01Q)
-        sim_dat_aux = sim_dat_aux.at[6:mesh_count].set(vessels[i].UM1A)
-        sim_dat_aux = sim_dat_aux.at[7:mesh_count].set(vessels[i].UM1Q)
-        sim_dat_aux = sim_dat_aux.at[8:mesh_count].set(vessels[i].UM2A)
-        sim_dat_aux = sim_dat_aux.at[9:mesh_count].set(vessels[i].UM2Q)
+        sim_dat_aux = sim_dat_aux.at[0,i].set(vessels[i].W1M0)
+        sim_dat_aux = sim_dat_aux.at[1,i].set(vessels[i].W2M0)
+        sim_dat_aux = sim_dat_aux.at[2,i].set(vessels[i].U00Q)
+        sim_dat_aux = sim_dat_aux.at[3,i].set(vessels[i].U00A)
+        sim_dat_aux = sim_dat_aux.at[4,i].set(vessels[i].U01Q)
+        sim_dat_aux = sim_dat_aux.at[5,i].set(vessels[i].U01A)
+        sim_dat_aux = sim_dat_aux.at[6,i].set(vessels[i].UM1Q)
+        sim_dat_aux = sim_dat_aux.at[7,i].set(vessels[i].UM1A)
+        sim_dat_aux = sim_dat_aux.at[8,i].set(vessels[i].UM2Q)
+        sim_dat_aux = sim_dat_aux.at[9,i].set(vessels[i].UM2A)
 
         mesh_count = new_mesh_count
 
-    return vessels
+    return vessels, sim_dat, sim_dat_aux
 
 
 def buildVessel(ID, vessel_data, blood, jump):
@@ -293,16 +293,16 @@ def buildVessel(ID, vessel_data, blood, jump):
     A = jnp.zeros(M, dtype=jnp.float64)
     u = jnp.zeros(M, dtype=jnp.float64)
     c = jnp.zeros(M, dtype=jnp.float64)
-    A0 = jnp.zeros(M, dtype=jnp.float64)
-    R0 = jnp.zeros(M, dtype=jnp.float64)
-    s_A0 = jnp.zeros(M, dtype=jnp.float64)
-    beta = jnp.zeros(M, dtype=jnp.float64)
+    A0 = np.zeros(M, dtype=jnp.float64)
+    R0 = np.zeros(M, dtype=jnp.float64)
+    s_A0 = np.zeros(M, dtype=jnp.float64)
+    beta = np.zeros(M, dtype=jnp.float64)
     wallE = np.zeros(M, dtype=jnp.float64)
-    gamma = jnp.zeros(M, dtype=jnp.float64)
+    gamma = np.zeros(M, dtype=jnp.float64)
     wallVa = np.zeros(M, dtype=jnp.float64)
     wallVb = np.zeros(M, dtype=jnp.float64)
-    inv_A0 = jnp.zeros(M, dtype=jnp.float64)
-    s_inv_A0 = jnp.zeros(M, dtype=jnp.float64)
+    inv_A0 = np.zeros(M, dtype=jnp.float64)
+    s_inv_A0 = np.zeros(M, dtype=jnp.float64)
     #Q_t = jnp.zeros((jump, 6), dtype=jnp.float64)
     P_t = jnp.zeros((jump, 6), dtype=jnp.float64)
     #A_t = jnp.zeros((jump, 6), dtype=jnp.float64)
@@ -313,10 +313,10 @@ def buildVessel(ID, vessel_data, blood, jump):
     #A_l = jnp.zeros((jump, 6), dtype=jnp.float64)
     #u_l = jnp.zeros((jump, 6), dtype=jnp.float64)
     #c_l = jnp.zeros((jump, 6), dtype=jnp.float64)
-    s_15_gamma = jnp.zeros(M, dtype=jnp.float64)
-    gamma_ghost = jnp.zeros(M + 2, dtype=jnp.float64)
+    s_15_gamma = np.zeros(M, dtype=jnp.float64)
+    gamma_ghost = np.zeros(M + 2, dtype=jnp.float64)
 
-    s_pi = jnp.sqrt(jnp.pi)
+    s_pi = np.sqrt(np.pi)
     s_pi_E_over_sigma_squared = s_pi * E / 0.75
     one_over_rho_s_p = 1.0 / (3.0 * blood.rho * s_pi)
     radius_slope = computeRadiusSlope(Rp, Rd, L)
@@ -333,16 +333,16 @@ def buildVessel(ID, vessel_data, blood, jump):
     Cv = 0.5 * s_pi * phi * h0 / (blood.rho * 0.75)
 
     for i in range(0,M):
-        R0 = R0.at[i].set(radius_slope * i * dx + Rp)
-        A0 = A0.at[i].set(jnp.pi * R0[i] * R0[i])
-        s_A0 = s_A0.at[i].set(jnp.sqrt(A0[i]))
-        inv_A0 = inv_A0.at[i].set(1.0 / A0[i])
-        s_inv_A0 = s_inv_A0.at[i].set(jnp.sqrt(inv_A0[i]))
+        R0[i] = radius_slope * i * dx + Rp
+        A0[i] = np.pi * R0[i] * R0[i]
+        s_A0[i] = np.sqrt(A0[i])
+        inv_A0[i] = 1.0 / A0[i]
+        s_inv_A0[i] = np.sqrt(inv_A0[i])
         A = A.at[i].set(A0[i])
-        beta = beta.at[i].set(s_inv_A0[i] * h0 * s_pi_E_over_sigma_squared)
-        gamma = gamma.at[i].set(beta[i] * one_over_rho_s_p / R0[i])
-        s_15_gamma = s_15_gamma.at[i].set(jnp.sqrt(1.5 * gamma[i]))
-        gamma_ghost = gamma_ghost.at[i+1].set(gamma[i])
+        beta[i] = s_inv_A0[i] * h0 * s_pi_E_over_sigma_squared
+        gamma[i] = beta[i] * one_over_rho_s_p / R0[i]
+        s_15_gamma[i] = np.sqrt(1.5 * gamma[i])
+        gamma_ghost[i+1] = gamma[i]
         c = c.at[i].set(waveSpeed(A[i], gamma[i]))
         wallE[i] = 3.0 * beta[i] * radius_slope * inv_A0[i] * s_pi * blood.rho_inv
         if phi != 0.0:
@@ -351,8 +351,8 @@ def buildVessel(ID, vessel_data, blood, jump):
     P = P.at[0:M].set(pressureSA(jnp.ones(M,jnp.float64), beta, Pext))
     
 
-    gamma_ghost = gamma_ghost.at[0].set(gamma[0])
-    gamma_ghost = gamma_ghost.at[-1].set(gamma[-1])
+    gamma_ghost[0] = gamma[0]
+    gamma_ghost[-1] = gamma[-1]
 
     if outlet == "wk2":
         R1, R2 = computeWindkesselInletImpedance(R2, blood, A0, gamma)

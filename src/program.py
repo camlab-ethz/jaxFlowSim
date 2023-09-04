@@ -19,7 +19,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     ini.JUMP =  data["solver"]["jump"]
 
-    vessels = buildArterialNetwork(data["network"])
+    vessels, sim_dat, sim_dat_aux = buildArterialNetwork(data["network"])
     makeResultsFolder(data, input_filename)
 
     buildConst(float(data["solver"]["Ccfl"]), data["solver"]["cycles"], data["solver"]["convergence tolerance"])
@@ -31,25 +31,26 @@ def runSimulation_opt(input_filename, verbose=False):
         print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
 
-    simulation_loop(vessels)
+    simulation_loop(vessels, sim_dat, sim_dat_aux)
 
     if verbose:
         print("\n")
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"Elapsed time = {ending_time} seconds")
 
-    writeResults(vessels)
+    #writeResults(vessels)
 
-def simulation_loop(vessels):
+def simulation_loop(vessels, sim_dat, sim_dat_aux):
+    jax.checking_leaks()
     current_time = 0.0
     passed_cycles = 0
     counter = 0
     timepoints = np.linspace(0, ini.HEART.cardiac_T, ini.JUMP)
-    dt = calculateDeltaT(vessels)
+    dt = 0 #calculateDeltaT(sim_dat[0,:], sim_dat[3,:])
 
     @jax.jit
     def cond_fun(args):
-        vessels, current_time, counter, timepoints, passed_cycles, dt = args
+        vessels, sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt = args
         err = computeConvError(vessels)
         def fun1():
             printConvError(err)
@@ -63,15 +64,37 @@ def simulation_loop(vessels):
 
     @jax.jit
     def body_fun(args):
-        vessels, current_time, counter, timepoints, passed_cycles, dt = args
-        dt = calculateDeltaT(vessels)
+        vessels, sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt = args
+        dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:])
         #jax.debug.breakpoint()
-        vessels = solveModel(vessels, dt, current_time)
+        vessels = solveModel(vessels, sim_dat, sim_dat_aux, dt, current_time)
+        #for i in range(len(vessels)):
+        #    vessels[i].u = sim_dat[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+        #    vessels[i].Q = sim_dat[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+        #    vessels[i].A = sim_dat[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+        #    vessels[i].c = sim_dat[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+        #    vessels[i].P = sim_dat[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
         #jax.debug.breakpoint()
         vessels = updateGhostCells(vessels)
         #jax.debug.breakpoint()
+        for i in range(len(vessels)):
+            sim_dat = sim_dat.at[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].u)
+            sim_dat = sim_dat.at[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].Q)
+            sim_dat = sim_dat.at[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].A)
+            sim_dat = sim_dat.at[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].c)
+            sim_dat = sim_dat.at[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].P)
+            sim_dat_aux = sim_dat_aux.at[0,i].set(vessels[i].W1M0)
+            sim_dat_aux = sim_dat_aux.at[1,i].set(vessels[i].W2M0)
+            sim_dat_aux = sim_dat_aux.at[2,i].set(vessels[i].U00Q)
+            sim_dat_aux = sim_dat_aux.at[3,i].set(vessels[i].U00A)
+            sim_dat_aux = sim_dat_aux.at[4,i].set(vessels[i].U01Q)
+            sim_dat_aux = sim_dat_aux.at[5,i].set(vessels[i].U01A)
+            sim_dat_aux = sim_dat_aux.at[6,i].set(vessels[i].UM1Q)
+            sim_dat_aux = sim_dat_aux.at[7,i].set(vessels[i].UM1A)
+            sim_dat_aux = sim_dat_aux.at[8,i].set(vessels[i].UM2Q)
+            sim_dat_aux = sim_dat_aux.at[9,i].set(vessels[i].UM2A)
 
-        
+
         (vessels,counter) = jax.lax.cond(current_time >= timepoints[counter], 
                                          lambda: (saveTempDatas(current_time,vessels,counter),counter+1), 
                                          lambda: (vessels,counter))
@@ -97,10 +120,10 @@ def simulation_loop(vessels):
                                          lambda: (passed_cycles+1), 
                                          lambda: (passed_cycles))
 
-        return vessels, current_time, counter, timepoints, passed_cycles, dt
+        return vessels, sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt
 
 
-    jax.lax.while_loop(cond_fun, body_fun, (vessels,current_time,counter,timepoints,passed_cycles,dt))
+    jax.lax.while_loop(cond_fun, body_fun, (vessels, sim_dat, sim_dat_aux, current_time,counter,timepoints,passed_cycles,dt))
     
     return current_time
     

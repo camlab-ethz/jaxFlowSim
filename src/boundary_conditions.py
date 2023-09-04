@@ -7,15 +7,16 @@ import src.initialise as ini
 
 #@jax.jit
 @partial(jax.jit, static_argnums=0)
-def setInletBC(i, t, dt, v):
+def setInletBC(i, u0, u1, A0, c0, c1, t, dt):
     h = ini.VCS[i].heart
-
+    Q0 = 0
+    P0 = 0
     if h.inlet_type == "Q":
-        v.Q = v.Q.at[0].set(inputFromData(t, h))
+        Q0 = inputFromData(t, h)
     else:
-        v.P = v.P.at[0].set(inputFromData(t, h))
+        P0 = inputFromData(t, h)
 
-    return inletCompatibility(i, dt, v, h)
+    return inletCompatibility(i, h, u0, u1, Q0, A0, c0, c1, P0, dt)
 
 @partial(jax.jit, static_argnums=1)
 def inputFromData(t, h):
@@ -35,28 +36,34 @@ def inputFromData(t, h):
     return qu
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0,3,))
-def inletCompatibility(i, dt, v, h):
-    W11, W21 = riemannInvariants(0, v)
-    W12, W22 = riemannInvariants(1, v)
+@partial(jax.jit, static_argnums=(0,1,))
+def inletCompatibility(i, h, u0, u1, Q0, A0, c0, c1, P0, dt):
+    W11, W21 = riemannInvariants(u0, c0)
+    W12, W22 = riemannInvariants(u1, c1)
 
-    W11 += (W12 - W11) * (v.c[0] - v.u[0]) * dt * ini.VCS[i].invDx
-    W21 = 2.0 * v.Q[0] / v.A[0] - W11
+    W11 += (W12 - W11) * (c0 - u0) * dt * ini.VCS[i].invDx
+    W21 = 2.0 * Q0 / A0 - W11
 
-    v.u = v.u.at[0].set(inverseRiemannInvariants(W11, W21)[0])
-    v.c = v.c.at[0].set(inverseRiemannInvariants(W11, W21)[1])
+    u0, c0 = inverseRiemannInvariants(W11, W21)
 
     if h.inlet_type == "Q":
-        v.A = v.A.at[0].set(v.Q[0] / v.u[0])
-        v.P = v.P.at[0].set(pressure(v.A[0], ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext))
+        A0 = Q0 / u0
+        P0 = pressure(A0, ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext)
     else:
-        v.A = v.A.at[0].set(areaFromPressure(v.P[0], ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext))
-        v.Q = v.Q.at[0].set(v.u[0] * v.A[0])
+        A0 = areaFromPressure(P0, ini.VCS[i].A0[0], ini.VCS[i].beta[0], ini.VCS[i].Pext)
+        Q0 = u0 * A0
 
-    return v
+    return Q0, A0
 
 @jax.jit
-def riemannInvariants(i, v):
+def riemannInvariants(u, c):
+    W1 = u - 4.0 * c
+    W2 = u + 4.0 * c
+
+    return W1, W2
+
+@jax.jit
+def riemannInvariants_old(i, v):
     W1 = v.u[i] - 4.0 * v.c[i]
     W2 = v.u[i] + 4.0 * v.c[i]
 
@@ -87,8 +94,8 @@ def setOutletBC(dt, v, i):
 #@jax.jit
 @partial(jax.jit, static_argnums=2)
 def outletCompatibility(dt, v, i):
-    W1M1, W2M1 = riemannInvariants(ini.VCS[i].M - 2, v)
-    W1M, W2M = riemannInvariants(ini.VCS[i].M-1, v)
+    W1M1, W2M1 = riemannInvariants_old(ini.VCS[i].M - 2, v)
+    W1M, W2M = riemannInvariants_old(ini.VCS[i].M-1, v)
 
     W2M += (W2M1 - W2M) * (v.u[-1] + v.c[-1]) * dt / ini.VCS[i].dx
     W1M = v.W1M0 - ini.VCS[i].Rt * (W2M - v.W2M0)

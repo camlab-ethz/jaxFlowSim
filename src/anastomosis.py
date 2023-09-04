@@ -8,30 +8,30 @@ import jax
 
 
 #@jit
-@partial(jit, static_argnums=(3,4,5,))
-def solveAnastomosis(v1, v2, v3, l, m, n):
-    U0 = jnp.array([v1.u[-1],
-                    v2.u[-1],
-                    v3.u[0],
-                    jnp.sqrt(jnp.sqrt(v1.A[-1])),
-                    jnp.sqrt(jnp.sqrt(v2.A[-1])),
-                    jnp.sqrt(jnp.sqrt(v3.A[0]))])
+@partial(jit, static_argnums=(6,7,8,))
+def solveAnastomosis(u1, u2, u3, A1, A2, A3, l, m, n):
+    U0 = jnp.array((u1,
+                    u2,
+                    u3,
+                    jnp.sqrt(jnp.sqrt(A1)),
+                    jnp.sqrt(jnp.sqrt(A2)),
+                    jnp.sqrt(jnp.sqrt(A3))), dtype=jnp.float64)
 
     k1 = ini.VCS[l].s_15_gamma[-1]
     k2 = ini.VCS[m].s_15_gamma[-1]
     k3 = ini.VCS[n].s_15_gamma[0]
-    k = jnp.array([k1, k2, k3])
+    k = jnp.array([k1, k2, k3], dtype=jnp.float64)
 
-    J = calculateJacobianAnastomosis(v1, v2, v3, U0, k, (l, m, n))
-    U = newtonRaphson([v1, v2, v3], J, U0, k, calculateWstarAnastomosis, calculateFAnastomosis, (l,m,n))[0]
+    J = calculateJacobianAnastomosis(U0, k, (l, m, n))
+    U = newtonRaphson(J, U0, k, calculateWstarAnastomosis, calculateFAnastomosis, (l,m,n))[0]
         
     #jax.debug.breakpoint()
 
-    return updateAnastomosis(U, v1, v2, v3, l, m, n)
+    return updateAnastomosis(U, l, m, n)
 
 #@jit
-@partial(jit, static_argnums=(5,))
-def calculateJacobianAnastomosis(v1, v2, v3, U, k, indices):
+@partial(jit, static_argnums=(2,))
+def calculateJacobianAnastomosis(U, k, indices):
     l, m, n = indices
     U43 = U[3]**3
     U53 = U[4]**3
@@ -59,7 +59,7 @@ def calculateJacobianAnastomosis(v1, v2, v3, U, k, indices):
                       [0.0, 0.0, 1.0, 0.0, 0.0, J36],
                       [J41, J42, J43, J44, J45, J46],
                       [0.0, 0.0, 0.0, J54, 0.0, J56],
-                      [0.0, 0.0, 0.0, 0.0, J65, J66]])
+                      [0.0, 0.0, 0.0, 0.0, J65, J66]], dtype=jnp.float64)
 
 @jit
 def calculateWstarAnastomosis(U, k):
@@ -67,15 +67,12 @@ def calculateWstarAnastomosis(U, k):
     W2 = U[1] + 4 * k[1] * U[4]
     W3 = U[2] - 4 * k[2] * U[5]
 
-    return jnp.array([W1, W2, W3])
+    return jnp.array([W1, W2, W3], dtype=jnp.float64)
 
 #@jit
-@partial(jit, static_argnums=(4,))
-def calculateFAnastomosis(vessels, U, k, W, indices):
+@partial(jit, static_argnums=(3,))
+def calculateFAnastomosis(U, k, W, indices):
     l, m, n = indices
-    v1 = vessels[0]
-    v2 = vessels[1]
-    v3 = vessels[2]
 
     U42 = U[3]**2
     U52 = U[4]**2
@@ -89,30 +86,29 @@ def calculateFAnastomosis(vessels, U, k, W, indices):
     f5 = ini.VCS[l].beta[-1] * (U42 * ini.VCS[l].s_inv_A0[-1] - 1.0) - (ini.VCS[n].beta[0] * (U62 * ini.VCS[n].s_inv_A0[0] - 1.0))
     f6 = ini.VCS[m].beta[0] * (U52 * ini.VCS[m].s_inv_A0[-1] - 1.0) - (ini.VCS[n].beta[0] * (U62 * ini.VCS[n].s_inv_A0[0] - 1.0))
 
-    return jnp.array([f1, f2, f3, f4, f5, f6])
+    return jnp.array([f1, f2, f3, f4, f5, f6], dtype=jnp.float64)
 
 #@jit
-@partial(jit, static_argnums=(4,5,6))
-def updateAnastomosis(U, v1, v2, v3, l, m, n):
-    v1.u = v1.u.at[-1].set(U[0])
-    v2.u = v2.u.at[-1].set(U[1])
-    v3.u = v3.u.at[0].set(U[2])
+@partial(jit, static_argnums=(1,2,3))
+def updateAnastomosis(U, l, m, n):
+    u1 = U[0]
+    u2 = U[1]
+    u3 = U[2]
 
-    v1.A = v1.A.at[-1].set(U[3]**4)
-    v2.A = v2.A.at[-1].set(U[4]**4)
-    v3.A = v3.A.at[0].set(U[5]**4)
+    A1 = U[3]**4
+    A2 = U[4]**4
+    A3 = U[5]**4
 
-    v1.Q = v1.Q.at[-1].set(v1.u[-1] * v1.A[-1])
-    v2.Q = v2.Q.at[-1].set(v2.u[-1] * v2.A[-1])
-    v3.Q = v3.Q.at[0].set(v3.u[0] * v3.A[0])
+    Q1 = u1 * A1
+    Q2 = u2 * A2
+    Q3 = u3 * A3
 
-    v1.P = v1.P.at[-1].set(pressure(v1.A[-1], ini.VCS[l].A0[-1], ini.VCS[l].beta[-1], ini.VCS[l].Pext))
-    v2.P = v2.P.at[-1].set(pressure(v2.A[-1], ini.VCS[m].A0[-1], ini.VCS[m].beta[-1], ini.VCS[m].Pext))
-    v3.P = v3.P.at[0].set(pressure(v3.A[0], ini.VCS[n].A0[0], ini.VCS[n].beta[0], ini.VCS[n].Pext))
+    c1 = waveSpeed(A1, ini.VCS[l].gamma[-1])
+    c2 = waveSpeed(A2, ini.VCS[m].gamma[-1])
+    c3 = waveSpeed(A3, ini.VCS[n].gamma[0])
 
-    v1.c = v1.c.at[-1].set(waveSpeed(v1.A[-1], ini.VCS[l].gamma[-1]))
-    v2.c = v2.c.at[-1].set(waveSpeed(v2.A[-1], ini.VCS[m].gamma[-1]))
-    v3.c = v3.c.at[0].set(waveSpeed(v3.A[0], ini.VCS[n].gamma[0]))
+    P1 = pressure(A1, ini.VCS[l].A0[-1], ini.VCS[l].beta[-1], ini.VCS[l].Pext)
+    P2 = pressure(A2, ini.VCS[m].A0[-1], ini.VCS[m].beta[-1], ini.VCS[m].Pext)
+    P3 = pressure(A3, ini.VCS[n].A0[0], ini.VCS[n].beta[0], ini.VCS[n].Pext)
 
-    #jax.debug.breakpoint()
-    return v1, v2, v3
+    return u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3
