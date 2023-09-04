@@ -81,30 +81,30 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 #@jax.jit
-@partial(jax.jit, static_argnums=2)
-def setOutletBC(dt, v, i):
+@partial(jax.jit, static_argnums=0)
+def setOutletBC(i, u1, u2, A1, c1, c2, P2, P3, W1M0, W2M0, dt):
     if ini.VCS[i].outlet == "reflection":
-        v.P = v.P.at[-1].set(2.0 * v.P[-2] - v.P[-3])
-        v = outletCompatibility(dt, v, i)
+        P1 = 2.0 * P2 - P3
+        return outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt), P1
     elif ini.VCS[i].outlet == "wk3":
         v = threeElementWindkessel(dt, v)
 
     return v
 
 #@jax.jit
-@partial(jax.jit, static_argnums=2)
-def outletCompatibility(dt, v, i):
-    W1M1, W2M1 = riemannInvariants_old(ini.VCS[i].M - 2, v)
-    W1M, W2M = riemannInvariants_old(ini.VCS[i].M-1, v)
+@partial(jax.jit, static_argnums=0)
+def outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt):
+    W1M1, W2M1 = riemannInvariants(u2, c2)
+    W1M, W2M = riemannInvariants(u1, c1)
 
-    W2M += (W2M1 - W2M) * (v.u[-1] + v.c[-1]) * dt / ini.VCS[i].dx
-    W1M = v.W1M0 - ini.VCS[i].Rt * (W2M - v.W2M0)
+    W2M += (W2M1 - W2M) * (u1 + c1) * dt / ini.VCS[i].dx
+    W1M = W1M0 - ini.VCS[i].Rt * (W2M - W2M0)
 
-    v.u = v.u.at[-1].set(inverseRiemannInvariants(W1M, W2M)[0])
-    v.c = v.c.at[-1].set(inverseRiemannInvariants(W1M, W2M)[1])
-    v.Q = v.Q.at[-1].set(v.A[-1] * v.u[-1])
+    u1, c1 = inverseRiemannInvariants(W1M, W2M)
+    Q1 = A1 * u1
+    #jax.debug.breakpoint()
 
-    return v
+    return u1, Q1, c1
 
 @jax.jit
 def threeElementWindkessel(dt, v):
@@ -158,19 +158,42 @@ def newtonSolver(f, df, x0):
     return temp[1]
 
 @jax.jit
-def updateGhostCell(v):
-    v.U00A = v.A[0]
-    v.U00Q = v.Q[0]
-    v.U01A = v.A[1]
-    v.U01Q = v.Q[1]
+def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
+    U00Q = Q0
+    U00A = A0
+    U01Q = Q1
+    U01A = A1
+    UM1Q = QM1
+    UM1A = AM1
+    UM2Q = QM2
+    UM2A = AM2
 
-    v.UM1A = v.A[-1]
-    v.UM1Q = v.Q[-1]
-    v.UM2A = v.A[-2]
-    v.UM2Q = v.Q[-2]
-
-    return v
+    return U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A
 
 @jax.jit
-def updateGhostCells(vessels):
-    return [updateGhostCell(vessel) for vessel in vessels]
+def updateGhostCells(sim_dat):
+    sim_dat_aux_temp = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
+    for i in range(ini.NUM_VESSELS):
+        start = ini.MESH_SIZES[i]
+        end = ini.MESH_SIZES[i+1]
+        Q0 = sim_dat[1,start]
+        Q1 = sim_dat[1,start+1]
+        QM1 = sim_dat[1,end-1]
+        QM2 = sim_dat[1,end-2]
+        A0 = sim_dat[2,start]
+        A1 = sim_dat[2,start+1]
+        AM1 = sim_dat[2,end-1]
+        AM2 = sim_dat[2,end-2]
+
+        U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[0,i].set(U00Q)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[1,i].set(U00A)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[2,i].set(U01Q)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[3,i].set(U01A)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[4,i].set(UM1Q)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[5,i].set(UM1A)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[6,i].set(UM2Q)
+        sim_dat_aux_temp = sim_dat_aux_temp.at[7,i].set(UM2A)
+        
+    return sim_dat_aux_temp
+    #return [updateGhostCell(vessel) for vessel in vessels]

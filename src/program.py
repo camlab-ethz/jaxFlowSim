@@ -67,32 +67,37 @@ def simulation_loop(vessels, sim_dat, sim_dat_aux):
         vessels, sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt = args
         dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:])
         #jax.debug.breakpoint()
-        vessels = solveModel(vessels, sim_dat, sim_dat_aux, dt, current_time)
-        #for i in range(len(vessels)):
-        #    vessels[i].u = sim_dat[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #    vessels[i].Q = sim_dat[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #    vessels[i].A = sim_dat[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #    vessels[i].c = sim_dat[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #    vessels[i].P = sim_dat[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #jax.debug.breakpoint()
-        vessels = updateGhostCells(vessels)
-        #jax.debug.breakpoint()
+        sim_dat = solveModel(sim_dat, sim_dat_aux, dt, current_time)
         for i in range(len(vessels)):
-            sim_dat = sim_dat.at[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].u)
-            sim_dat = sim_dat.at[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].Q)
-            sim_dat = sim_dat.at[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].A)
-            sim_dat = sim_dat.at[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].c)
-            sim_dat = sim_dat.at[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].P)
-            sim_dat_aux = sim_dat_aux.at[0,i].set(vessels[i].W1M0)
-            sim_dat_aux = sim_dat_aux.at[1,i].set(vessels[i].W2M0)
-            sim_dat_aux = sim_dat_aux.at[2,i].set(vessels[i].U00Q)
-            sim_dat_aux = sim_dat_aux.at[3,i].set(vessels[i].U00A)
-            sim_dat_aux = sim_dat_aux.at[4,i].set(vessels[i].U01Q)
-            sim_dat_aux = sim_dat_aux.at[5,i].set(vessels[i].U01A)
-            sim_dat_aux = sim_dat_aux.at[6,i].set(vessels[i].UM1Q)
-            sim_dat_aux = sim_dat_aux.at[7,i].set(vessels[i].UM1A)
-            sim_dat_aux = sim_dat_aux.at[8,i].set(vessels[i].UM2Q)
-            sim_dat_aux = sim_dat_aux.at[9,i].set(vessels[i].UM2A)
+            vessels[i].u = sim_dat[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+            vessels[i].Q = sim_dat[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+            vessels[i].A = sim_dat[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+            vessels[i].c = sim_dat[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+            vessels[i].P = sim_dat[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
+        #jax.debug.breakpoint()
+        sim_dat_aux = sim_dat_aux.at[2:,:].set(updateGhostCells(sim_dat))
+        #jax.debug.breakpoint()
+        #for i in range(len(vessels)):
+            #vessels[i].W1M0 = sim_dat_aux[0,i]
+            #vessels[i].W2M0 = sim_dat_aux[1,i]
+            #vessels[i].U00Q = sim_dat_aux[2,i]
+            #vessels[i].U00A = sim_dat_aux[3,i]
+            #vessels[i].U01Q = sim_dat_aux[4,i]
+            #vessels[i].U01A = sim_dat_aux[5,i]
+            #vessels[i].UM1Q = sim_dat_aux[6,i]
+            #vessels[i].UM1A = sim_dat_aux[7,i]
+            #vessels[i].UM2Q = sim_dat_aux[8,i]
+            #vessels[i].UM2A = sim_dat_aux[9,i]
+            #sim_dat_aux = sim_dat_aux.at[0,i].set(vessels[i].W1M0)
+            #sim_dat_aux = sim_dat_aux.at[1,i].set(vessels[i].W2M0)
+            #sim_dat_aux = sim_dat_aux.at[2,i].set(vessels[i].U00Q)
+            #sim_dat_aux = sim_dat_aux.at[3,i].set(vessels[i].U00A)
+            #sim_dat_aux = sim_dat_aux.at[4,i].set(vessels[i].U01Q)
+            #sim_dat_aux = sim_dat_aux.at[5,i].set(vessels[i].U01A)
+            #sim_dat_aux = sim_dat_aux.at[6,i].set(vessels[i].UM1Q)
+            #sim_dat_aux = sim_dat_aux.at[7,i].set(vessels[i].UM1A)
+            #sim_dat_aux = sim_dat_aux.at[8,i].set(vessels[i].UM2Q)
+            #sim_dat_aux = sim_dat_aux.at[9,i].set(vessels[i].UM2A)
 
 
         (vessels,counter) = jax.lax.cond(current_time >= timepoints[counter], 

@@ -51,7 +51,7 @@ def calculateDeltaT(u, c):
 
 #@partial(jax.jit, static_argnums=1)
 @jax.jit
-def solveModel(vessels, sim_dat, sim_dat_aux, dt, t):
+def solveModel(sim_dat, sim_dat_aux, dt, t):
     for j in np.arange(0,ini.EDGES.edges.shape[0],1):
         i = ini.EDGES.edges[j,0]-1
         start = ini.MESH_SIZES[i]
@@ -80,33 +80,31 @@ def solveModel(vessels, sim_dat, sim_dat_aux, dt, t):
         #jax.debug.breakpoint()
 
 
-        vessels[i].u = sim_dat[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        vessels[i].Q = sim_dat[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        vessels[i].A = sim_dat[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        vessels[i].c = sim_dat[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        vessels[i].P = sim_dat[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
-        #sim_dat = sim_dat.at[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].u)
-        #sim_dat = sim_dat.at[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].Q)
-        #sim_dat = sim_dat.at[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].A)
-        #sim_dat = sim_dat.at[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].c)
-        #sim_dat = sim_dat.at[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].P)
         if ini.VCS[i].outlet != "none":
-            vessels[i] = setOutletBC(dt, vessels[i], i)
-            #sim_dat = sim_dat.at[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].u)
-            #sim_dat = sim_dat.at[1,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].Q)
-            #sim_dat = sim_dat.at[2,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].A)
-            #sim_dat = sim_dat.at[3,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].c)
-            #sim_dat = sim_dat.at[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]].set(vessels[i].P)
+            u1 = sim_dat[0,end-1]
+            u2 = sim_dat[0,end-2]
+            A1 = sim_dat[2,end-1]
+            c1 = sim_dat[3,end-1]
+            c2 = sim_dat[3,end-2]
+            P2 = sim_dat[4,end-2]
+            P3 = sim_dat[4,end-3]
+            W1M0 = sim_dat_aux[0,i]
+            W2M0 = sim_dat_aux[1,i]
+            uQc, P1 = setOutletBC(i, u1, u2, A1, c1, c2, P2, P3, W1M0, W2M0, dt)
+            sim_dat = sim_dat.at[0,end-1].set(uQc[0])
+            sim_dat = sim_dat.at[1,end-1].set(uQc[1])
+            sim_dat = sim_dat.at[3,end-1].set(uQc[2])
+            sim_dat = sim_dat.at[4,end-3].set(P1)
 
 
-        elif ini.EDGES.inlets[j,0] == 2:
-            d1_i = ini.EDGES.inlets[j,1]
-            d2_i = ini.EDGES.inlets[j,2]
-            vessels[i], vessels[d1_i], vessels[d2_i] = joinVessels(vessels[i], vessels[d1_i], vessels[d2_i])
+        #elif ini.EDGES.inlets[j,0] == 2:
+        #    d1_i = ini.EDGES.inlets[j,1]
+        #    d2_i = ini.EDGES.inlets[j,2]
+        #    vessels[i], vessels[d1_i], vessels[d2_i] = joinVessels(vessels[i], vessels[d1_i], vessels[d2_i])
 
-        elif ini.EDGES.outlets[j,0] == 1:
-            d_i = ini.EDGES.outlets[j,1]
-            vessels[i], vessels[d_i] = joinVessels(vessels[i], vessels[d_i])
+        #elif ini.EDGES.outlets[j,0] == 1:
+        #    d_i = ini.EDGES.outlets[j,1]
+        #    vessels[i], vessels[d_i] = joinVessels(vessels[i], vessels[d_i])
 
         elif ini.EDGES.outlets[j,0] == 2:
 
@@ -149,21 +147,6 @@ def solveModel(vessels, sim_dat, sim_dat_aux, dt, t):
             sim_dat = sim_dat.at[4,ini.MESH_SIZES[i+1]-1].set(P1)
             sim_dat = sim_dat.at[4,ini.MESH_SIZES[p1_i+1]-1].set(P2)
             sim_dat = sim_dat.at[4,ini.MESH_SIZES[d]].set(P3)
-            vessels[i].u = vessels[i].u.at[-1].set(u1)
-            vessels[p1_i].u = vessels[p1_i].u.at[-1].set(u2)
-            vessels[d].u = vessels[i].u.at[0].set(u3)
-            vessels[i].Q = vessels[i].Q.at[-1].set(Q1)
-            vessels[p1_i].Q = vessels[p1_i].Q.at[-1].set(Q2)
-            vessels[d].Q = vessels[d].Q.at[0].set(Q3)
-            vessels[i].A = vessels[i].A.at[-1].set(A1)
-            vessels[p1_i].A = vessels[p1_i].A.at[-1].set(A2)
-            vessels[d].A = vessels[d].A.at[0].set(A3)
-            vessels[i].c = vessels[i].c.at[-1].set(c1)
-            vessels[p1_i].c = vessels[p1_i].c.at[-1].set(c2)
-            vessels[d].c = vessels[d].c.at[0].set(c3)
-            vessels[i].P = vessels[i].P.at[-1].set(P1)
-            vessels[p1_i].P = vessels[p1_i].P.at[-1].set(P2)
-            vessels[d].P = vessels[d].P.at[0].set(P3)
             #jax.debug.breakpoint()
 
         #vessels[i].u = sim_dat[0,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
@@ -173,7 +156,7 @@ def solveModel(vessels, sim_dat, sim_dat_aux, dt, t):
         #vessels[i].P = sim_dat[4,ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]]
             
     
-    return vessels
+    return sim_dat
 
 
 @partial(jax.jit, static_argnums=0)
