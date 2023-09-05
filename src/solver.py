@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from src.anastomosis import solveAnastomosis
+from src.conjunctions import solveConjunction
 from src.boundary_conditions import setInletBC, setOutletBC
 from src.junctions import joinVessels
 from src.utils import pressureSA, waveSpeedSA
@@ -43,18 +44,24 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         if ini.VCS[i].outlet != "none":
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,end-2]
+            Q1 = sim_dat[1,end-1]
             A1 = sim_dat[2,end-1]
             c1 = sim_dat[3,end-1]
             c2 = sim_dat[3,end-2]
+            P1 = sim_dat[4,end-1]
             P2 = sim_dat[4,end-2]
             P3 = sim_dat[4,end-3]
+            Pc = sim_dat_aux[10,i]
             W1M0 = sim_dat_aux[0,i]
             W2M0 = sim_dat_aux[1,i]
-            uQc, P1 = setOutletBC(i, u1, u2, A1, c1, c2, P2, P3, W1M0, W2M0, dt)
-            sim_dat = sim_dat.at[0,end-1].set(uQc[0])
-            sim_dat = sim_dat.at[1,end-1].set(uQc[1])
-            sim_dat = sim_dat.at[3,end-1].set(uQc[2])
-            sim_dat = sim_dat.at[4,end-3].set(P1)
+            u, Q, A, c, P1, Pc = setOutletBC(i, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt)
+            sim_dat = sim_dat.at[0,end-1].set(u)
+            sim_dat = sim_dat.at[1,end-1].set(Q)
+            sim_dat = sim_dat.at[2,end-1].set(A)
+            sim_dat = sim_dat.at[3,end-1].set(c)
+            sim_dat = sim_dat.at[4,end-1].set(P1)
+            sim_dat_aux = sim_dat_aux.at[10,i].set(Pc)
+
 
 
         #elif ini.EDGES.inlets[j,0] == 2:
@@ -62,53 +69,79 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         #    d2_i = ini.EDGES.inlets[j,2]
         #    vessels[i], vessels[d1_i], vessels[d2_i] = joinVessels(vessels[i], vessels[d1_i], vessels[d2_i])
 
-        #elif ini.EDGES.outlets[j,0] == 1:
-        #    d_i = ini.EDGES.outlets[j,1]
-        #    vessels[i], vessels[d_i] = joinVessels(vessels[i], vessels[d_i])
+        elif ini.EDGES.outlets[j,0] == 1:
+            d_i = ini.EDGES.outlets[j,1]
+            d_i_start = ini.MESH_SIZES[d_i]
+            u1 = sim_dat[0,end-1]
+            u2 = sim_dat[0,d_i_start]
+            Q1 = sim_dat[1,end-1]
+            Q2 = sim_dat[1,d_i_start]
+            A1 = sim_dat[2,end-1]
+            A2 = sim_dat[2,d_i_start]
+            c1 = sim_dat[3,end-1]
+            c2 = sim_dat[3,d_i_start]
+            P1 = sim_dat[4,end-1]
+            P2 = sim_dat[4,d_i_start]
+            u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2, = solveConjunction(i, d_i,
+                                                                        u1, u2, 
+                                                                        A1, A2)
+            sim_dat = sim_dat.at[0,end-1].set(u1)
+            sim_dat = sim_dat.at[0,d_i_start].set(u2)
+            sim_dat = sim_dat.at[1,end-1].set(Q1)
+            sim_dat = sim_dat.at[1,d_i_start].set(Q2)
+            sim_dat = sim_dat.at[2,end-1].set(A1)
+            sim_dat = sim_dat.at[2,d_i_start].set(A2)
+            sim_dat = sim_dat.at[3,end-1].set(c1)
+            sim_dat = sim_dat.at[3,d_i_start].set(c2)
+            sim_dat = sim_dat.at[4,end-1].set(P1)
+            sim_dat = sim_dat.at[4,d_i_start].set(P2)
+            #jax.debug.breakpoint()
 
-        elif ini.EDGES.outlets[j,0] == 2:
-
+        elif ini.EDGES.outlets[j,0] == 2:                                           
             p1_i = ini.EDGES.outlets[j,1]
             p2_i = ini.EDGES.outlets[j,2]
             d = ini.EDGES.outlets[j,3]
-            u1 = sim_dat[0,ini.MESH_SIZES[i+1]-1]
-            u2 = sim_dat[0,ini.MESH_SIZES[p1_i+1]-1]
-            u3 = sim_dat[0,ini.MESH_SIZES[d]]
-            Q1 = sim_dat[1,ini.MESH_SIZES[i+1]-1]
-            Q2 = sim_dat[1,ini.MESH_SIZES[p1_i+1]-1]
-            Q3 = sim_dat[1,ini.MESH_SIZES[d]]
-            A1 = sim_dat[2,ini.MESH_SIZES[i+1]-1]
-            A2 = sim_dat[2,ini.MESH_SIZES[p1_i+1]-1]
-            A3 = sim_dat[2,ini.MESH_SIZES[d]]
-            c1 = sim_dat[3,ini.MESH_SIZES[i+1]-1]
-            c2 = sim_dat[3,ini.MESH_SIZES[p1_i+1]-1]
-            c3 = sim_dat[3,ini.MESH_SIZES[d]]
-            P1 = sim_dat[4,ini.MESH_SIZES[i+1]-1]
-            P2 = sim_dat[4,ini.MESH_SIZES[p1_i+1]-1]
-            P3 = sim_dat[4,ini.MESH_SIZES[d]]
+            p1_i_end = ini.MESH_SIZES[p1_i+1]
+            d_start = ini.MESH_SIZES[d]
+            u1 = sim_dat[0,end-1]
+            u2 = sim_dat[0,p1_i_end-1]
+            u3 = sim_dat[0,d_start]
+            Q1 = sim_dat[1,end-1]
+            Q2 = sim_dat[1,p1_i_end-1]
+            Q3 = sim_dat[1,d_start]
+            A1 = sim_dat[2,end-1]
+            A2 = sim_dat[2,p1_i_end-1]
+            A3 = sim_dat[2,d_start]
+            c1 = sim_dat[3,end-1]
+            c2 = sim_dat[3,p1_i_end-1]
+            c3 = sim_dat[3,d_start]
+            P1 = sim_dat[4,end-1]
+            P2 = sim_dat[4,p1_i_end-1]
+            P3 = sim_dat[4,d_start]
             u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = jax.lax.cond(
                 jnp.maximum(p1_i, p2_i) == i, 
-                lambda: solveAnastomosis(u1, u2, u3, 
+                lambda: solveAnastomosis(i, p1_i, d,
+                                         u1, u2, u3, 
                                          A1, A2, A3,
-                                        i, p1_i, d), 
+                                        ), 
                 lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-            sim_dat = sim_dat.at[0,ini.MESH_SIZES[i+1]-1].set(u1)
-            sim_dat = sim_dat.at[0,ini.MESH_SIZES[p1_i+1]-1].set(u2)
-            sim_dat = sim_dat.at[0,ini.MESH_SIZES[d]].set(u3)
-            sim_dat = sim_dat.at[1,ini.MESH_SIZES[i+1]-1].set(Q1)
-            sim_dat = sim_dat.at[1,ini.MESH_SIZES[p1_i+1]-1].set(Q2)
-            sim_dat = sim_dat.at[1,ini.MESH_SIZES[d]].set(Q3)
-            sim_dat = sim_dat.at[2,ini.MESH_SIZES[i+1]-1].set(A1)
-            sim_dat = sim_dat.at[2,ini.MESH_SIZES[p1_i+1]-1].set(A2)
-            sim_dat = sim_dat.at[2,ini.MESH_SIZES[d]].set(A3)
-            sim_dat = sim_dat.at[3,ini.MESH_SIZES[i+1]-1].set(c1)
-            sim_dat = sim_dat.at[3,ini.MESH_SIZES[p1_i+1]-1].set(c2)
-            sim_dat = sim_dat.at[3,ini.MESH_SIZES[d]].set(c3)
-            sim_dat = sim_dat.at[4,ini.MESH_SIZES[i+1]-1].set(P1)
-            sim_dat = sim_dat.at[4,ini.MESH_SIZES[p1_i+1]-1].set(P2)
-            sim_dat = sim_dat.at[4,ini.MESH_SIZES[d]].set(P3)
+            sim_dat = sim_dat.at[0,end-1].set(u1)
+            sim_dat = sim_dat.at[0,p1_i_end-1].set(u2)
+            sim_dat = sim_dat.at[0,d_start].set(u3)
+            sim_dat = sim_dat.at[1,end-1].set(Q1)
+            sim_dat = sim_dat.at[1,p1_i_end-1].set(Q2)
+            sim_dat = sim_dat.at[1,d_start].set(Q3)
+            sim_dat = sim_dat.at[2,end-1].set(A1)
+            sim_dat = sim_dat.at[2,p1_i_end-1].set(A2)
+            sim_dat = sim_dat.at[2,d_start].set(A3)
+            sim_dat = sim_dat.at[3,end-1].set(c1)
+            sim_dat = sim_dat.at[3,p1_i_end-1].set(c2)
+            sim_dat = sim_dat.at[3,d_start].set(c3)
+            sim_dat = sim_dat.at[4,end-1].set(P1)
+            sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
+            sim_dat = sim_dat.at[4,d_start].set(P3)
     
-    return sim_dat
+    return sim_dat, sim_dat_aux
 
 
 @partial(jax.jit, static_argnums=0)
@@ -118,14 +151,12 @@ def solveVessel(i,u0, u1, Q, A, c0, c1, U00Q, U00A, UM1Q, UM1A, dt, t):
         Q = Q.at[0].set(Q0)
         A = A.at[0].set(A0)
 
-    #jax.debug.breakpoint()
     return muscl(i, U00Q, U00A, 
                 UM1Q, UM1A, Q, A, dt)
 
 
 @partial(jax.jit, static_argnums=(0,))
 def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
-    #v = ini.VCS[i]
     M = ini.VCS[i].M
     vA = jnp.empty(M+2, dtype=jnp.float64)
     vQ = jnp.empty(M+2, dtype=jnp.float64)

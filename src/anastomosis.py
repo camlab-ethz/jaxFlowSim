@@ -8,8 +8,8 @@ import jax
 
 
 #@jit
-@partial(jit, static_argnums=(6,7,8,))
-def solveAnastomosis(u1, u2, u3, A1, A2, A3, l, m, n):
+@partial(jit, static_argnums=(0,1,2,))
+def solveAnastomosis(l, m, n, u1, u2, u3, A1, A2, A3):
     U0 = jnp.array((u1,
                     u2,
                     u3,
@@ -22,16 +22,16 @@ def solveAnastomosis(u1, u2, u3, A1, A2, A3, l, m, n):
     k3 = ini.VCS[n].s_15_gamma[0]
     k = jnp.array([k1, k2, k3], dtype=jnp.float64)
 
-    J = calculateJacobianAnastomosis(U0, k, (l, m, n))
-    U = newtonRaphson(J, U0, k, calculateWstarAnastomosis, calculateFAnastomosis, (l,m,n))[0]
+    J = calculateJacobianAnastomosis((l, m, n), U0, k)
+    U = newtonRaphson((l, m, n), calculateWstarAnastomosis, calculateFAnastomosis, J, U0, k)[0]
         
     #jax.debug.breakpoint()
 
-    return updateAnastomosis(U, l, m, n)
+    return updateAnastomosis(l, m, n, U)
 
 #@jit
-@partial(jit, static_argnums=(2,))
-def calculateJacobianAnastomosis(U, k, indices):
+@partial(jit, static_argnums=(0,))
+def calculateJacobianAnastomosis(indices, U, k):
     l, m, n = indices
     U43 = U[3]**3
     U53 = U[4]**3
@@ -70,8 +70,8 @@ def calculateWstarAnastomosis(U, k):
     return jnp.array([W1, W2, W3], dtype=jnp.float64)
 
 #@jit
-@partial(jit, static_argnums=(3,))
-def calculateFAnastomosis(U, k, W, indices):
+@partial(jit, static_argnums=(0,))
+def calculateFAnastomosis(indices, U, k, W):
     l, m, n = indices
 
     U42 = U[3]**2
@@ -89,8 +89,8 @@ def calculateFAnastomosis(U, k, W, indices):
     return jnp.array([f1, f2, f3, f4, f5, f6], dtype=jnp.float64)
 
 #@jit
-@partial(jit, static_argnums=(1,2,3))
-def updateAnastomosis(U, l, m, n):
+@partial(jit, static_argnums=(0,1,2))
+def updateAnastomosis(l, m, n, U):
     u1 = U[0]
     u2 = U[1]
     u3 = U[2]

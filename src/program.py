@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, buildConst, makeResultsFolder
-from src.IOutils import saveTempDatas, transferTempToLasts, writeResults
+from src.IOutils import saveTempDatas, writeResults
 from src.boundary_conditions import updateGhostCells
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
@@ -20,29 +20,29 @@ def runSimulation_opt(input_filename, verbose=False):
 
     ini.JUMP =  data["solver"]["jump"]
 
-    vessels, sim_dat, sim_dat_aux = buildArterialNetwork(data["network"])
+    sim_dat, sim_dat_aux = buildArterialNetwork(data["network"])
     makeResultsFolder(data, input_filename)
 
     buildConst(float(data["solver"]["Ccfl"]), data["solver"]["cycles"], data["solver"]["convergence tolerance"])
     
     if verbose:
-        print("Start simulation \n")
+        print("Start simulation")
 
     if verbose:
-        print("Solving cardiac cycle no: 1")
+        #print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
 
-    simulation_loop(sim_dat, sim_dat_aux)
+    jax.block_until_ready(simulation_loop(sim_dat, sim_dat_aux))
 
     if verbose:
-        print("\n")
+        #print("\n")
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"Elapsed time = {ending_time} seconds")
 
     #writeResults(vessels)
 
 def simulation_loop(sim_dat, sim_dat_aux):
-    current_time = 0.0
+    t = 0.0
     passed_cycles = 0
     counter = 0
     timepoints = np.linspace(0, ini.HEART.cardiac_T, ini.JUMP)
@@ -52,27 +52,27 @@ def simulation_loop(sim_dat, sim_dat_aux):
 
     @jax.jit
     def cond_fun(args):
-        _, _, current_time, _, _, passed_cycles, dt, P_t, P_l = args
+        _, _, t, _, _, passed_cycles, dt, P_t, P_l = args
         err = computeConvError(P_t, P_l)
         def printConvErrorWrapper():
             printConvError(err)
             return False
         ret = jax.lax.cond((passed_cycles + 1 > 1)*(checkConvergence(err))*
-                           ((current_time - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                            (current_time - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
+                           ((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
+                            (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
                             printConvErrorWrapper,
                             lambda: True)
         return ret
 
     @jax.jit
     def body_fun(args):
-        sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt, P_t, P_l = args
+        sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l = args
         dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:])
-        sim_dat = solveModel(sim_dat, sim_dat_aux, dt, current_time)
-        sim_dat_aux = sim_dat_aux.at[2:,:].set(updateGhostCells(sim_dat))
+        sim_dat, sim_dat_aux = solveModel(sim_dat, sim_dat_aux, dt, t)
+        sim_dat_aux = sim_dat_aux.at[2:10,:].set(updateGhostCells(sim_dat))
 
 
-        (P_t_temp,counter_temp) = jax.lax.cond(current_time >= timepoints[counter], 
+        (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
                                          lambda: (saveTempDatas(sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
@@ -82,27 +82,27 @@ def simulation_loop(sim_dat, sim_dat_aux):
             err = computeConvError(P_t, P_l)
             printConvError(err)
 
-        jax.lax.cond(((current_time - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                       (current_time - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)*
+        jax.lax.cond(((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
+                       (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)
-        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((current_time - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                                            (current_time - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
+        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
+                                            (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
                                          lambda: (P_t,0,timepoints + ini.HEART.cardiac_T, passed_cycles+1), 
                                          lambda: (P_l,counter,timepoints, passed_cycles))
         
 
 
-        current_time += dt
-        (passed_cycles) = jax.lax.cond(current_time >= ini.TOTAL_TIME,
+        t += dt
+        (passed_cycles) = jax.lax.cond(t >= ini.TOTAL_TIME,
                                          lambda: (passed_cycles+1), 
                                          lambda: (passed_cycles))
 
-        return sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt, P_t, P_l
+        return sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l
 
 
-    jax.lax.while_loop(cond_fun, body_fun, (sim_dat, sim_dat_aux, current_time, counter, timepoints, passed_cycles, dt, P_t, P_l))
+    jax.lax.while_loop(cond_fun, body_fun, (sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l))
     
-    return current_time
+    return t
     

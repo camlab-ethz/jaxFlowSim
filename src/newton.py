@@ -4,8 +4,8 @@ from functools import partial
 import jax
 
 #@jit
-@partial(jit, static_argnums=(3,4,5,))
-def newtonRaphson(J, U, k, fun_w, fun_f, indices):
+@partial(jit, static_argnums=(0,1,2,))
+def newtonRaphson(indices, fun_w, fun_f, J, U, k):
 
     nr_toll_U = 1e-5
     nr_toll_F = 1e-5
@@ -15,7 +15,7 @@ def newtonRaphson(J, U, k, fun_w, fun_f, indices):
         #print(jnp.abs(val[0] - val[1]) <= 1e-5)
         #ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
         W = fun_w(U[0], k)
-        F = fun_f(U[0], k, W, indices)
+        F = fun_f(indices, U[0], k, W)
         ret = jax.lax.cond(jnp.where((jnp.abs(U[1]) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
                                       jnp.ones(F.size),
                                       jnp.zeros(F.size)).sum().astype(int)==F.size,
@@ -25,7 +25,7 @@ def newtonRaphson(J, U, k, fun_w, fun_f, indices):
     @jax.jit
     def body_fun(U):
         W = fun_w(U[0], k)
-        F = fun_f(U[0], k, W, indices)
+        F = fun_f(indices, U[0], k, W)
         dU = jnp.linalg.solve(J, -F)
         return jnp.array((U[0]+dU, dU), dtype=jnp.float64)
 

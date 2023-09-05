@@ -1,26 +1,29 @@
 import jax
+from jax import jit
 import jax.numpy as jnp
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 import src.initialise as ini
+from functools import partial
 
-@jax.jit
-def solveConjunction(v1, v2):
-    U0 = jnp.array([v1.u[-1], v2.u[0], jnp.sqrt(jnp.sqrt(v1.A[-1])), jnp.sqrt(jnp.sqrt(v2.A[0]))])
+@partial(jit, static_argnums=(0,1,))
+def solveConjunction(l, m, u1, u2, A1, A2):
+    U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))), dtype=jnp.float64)
 
-    k1 = v1.s_15_gamma[-1]
-    k2 = v2.s_15_gamma[0]
+    k1 = ini.VCS[l].s_15_gamma[-1]
+    k2 = ini.VCS[m].s_15_gamma[0]
     k3 = ini.BLOOD.rho
     k = jnp.array([k1, k2, k3])
 
-    J = calculateJacobianConjunction(v1, v2, U0, k)
-    U = newtonRaphson([v1, v2], J, U0, k, calculateWStarConjunction, calculateFConjunction)[0]
+    J = calculateJacobianConjunction((l,m), U0, k)
+    U = newtonRaphson((l,m), calculateWStarConjunction, calculateFConjunction, J, U0, k)[0]
 
-    return updateConjunction(U, v1, v2)
+    return updateConjunction(l, m, U)
 
 
-@jax.jit
-def calculateJacobianConjunction(v1, v2, U, k):
+@partial(jit, static_argnums=(0,))
+def calculateJacobianConjunction(indices, U, k):
+    l, m = indices
     U33 = U[2]**3
     U43 = U[3]**3
 
@@ -34,13 +37,13 @@ def calculateJacobianConjunction(v1, v2, U, k):
 
     J41 =  k[2] * U[0]
     J42 = -k[2] * U[1]
-    J43 =  2.0 * v1.beta[-1] * U[2] * v1.s_inv_A0[-1]
-    J44 = -2.0 * v2.beta[0] * U[3] * v2.s_inv_A0[0]
+    J43 =  2.0 * ini.VCS[l].beta[-1] * U[2] * ini.VCS[l].s_inv_A0[-1]
+    J44 = -2.0 * ini.VCS[m].beta[0] * U[3] * ini.VCS[m].s_inv_A0[0]
 
     return jnp.array([[1.0, 0.0, J13, 0.0],
                       [0.0, 1.0, 0.0, J24],
                       [J31, J32, J33, J34],
-                      [J41, J42, J43, J44]])
+                      [J41, J42, J43, J44]], dtype=jnp.float64)
 
 
 @jax.jit
@@ -48,13 +51,12 @@ def calculateWStarConjunction(U, k):
     W1 = U[0] + 4.0 * k[0] * U[2]
     W2 = U[1] - 4.0 * k[1] * U[3]
 
-    return jnp.array([W1, W2])
+    return jnp.array([W1, W2], dtype=jnp.float64)
 
 
-@jax.jit
-def calculateFConjunction(vessels, U, k, W):
-    v1 = vessels[0]
-    v2 = vessels[1]
+@partial(jit, static_argnums=(0,))
+def calculateFConjunction(indices, U, k, W):
+    (l,m) = indices
 
     U32 = U[2]**2
     U42 = U[3]**2
@@ -63,26 +65,26 @@ def calculateFConjunction(vessels, U, k, W):
     f2 = U[1] - 4.0 * k[1] * U[3] - W[1]
     f3 = U[0] * U32**2 - U[1] * U42**2
 
-    f4 = 0.5 * k[2] * U[0]**2 + v1.beta[-1] * (U32 * v1.s_inv_A0[-1] - 1.0) - (0.5 * k[2] * U[1]**2 + v2.beta[0] * (U42 * v2.s_inv_A0[0] - 1.0))
+    f4 = 0.5 * k[2] * U[0]**2 + ini.VCS[l].beta[-1] * (U32 * ini.VCS[l].s_inv_A0[-1] - 1.0) - (0.5 * k[2] * U[1]**2 + ini.VCS[m].beta[0] * (U42 * ini.VCS[m].s_inv_A0[0] - 1.0))
 
-    return jnp.array([f1, f2, f3, f4])
+    return jnp.array([f1, f2, f3, f4], dtype=jnp.float64)
 
 
-@jax.jit
-def updateConjunction(U, v1, v2):
-    v1.u = v1.u.at[-1].set(U[0])
-    v2.u = v2.u.at[0].set(U[1])
+@partial(jit, static_argnums=(0,1))
+def updateConjunction(l, m , U):
+    u1 = U[0]
+    u2 = U[1]
 
-    v1.A = v1.A.at[-1].set(U[2]**4)
-    v1.Q = v1.Q.at[-1].set(v1.u[-1] * v1.A[-1])
+    A1 = U[2]**4
+    Q1 = u1 * A1
 
-    v2.A = v2.A.at[0].set(U[3]**4)
-    v2.Q = v2.Q.at[0].set(v2.u[0] * v2.A[0])
+    A2  = U[3]**4
+    Q2  = u2 * A2
 
-    v1.P = v1.P.at[-1].set(pressure(v1.A[-1], v1.A0[-1], v1.beta[-1], v1.Pext))
-    v2.P = v2.P.at[0].set(pressure(v2.A[0], v2.A0[0], v2.beta[0], v2.Pext))
+    P1 = pressure(A1, ini.VCS[l].A0[-1], ini.VCS[l].beta[-1], ini.VCS[l].Pext)
+    P2 = pressure(A2, ini.VCS[m].A0[0], ini.VCS[m].beta[0], ini.VCS[m].Pext)
 
-    v1.c = v1.c.at[-1].set(waveSpeed(v1.A[-1], v1.gamma[-1]))
-    v2.c = v2.c.at[0].set(waveSpeed(v2.A[0], v2.gamma[0]))
+    c1 = waveSpeed(A1, ini.VCS[l].gamma[-1])
+    c2 = waveSpeed(A2, ini.VCS[m].gamma[0])
 
-    return v1, v2
+    return u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2

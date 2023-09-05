@@ -281,8 +281,8 @@ class Edges:
         self.inlets = inlets
         self.outlets = outlets
 
-    def __hash__(self):
-        return hash(np.array2string(self.edges))
+    #def __hash__(self):
+    #    return hash(np.array2string(self.edges))
 
-    def __eq__(self,other):
-        return (self.__hash__() == other.__hash__())
+    #def __eq__(self,other):
+    #    return (self.__hash__() == other.__hash__())

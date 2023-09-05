@@ -242,7 +242,7 @@ def buildArterialNetwork(network):
     global MESH_SIZES
     MESH_SIZES = np.zeros(len(vessels)+1,dtype=np.int32)
     sim_dat = jnp.zeros((5, MESH_SIZE_TOT), dtype=jnp.float64)
-    sim_dat_aux = jnp.zeros((10, NUM_VESSELS), dtype=jnp.float64)
+    sim_dat_aux = jnp.zeros((11, NUM_VESSELS), dtype=jnp.float64)
     
     
     mesh_count = 0
@@ -266,10 +266,11 @@ def buildArterialNetwork(network):
         sim_dat_aux = sim_dat_aux.at[7,i].set(vessels[i].UM1A)
         sim_dat_aux = sim_dat_aux.at[8,i].set(vessels[i].UM2Q)
         sim_dat_aux = sim_dat_aux.at[9,i].set(vessels[i].UM2A)
+        sim_dat_aux = sim_dat_aux.at[10,i].set(vessels_const[i].Pc)
 
         mesh_count = new_mesh_count
 
-    return vessels, sim_dat, sim_dat_aux
+    return sim_dat, sim_dat_aux
 
 
 def buildVessel(ID, vessel_data, blood, jump):

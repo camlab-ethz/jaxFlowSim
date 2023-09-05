@@ -82,16 +82,15 @@ def areaFromPressure(P, A0, beta, Pext):
 
 #@jax.jit
 @partial(jax.jit, static_argnums=0)
-def setOutletBC(i, u1, u2, A1, c1, c2, P2, P3, W1M0, W2M0, dt):
+def setOutletBC(i, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt):
     if ini.VCS[i].outlet == "reflection":
         P1 = 2.0 * P2 - P3
-        return outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt), P1
+        u1, Q1, c1 = outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt)
+        return u1, Q1, A1, c1, P1, Pc
     elif ini.VCS[i].outlet == "wk3":
-        v = threeElementWindkessel(dt, v)
+        u1, A1, Pc = threeElementWindkessel(i, dt, u1, A1, Pc)
+        return u1, Q1, A1, c1, P1, Pc
 
-    return v
-
-#@jax.jit
 @partial(jax.jit, static_argnums=0)
 def outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt):
     W1M1, W2M1 = riemannInvariants(u2, c2)
@@ -106,42 +105,42 @@ def outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt):
 
     return u1, Q1, c1
 
-@jax.jit
-def threeElementWindkessel(dt, v):
+@partial(jax.jit, static_argnums=0)
+def threeElementWindkessel(i, dt, u1, A1, Pc):
     Pout = 0.0
 
-    Al = v.A[-1]
-    ul = v.u[-1]
+    Al = A1
+    ul = u1
 
-    v.Pc += dt / v.Cc * (Al * ul - (v.Pc - Pout) / v.R2)
+    Pc += dt / ini.VCS[i].Cc * (Al * ul - (Pc - Pout) / ini.VCS[i].R2)
 
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
-    sgamma = 2 * jnp.sqrt(6 * v.gamma[-1])
-    sA0 = jnp.sqrt(v.A0[-1])
-    bA0 = v.beta[-1] / sA0
+    sgamma = 2 * jnp.sqrt(6 * ini.VCS[i].gamma[-1])
+    sA0 = jnp.sqrt(ini.VCS[i].A0[-1])
+    bA0 = ini.VCS[i].beta[-1] / sA0
 
     @jax.jit
     def fun(As):
-        return As * v.R1 * (ul + sgamma * (ssAl - jnp.sqrt(jnp.sqrt(As)))) - (v.Pext + bA0 * (jnp.sqrt(As) - sA0)) + v.Pc
+        return As * ini.VCS[i].R1 * (ul + sgamma * (ssAl - jnp.sqrt(jnp.sqrt(As)))) - (ini.VCS[i].Pext + bA0 * (jnp.sqrt(As) - sA0)) + Pc
 
     @jax.jit
     def dfun(As):
-        return v.R1 * (ul + sgamma * (ssAl - 1.25 * jnp.sqrt(jnp.sqrt(As)))) - bA0 * 0.5 / jnp.sqrt(As)
+        return ini.VCS[i].R1 * (ul + sgamma * (ssAl - 1.25 * jnp.sqrt(jnp.sqrt(As)))) - bA0 * 0.5 / jnp.sqrt(As)
 
     try:
         As = newtonSolver(fun, dfun, As)
     except Exception as e:
-        vlab = v.label
+        vlab = ini.VCS[i].label
         print(f"\nNewton solver doesn't converge at {vlab} outlet!")
         raise e
 
-    us = (pressure(As, v.A0[-1], v.beta[-1], v.Pext) - Pout) / (As * v.R1)
+    us = (pressure(As, ini.VCS[i].A0[-1], ini.VCS[i].beta[-1], ini.VCS[i].Pext) - Pout) / (As * ini.VCS[i].R1)
 
-    v.A = v.A.at[-1].set(As)
-    v.u = v.u.at[-1].set(us)
+    A1 = As
+    u1 = us
 
-    return v
+    return u1, A1, Pc
 
 @partial(jax.jit, static_argnums=(0,1,))
 def newtonSolver(f, df, x0):
