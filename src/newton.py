@@ -10,7 +10,6 @@ def newtonRaphson(indices, fun_w, fun_f, J, U, k):
     nr_toll_U = 1e-5
     nr_toll_F = 1e-5
 
-    @jax.jit
     def cond_fun(U):
         #print(jnp.abs(val[0] - val[1]) <= 1e-5)
         #ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
@@ -22,7 +21,7 @@ def newtonRaphson(indices, fun_w, fun_f, J, U, k):
                             lambda: False,
                             lambda: True)
         return ret
-    @jax.jit
+
     def body_fun(U):
         W = fun_w(U[0], k)
         F = fun_f(indices, U[0], k, W)

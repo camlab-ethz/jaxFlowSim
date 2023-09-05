@@ -14,12 +14,16 @@ import src.initialise as ini
 @jax.jit
 def calculateDeltaT(u, c):
     dt = 1.0
+    start = ini.MESH_SIZES[0]
     for i in range(ini.NUM_VESSELS):
-        Smax = 0.0
-        _lambda = jnp.abs(u[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]] + c[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]])
-        Smax = jnp.max(_lambda)
+        end = ini.MESH_SIZES[i+1]
+        Smax = jnp.max(jnp.abs(u[start:end] + c[start:end]))
+        #Smax = 0.0
+        #_lambda = jnp.abs(u[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]] + c[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]])
+        #Smax = jnp.max(_lambda)
         vessel_dt = ini.VCS[i].dx * ini.CCFL / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
+        start = end
     return dt
 
 
@@ -30,7 +34,7 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         i = ini.EDGES.edges[j,0]-1
         start = ini.MESH_SIZES[i]
         end = ini.MESH_SIZES[i+1]
-        sim_dat = sim_dat.at[1:,start:end].set(solveVessel(i, sim_dat[0,start], sim_dat[0,start+1], 
+        sim_dat = sim_dat.at[:,start:end].set(solveVessel(i, sim_dat[0,start], sim_dat[0,start+1], 
                                  sim_dat[1,start:end], 
                                  sim_dat[2,start:end], 
                                  sim_dat[3,start], sim_dat[3,start+1], 
@@ -39,7 +43,7 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
                                  sim_dat_aux[6,i], 
                                  sim_dat_aux[7,i],
                                  dt, t))
-        sim_dat = sim_dat.at[0,start:end].set(sim_dat[1,start:end]/sim_dat[2,start:end])
+        #sim_dat = sim_dat.at[0,start:end].set(sim_dat[1,start:end]/sim_dat[2,start:end])
 
 
         if ini.VCS[i].outlet != "none":
@@ -268,17 +272,18 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
 
     #    v.Q = v.Q.at[mask].set(jax.scipy.linalg.solve_banded((1, 1), jnp.array([Tlu[:-1], Td, Tlu[1:]]), d))
 
-
-    return Q, A, c, P 
+    u = Q/A
+    return u, Q, A, c, P 
 
 
 @jax.jit
 def computeFlux(gamma_ghost, A, Q):
-    Flux = jnp.empty((2,A.size), dtype=jnp.float64)
-    Flux = Flux.at[0,:].set(Q)
-    Flux = Flux.at[1,:].set(Q * Q / A + gamma_ghost * A * jnp.sqrt(A))
+    #Flux = jnp.empty((2,A.size), dtype=jnp.float64)
+    #Flux = Flux.at[0,:].set(Q)
+    #Flux = Flux.at[1,:].set(Q * Q / A + gamma_ghost * A * jnp.sqrt(A))
 
-    return Flux
+    #return Flux
+    return jnp.stack((Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)))
 
 @jax.jit
 def maxMod(a, b):
@@ -290,24 +295,31 @@ def minMod(a, b):
 
 @jax.jit
 def superBee(dU):
-    s1 = minMod(dU[0, :], 2 * dU[1, :])
-    s2 = minMod(2 * dU[0, :], dU[1, :])
+    #s1 = minMod(dU[0, :], 2 * dU[1, :])
+    #s2 = minMod(2 * dU[0, :], dU[1, :])
 
-    return maxMod(s1, s2)
+    #return maxMod(s1, s2)
+    return maxMod(minMod(dU[0, :], 2 * dU[1, :]), minMod(2 * dU[0, :], dU[1, :]))
 
 @jax.jit
 def computeLimiter(U, invDx):
-    dU = jnp.empty((2, U.size), dtype=jnp.float64)
-    dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
-    dU = dU.at[1, 0:-1].set(dU[0, 1:])
-    
-    return superBee(dU)
+    #dU = jnp.empty((2, U.size), dtype=jnp.float64)
+    #dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
+    #dU = dU.at[1, 0:-1].set(dU[0, 1:])
+    dU = jnp.diff(U) * invDx
+    #test = [[0,(U[1:] - U[:-1]) * invDx], 
+    #       [0, (U[1:-1] - U[:-2]) * invDx, 0]]
+    #jax.debug.breakpoint()
+    return superBee(jnp.stack((jnp.concatenate((jnp.array([0.0]),dU)),jnp.concatenate((dU,jnp.array([0.0]))))))
+
 
 @jax.jit
 def computeLimiterIdx(U, idx, invDx):
-    U = U[idx, :]
-    dU = jnp.empty((2, U.size), dtype=jnp.float64)
-    dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
-    dU = dU.at[1, 0:-1].set(dU[0, 1:])
+    #U = U[idx, :]
+    dU = jnp.diff(U[idx, :]) * invDx
+    #dU = jnp.empty((2, U.size), dtype=jnp.float64)
+    #dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
+    #dU = dU.at[1, 0:-1].set(dU[0, 1:])
     
-    return superBee(dU)
+    #return superBee(dU)
+    return superBee(jnp.stack((jnp.concatenate((jnp.array([0.0]),dU)),jnp.concatenate((dU,jnp.array([0.0]))))))

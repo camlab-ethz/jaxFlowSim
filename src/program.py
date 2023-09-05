@@ -32,7 +32,8 @@ def runSimulation_opt(input_filename, verbose=False):
         #print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
 
-    jax.block_until_ready(simulation_loop(sim_dat, sim_dat_aux))
+        #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
+        simulation_loop(sim_dat, sim_dat_aux)
 
     if verbose:
         #print("\n")
@@ -41,6 +42,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     #writeResults(vessels)
 
+@jax.jit
 def simulation_loop(sim_dat, sim_dat_aux):
     t = 0.0
     passed_cycles = 0
@@ -50,7 +52,6 @@ def simulation_loop(sim_dat, sim_dat_aux):
     P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     dt = 0 
 
-    @jax.jit
     def cond_fun(args):
         _, _, t, _, _, passed_cycles, dt, P_t, P_l = args
         err = computeConvError(P_t, P_l)
@@ -64,7 +65,6 @@ def simulation_loop(sim_dat, sim_dat_aux):
                             lambda: True)
         return ret
 
-    @jax.jit
     def body_fun(args):
         sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l = args
         dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:])

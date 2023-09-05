@@ -146,11 +146,10 @@ def threeElementWindkessel(i, dt, u1, A1, Pc):
 def newtonSolver(f, df, x0):
     xn = x0 - f(x0) / df(x0)
     
-    @jax.jit
     def cond_fun(val):
         ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
         return ret
-    @jax.jit
+
     def body_fun(val):
         return jnp.array((val[1],val[1] - f(val[1]) / df(val[1]))) 
     temp = lax.while_loop(cond_fun, body_fun, jnp.array((x0,xn)))
