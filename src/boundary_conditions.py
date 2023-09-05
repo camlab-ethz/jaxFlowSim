@@ -39,7 +39,7 @@ def inputFromData(t, h):
 @partial(jax.jit, static_argnums=(0,1,))
 def inletCompatibility(i, h, u0, u1, Q0, A0, c0, c1, P0, dt):
     W11, W21 = riemannInvariants(u0, c0)
-    W12, W22 = riemannInvariants(u1, c1)
+    W12, _ = riemannInvariants(u1, c1)
 
     W11 += (W12 - W11) * (c0 - u0) * dt * ini.VCS[i].invDx
     W21 = 2.0 * Q0 / A0 - W11
@@ -93,7 +93,7 @@ def setOutletBC(i, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt):
 
 @partial(jax.jit, static_argnums=0)
 def outletCompatibility(i, u1, u2, A1, c1, c2, W1M0, W2M0, dt):
-    W1M1, W2M1 = riemannInvariants(u2, c2)
+    _, W2M1 = riemannInvariants(u2, c2)
     W1M, W2M = riemannInvariants(u1, c1)
 
     W2M += (W2M1 - W2M) * (u1 + c1) * dt / ini.VCS[i].dx
@@ -120,11 +120,9 @@ def threeElementWindkessel(i, dt, u1, A1, Pc):
     sA0 = jnp.sqrt(ini.VCS[i].A0[-1])
     bA0 = ini.VCS[i].beta[-1] / sA0
 
-    @jax.jit
     def fun(As):
         return As * ini.VCS[i].R1 * (ul + sgamma * (ssAl - jnp.sqrt(jnp.sqrt(As)))) - (ini.VCS[i].Pext + bA0 * (jnp.sqrt(As) - sA0)) + Pc
 
-    @jax.jit
     def dfun(As):
         return ini.VCS[i].R1 * (ul + sgamma * (ssAl - 1.25 * jnp.sqrt(jnp.sqrt(As)))) - bA0 * 0.5 / jnp.sqrt(As)
 

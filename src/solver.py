@@ -43,7 +43,6 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
                                  sim_dat_aux[6,i], 
                                  sim_dat_aux[7,i],
                                  dt, t))
-        #sim_dat = sim_dat.at[0,start:end].set(sim_dat[1,start:end]/sim_dat[2,start:end])
 
 
         if ini.VCS[i].outlet != "none":
@@ -202,11 +201,11 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     vA = vA.at[1:M+1].set(A)
     vQ = vQ.at[1:M+1].set(Q)
 
-    slopesA = computeLimiter(vA, ini.VCS[i].invDx)
-    slopesQ = computeLimiter(vQ, ini.VCS[i].invDx)
+    slopeA_halfDx = computeLimiter(vA, ini.VCS[i].invDx) * ini.VCS[i].halfDx
+    slopeQ_halfDx = computeLimiter(vQ, ini.VCS[i].invDx) * ini.VCS[i].halfDx
 
-    slopeA_halfDx = slopesA * ini.VCS[i].halfDx
-    slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
+    #slopeA_halfDx = slopesA * ini.VCS[i].halfDx
+    #slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
 
     Al = vA + slopeA_halfDx
     Ar = vA - slopeA_halfDx
@@ -216,31 +215,37 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql)
     Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr)
 
-    dxDt = jnp.float64(ini.VCS[i].dx) / jnp.float64(dt)
-    one = jnp.float64(1.0)
+    dxDt = ini.VCS[i].dx / dt
     
-    invDxDt = one / jnp.float64(dxDt)
+    invDxDt = dt / ini.VCS[i].dx
 
     flux = jnp.empty((2,M+2), dtype=jnp.float64)
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
     flux = flux.at[1,0:M+1].set(0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1])))
+    #flux = jnp.stack((0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])), 
+    #                  0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))))
 
     uStar = jnp.empty((2,M+2), dtype=jnp.float64)
-    uStar = uStar.at[0,1:M+1].set(vA[1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1]))
-    uStar = uStar.at[1,1:M+1].set(vQ[1:M+1] + invDxDt * (flux[1, 0:M] - flux[1, 1:M+1]))
+    uStar = uStar.at[0,1:M+1].set(vA[1:M+1] - invDxDt * jnp.diff(flux[0,0:M+1]))
+    uStar = uStar.at[1,1:M+1].set(vQ[1:M+1] - invDxDt * jnp.diff(flux[1,0:M+1]))
+    #uStar1 = vA[1:M+1] - invDxDt * jnp.diff(flux[0,0:M+1])
+    #uStar2 = vQ[1:M+1] - invDxDt * jnp.diff(flux[1,0:M+1])
+    #uStar = jnp.stack((jnp.concatenate((jnp.array([uStar1[0]],dtype=jnp.float64),uStar1,jnp.array([uStar1[-1]],dtype=jnp.float64))), 
+    #                   jnp.concatenate((jnp.array([uStar2[0]],dtype=jnp.float64),uStar2,jnp.array([uStar2[-1]],dtype=jnp.float64)))))
+
 
     uStar = uStar.at[0,0].set(uStar[0,1])
     uStar = uStar.at[1,0].set(uStar[1,1])
     uStar = uStar.at[0,M+1].set(uStar[0,M])
     uStar = uStar.at[1,M+1].set(uStar[1,M])
 
-    slopesA = computeLimiterIdx(uStar, 0, ini.VCS[i].invDx)
-    slopesQ = computeLimiterIdx(uStar, 1, ini.VCS[i].invDx)
+    slopesA = computeLimiterIdx(uStar, 0, ini.VCS[i].invDx) * ini.VCS[i].halfDx
+    slopesQ = computeLimiterIdx(uStar, 1, ini.VCS[i].invDx) * ini.VCS[i].halfDx
 
-    Al = uStar[0,0:M+2] + slopesA * ini.VCS[i].halfDx
-    Ar = uStar[0,0:M+2] - slopesA * ini.VCS[i].halfDx
-    Ql = uStar[1,0:M+2] + slopesQ * ini.VCS[i].halfDx
-    Qr = uStar[1,0:M+2] - slopesQ * ini.VCS[i].halfDx
+    Al = uStar[0,0:M+2] + slopesA
+    Ar = uStar[0,0:M+2] - slopesA
+    Ql = uStar[1,0:M+2] + slopesQ
+    Qr = uStar[1,0:M+2] - slopesQ
 
     Fl = computeFlux(ini.VCS[i].gamma_ghost, Al, Ql)
     Fr = computeFlux(ini.VCS[i].gamma_ghost, Ar, Qr)
@@ -248,13 +253,17 @@ def muscl(i, U00Q, U00A, UM1Q, UM1A, Q, A, dt):
     flux = jnp.empty((2,M+2), dtype=jnp.float64)
     flux = flux.at[0,0:M+1].set(0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])))
     flux = flux.at[1,0:M+1].set(0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1])))
+    #flux = jnp.stack((0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])), 
+    #                 0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))))
 
-    A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1])))
-    Q = Q.at[0:M].set(0.5*(Q[0:M] + uStar[1,1:M+1] + invDxDt * (flux[1, 0:M] - flux[1, 1:M+1])))
+
+    #A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1])))
+    A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] - invDxDt * jnp.diff(flux[0,0:M+1])))
+    Q = Q.at[0:M].set(0.5*(Q[0:M] + uStar[1,1:M+1] - invDxDt * jnp.diff(flux[1,0:M+1])))
 
     s_A = jnp.sqrt(A)
-    Si = - ini.VCS[i].viscT * Q / A - ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A
-    Q = Q + dt * Si
+    #Si = - ini.VCS[i].viscT * Q / A - ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A
+    Q = Q - dt * (ini.VCS[i].viscT * Q / A + ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A)
 
     P = pressureSA(s_A * ini.VCS[i].s_inv_A0, ini.VCS[i].beta, ini.VCS[i].Pext)
     c = waveSpeedSA(s_A, ini.VCS[i].gamma)

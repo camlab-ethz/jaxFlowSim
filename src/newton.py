@@ -10,25 +10,32 @@ def newtonRaphson(indices, fun_w, fun_f, J, U, k):
     nr_toll_U = 1e-5
     nr_toll_F = 1e-5
 
-    def cond_fun(U):
+    W = fun_w(U, k)
+    F = fun_f(indices, U, k, W)
+    dU = jnp.linalg.solve(J, -F)
+    n = F.size
+    ones = jnp.ones(n,dtype=jnp.int32)
+    zeros = jnp.zeros(n,dtype=jnp.int32)
+
+    def cond_fun(args):
         #print(jnp.abs(val[0] - val[1]) <= 1e-5)
         #ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
-        W = fun_w(U[0], k)
-        F = fun_f(indices, U[0], k, W)
-        ret = jax.lax.cond(jnp.where((jnp.abs(U[1]) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
-                                      jnp.ones(F.size),
-                                      jnp.zeros(F.size)).sum().astype(int)==F.size,
+        _, dU, F  = args
+        ret = jax.lax.cond(jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
+                                      ones,
+                                      zeros).sum()==n,
                             lambda: False,
                             lambda: True)
         return ret
 
-    def body_fun(U):
-        W = fun_w(U[0], k)
-        F = fun_f(indices, U[0], k, W)
+    def body_fun(args):
+        U, _, _  = args
+        W = fun_w(U, k)
+        F = fun_f(indices, U, k, W)
         dU = jnp.linalg.solve(J, -F)
-        return jnp.array((U[0]+dU, dU), dtype=jnp.float64)
+        return U+dU, dU, F
 
-    return jax.lax.while_loop(cond_fun, body_fun, jnp.array((U,jnp.ones(U.size))))
+    return jax.lax.while_loop(cond_fun, body_fun, (U+dU, dU, F))
     #while True:
     #    dU = jnp.linalg.solve(J, -F)
     #    U_new = U + dU
