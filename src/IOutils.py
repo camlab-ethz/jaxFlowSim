@@ -10,8 +10,8 @@ import src.initialise as ini
 def saveTempDatas(P):
     P_t_temp = jnp.zeros(5*ini.NUM_VESSELS)
     for i in range(ini.NUM_VESSELS):
-        start = ini.MESH_SIZES[i]
-        end = ini.MESH_SIZES[i+1]
+        start = i*ini.MESH_SIZE
+        end = (i+1)*ini.MESH_SIZE
         P_t_temp = P_t_temp.at[i*5:(i+1)*5].set(saveTempData(i, P[start:end]))
     
     return P_t_temp

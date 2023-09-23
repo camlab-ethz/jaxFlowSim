@@ -5,7 +5,6 @@ from src.utils import pressure
 from functools import partial
 import src.initialise as ini
 
-#@partial(jax.jit, static_argnums=0)
 @jax.jit
 def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext):
     #if inlet == 1: #"Q":
@@ -14,7 +13,8 @@ def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0
     #    P0 = inputFromData(t, input_data, cardiac_T)
     return inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext)
 
-@partial(jax.jit, static_argnums=1)
+
+@jax.jit
 def inputFromData(t, input_data, cardiac_T):
     idt = input_data[:, 0]
     idt1 = idt
@@ -31,8 +31,7 @@ def inputFromData(t, input_data, cardiac_T):
 
     return qu
 
-#@jax.jit
-@partial(jax.jit, static_argnums=(0,))
+@jax.jit
 def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext):
     W11, W21 = riemannInvariants(u0, c0)
     W12, _ = riemannInvariants(u1, c1)
@@ -74,17 +73,17 @@ def areaFromPressure(P, A0, beta, Pext):
 
 @jax.jit
 def setOutletBC(outlet, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext):
-    def outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext):
+    def outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0):
         P1 = 2.0 * P2 - P3
         u1, Q1, c1 = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
         return u1, Q1, A1, c1, P1, Pc
-    def threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext):
+    def threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0):
         u1, A1, Pc = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
         return u1, Q1, A1, c1, P1, Pc
     return jax.lax.cond(outlet == 1,
-                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext: outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext),
-                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext: threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext), 
-                  u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext)
+                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0: outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0),
+                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0: threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0), 
+                  u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0)
 
 @jax.jit
 def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
@@ -112,7 +111,7 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
     sgamma = 2 * jnp.sqrt(6 * gamma[-1])
-    sA0 = jnp.sqrt(A0[-1])
+    sA0 = jnp.sqrt(A0)
     bA0 = beta[-1] / sA0
 
     def fun(As):
@@ -121,32 +120,31 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     def dfun(As):
         return R1 * (ul + sgamma * (ssAl - 1.25 * jnp.sqrt(jnp.sqrt(As)))) - bA0 * 0.5 / jnp.sqrt(As)
 
+    def newtonSolver(x0):
+        xn = x0 - fun(x0) / dfun(x0)
+
+        def cond_fun(val):
+            ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
+            return ret
+
+        def body_fun(val):
+            return jnp.array((val[1],val[1] - fun(val[1]) / dfun(val[1]))) 
+        temp = lax.while_loop(cond_fun, body_fun, jnp.array((x0,xn)))
+        return temp[1]
+
     try:
-        As = newtonSolver(fun, dfun, As)
+        As = newtonSolver(As)
     except Exception as e:
         #vlab = ini.VCS[i].label
         #print(f"\nNewton solver doesn't converge at {vlab} outlet!")
         raise e
 
-    us = (pressure(As, A0[-1], beta[-1], Pext) - Pout) / (As * R1)
+    us = (pressure(As, A0, beta[-1], Pext) - Pout) / (As * R1)
 
     A1 = As
     u1 = us
 
     return u1, A1, Pc
-
-@partial(jax.jit, static_argnums=(0,1,))
-def newtonSolver(f, df, x0):
-    xn = x0 - f(x0) / df(x0)
-    
-    def cond_fun(val):
-        ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
-        return ret
-
-    def body_fun(val):
-        return jnp.array((val[1],val[1] - f(val[1]) / df(val[1]))) 
-    temp = lax.while_loop(cond_fun, body_fun, jnp.array((x0,xn)))
-    return temp[1]
 
 @jax.jit
 def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
@@ -165,8 +163,8 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 def updateGhostCells(sim_dat):
     sim_dat_aux_temp = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
     for i in range(ini.NUM_VESSELS):
-        start = ini.MESH_SIZES[i]
-        end = ini.MESH_SIZES[i+1]
+        start = i*ini.MESH_SIZE
+        end = (i+1)*ini.MESH_SIZE
         Q0 = sim_dat[1,start]
         Q1 = sim_dat[1,start+1]
         QM1 = sim_dat[1,end-1]

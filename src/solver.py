@@ -13,13 +13,10 @@ import src.initialise as ini
 @jax.jit
 def calculateDeltaT(u, c):
     dt = 1.0
-    start = ini.MESH_SIZES[0]
+    start = 0
     for i in range(ini.NUM_VESSELS):
-        end = ini.MESH_SIZES[i+1]
+        end = (i+1)*ini.MESH_SIZE
         Smax = jnp.max(jnp.abs(u[start:end] + c[start:end]))
-        #Smax = 0.0
-        #_lambda = jnp.abs(u[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]] + c[ini.MESH_SIZES[i]:ini.MESH_SIZES[i+1]])
-        #Smax = jnp.max(_lambda)
         vessel_dt = ini.DXS[i] * ini.CCFL / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
         start = end
@@ -30,17 +27,14 @@ def calculateDeltaT(u, c):
 @jax.jit
 def solveModel(sim_dat, sim_dat_aux, dt, t):
 
-    #@partial(jax.jit, static_argnums=0)
     def body_fun(j,dat):
-        sim_dat, sim_dat_aux, edges, inlets, outlets, outlet, mesh_sizes, inlet, input_data, cardiac_T, dx, halfDx, invDx, A0, s_A0, s_inv_A0, beta, Pext, gamma, gamma_ghost, viscT, wallE, Rt, R1, R2, Cc = dat
+        sim_dat, sim_dat_aux, edges, outlet, inlet, input_data, cardiac_T, dx, A0, beta, Pext, gamma, viscT, wallE, Rt, R1, R2, Cc = dat
         i = edges[j,0]-1
-        start = mesh_sizes[i]
-        end = mesh_sizes[i+1]
+        M = ini.MESH_SIZE
+        start = i*M
+        end = (i+1)*M
         size = input_data.shape[1]
-        M = 242
         test = solveVessel(inlet[i], sim_dat[0,start], sim_dat[0,start+1], 
-                                 #sim_dat[1,start:start+100], 
-                                 #sim_dat[2,start:start+100], 
                                  jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).reshape(M),
                                  jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).reshape(M),
                                  sim_dat[3,start], sim_dat[3,start+1], 
@@ -48,16 +42,12 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
                                  sim_dat_aux[3,i], 
                                  sim_dat_aux[6,i], 
                                  sim_dat_aux[7,i],
-                                 #dt, t, input_data[i:i+1,:], cardiac_T[i], invDx[i], A0[i*100, (i+1)*100], beta[i*100, (i+1)*100], Pext[i]))
                                  dt, t, jax.lax.dynamic_slice(input_data, (i,0), (2,size)), 
-                                 cardiac_T[i], dx[i], halfDx[i], invDx[i], A0[i,0], 
-                                 jax.lax.dynamic_slice(s_A0, (i,0), (1,M)).reshape(M), 
-                                 jax.lax.dynamic_slice(s_inv_A0, (i,0), (1,M)).reshape(M), beta[i,0], 
+                                 cardiac_T[i], dx[i], 
+                                 jax.lax.dynamic_slice(A0, (i,0), (1,M)).reshape(M), beta[i,0], 
                                  Pext[i], jax.lax.dynamic_slice(gamma, (i,0), (1,M)).reshape(M), 
-                                 jax.lax.dynamic_slice(gamma_ghost, (i,0), (1,M+2)).reshape(M+2), 
                                  viscT[i], jax.lax.dynamic_slice(wallE, (i,0), (1,M)).reshape(M))
         sim_dat = jax.lax.dynamic_update_slice(sim_dat, test, (0,start))
-        #sim_dat = sim_dat.at[:,start:start+242].set(test)
 
 
         
@@ -74,7 +64,7 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
             Pc = sim_dat_aux[10,i]
             W1M0 = sim_dat_aux[0,i]
             W2M0 = sim_dat_aux[1,i]
-            u, Q, A, c, P1, Pc = setOutletBC(outlet[i], u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt, dx[i], Rt[i], Cc[i], R1[i], R2[i], beta[i], gamma[i], A0[i], Pext[i])
+            u, Q, A, c, P1, Pc = setOutletBC(outlet[i], u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt, dx[i], Rt[i], Cc[i], R1[i], R2[i], beta[i], gamma[i], A0[i,M-1], Pext[i])
             sim_dat = sim_dat.at[0,end-1].set(u)
             sim_dat = sim_dat.at[1,end-1].set(Q)
             sim_dat = sim_dat.at[2,end-1].set(A)
@@ -87,9 +77,9 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
 
 
 
-        #if inlets[j,0] == 2:
-        #    d1_i = inlets[j,1]
-        #    d2_i = inlets[j,2]
+        #if edges[j,3] == 2:
+        #    d1_i = edges[j,4]
+        #    d2_i = edges[j,5]
         #    d1_i_start = mesh_sizes[d1_i]
         #    d2_i_start = mesh_sizes[d2_i]
         #    u1 = sim_dat[0,end-1]
@@ -126,8 +116,8 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         #    sim_dat = sim_dat.at[4,d1_i_start].set(P2)
         #    sim_dat = sim_dat.at[4,d2_i_start].set(P3)
 
-        #elif outlets[j,0] == 1:
-        #    d_i = outlets[j,1]
+        #elif edges[j,6] == 1:
+        #    d_i = edges[j,7]
         #    d_i_start = mesh_sizes[d_i]
         #    u1 = sim_dat[0,end-1]
         #    u2 = sim_dat[0,d_i_start]
@@ -148,10 +138,10 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         #    sim_dat = sim_dat.at[4,d_i_start].set(P2)
         #    #jax.debug.breakpoint()
 
-        #elif outlets[j,0] == 2:                                           
-        #    p1_i = outlets[j,1]
-        #    p2_i = outlets[j,2]
-        #    d = outlets[j,3]
+        #elif edges[j,6] == 2:                                           
+        #    p1_i = edges[j,7]
+        #    p2_i = edges[j,8]
+        #    d = edges[j,9]
         #    p1_i_end = mesh_sizes[p1_i+1]
         #    d_start = mesh_sizes[d]
         #    u1 = sim_dat[0,end-1]
@@ -192,7 +182,7 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         #    sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
         #    sim_dat = sim_dat.at[4,d_start].set(P3)
         
-        return sim_dat, sim_dat_aux, edges, inlets, outlets, outlet, mesh_sizes, inlet, input_data, cardiac_T, dx, halfDx, invDx, A0, s_A0, s_inv_A0, beta, Pext, gamma, gamma_ghost, viscT, wallE, Rt, R1, R2, Cc
+        return sim_dat, sim_dat_aux, edges, outlet, inlet, input_data, cardiac_T, dx, A0, beta, Pext, gamma, viscT, wallE, Rt, R1, R2, Cc
 
     #for j in np.arange(0,,1):
     
@@ -201,13 +191,12 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
     #    return j < ini.EDGES.edges.shape[0]
 
 
-    sim_dat, sim_dat_aux, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = jax.lax.fori_loop(0, ini.EDGES.edges.shape[0], 
-                      body_fun, (sim_dat, sim_dat_aux, ini.EDGES.edges, 
-                                 ini.EDGES.inlets, ini.EDGES.outlets, 
-                                 ini.OUTLET_TYPES, ini.MESH_SIZES, ini.INLET_TYPES, ini.INPUT_DATAS, ini.CARDIAC_TS, 
-                                 ini.DXS, ini.HALFDXS, ini.INVDXS,
-                                 ini.A0S, ini.S_A0S, ini.S_INV_A0S, ini.BETAS, 
-                                 ini.PEXTS, ini.GAMMAS, ini.GAMMA_GHOSTS, ini.VISCTS, ini.WALLES, 
+    sim_dat, sim_dat_aux, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,  = jax.lax.fori_loop(0, ini.NUM_VESSELS, 
+                      body_fun, (sim_dat, sim_dat_aux, ini.EDGES, 
+                                 ini.OUTLET_TYPES, ini.INLET_TYPES, ini.INPUT_DATAS, ini.CARDIAC_TS, 
+                                 ini.DXS, 
+                                 ini.A0S, ini.BETAS, 
+                                 ini.PEXTS, ini.GAMMAS, ini.VISCTS, ini.WALLES, 
                                  ini.RTS, ini.R1S, ini.R2S, ini.CCS))
 
     
@@ -219,9 +208,9 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
 def solveVessel(inlet, u0, u1, Q, A, 
                 c0, c1, U00Q, U00A, UM1Q, UM1A, 
                 dt, t, input_data, cardiac_T, 
-                dx, halfDx, invDx, A0, s_A0, s_inv_A0, beta, Pext,
-                gamma, gamma_ghost, viscT, wallE):
-    _Q, _A = jax.lax.cond(inlet > 0, lambda: setInletBC(inlet, u0, u1, A[0], c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext), lambda: (Q[0],A[0]))
+                dx, A0, beta, Pext,
+                gamma, viscT, wallE):
+    _Q, _A = jax.lax.cond(inlet > 0, lambda: setInletBC(inlet, u0, u1, A[0], c0, c1, t, dt, input_data, cardiac_T, 1/dx, A0[0], beta, Pext), lambda: (Q[0],A[0]))
     Q = Q.at[0].set(_Q)
     A = A.at[0].set(_A)
 
@@ -231,13 +220,21 @@ def solveVessel(inlet, u0, u1, Q, A,
     #    A = A.at[0].set(A0)
 
     return muscl(U00Q, U00A, 
-                UM1Q, UM1A, Q.transpose(), A.transpose(), s_A0, s_inv_A0,
-                dt, dx, halfDx, invDx, beta, Pext, gamma, gamma_ghost, viscT, wallE)
+                UM1Q, UM1A, Q.transpose(), A.transpose(), A0,
+                dt, dx, beta, Pext, gamma, viscT, wallE)
 
 #@partial(jax.jit, static_argnums=(0,))
 @jax.jit
-def muscl(U00Q, U00A, UM1Q, UM1A, Q, A, s_A0, s_inv_A0, dt, dx, halfDx, invDx, beta, Pext, gamma, gamma_ghost, viscT, wallE):
+def muscl(U00Q, U00A, UM1Q, UM1A, Q, A, A0, dt, dx, beta, Pext, gamma, viscT, wallE):
     M = 242
+    s_A0 = jnp.sqrt(A0)
+    s_inv_A0 = 1/s_A0
+    halfDx = 0.5*dx
+    invDx = 1/dx
+    gamma_ghost = jnp.zeros(M+2)
+    gamma_ghost = gamma_ghost.at[1:M+1].set(gamma)
+    gamma_ghost = gamma_ghost.at[0].set(gamma[0])
+    gamma_ghost = gamma_ghost.at[-1].set(gamma[-1])
     vA = jnp.empty(M+2, dtype=jnp.float64)
     vQ = jnp.empty(M+2, dtype=jnp.float64)
     vA = vA.at[0].set(U00A)
