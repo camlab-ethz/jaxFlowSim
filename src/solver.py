@@ -35,8 +35,8 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
         end = (i+1)*M
         size = input_data.shape[1]
         test = solveVessel(inlet[i], sim_dat[0,start], sim_dat[0,start+1], 
-                                 jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).reshape(M),
-                                 jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).reshape(M),
+                                 jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).flatten(),
+                                 jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).flatten(),
                                  sim_dat[3,start], sim_dat[3,start+1], 
                                  sim_dat_aux[2,i], 
                                  sim_dat_aux[3,i], 
@@ -44,9 +44,9 @@ def solveModel(sim_dat, sim_dat_aux, dt, t):
                                  sim_dat_aux[7,i],
                                  dt, t, jax.lax.dynamic_slice(input_data, (i,0), (2,size)), 
                                  cardiac_T[i], dx[i], 
-                                 jax.lax.dynamic_slice(A0, (i,0), (1,M)).reshape(M), beta[i,0], 
-                                 Pext[i], jax.lax.dynamic_slice(gamma, (i,0), (1,M)).reshape(M), 
-                                 viscT[i], jax.lax.dynamic_slice(wallE, (i,0), (1,M)).reshape(M))
+                                 jax.lax.dynamic_slice(A0, (i,0), (1,M)).flatten(), beta[i,0], 
+                                 Pext[i], jax.lax.dynamic_slice(gamma, (i,0), (1,M)).flatten(), 
+                                 viscT[i], jax.lax.dynamic_slice(wallE, (i,0), (1,M)).flatten())
         sim_dat = jax.lax.dynamic_update_slice(sim_dat, test, (0,start))
 
 

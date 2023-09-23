@@ -47,7 +47,7 @@ def simulation_loop(sim_dat, sim_dat_aux):
     t = 0.0
     passed_cycles = 0
     counter = 0
-    timepoints = np.linspace(0, ini.HEART.cardiac_T, ini.JUMP)
+    timepoints = np.linspace(0, ini.CARDIAC_TS[0], ini.JUMP)
     P_t = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     dt = 0 
@@ -59,7 +59,7 @@ def simulation_loop(sim_dat, sim_dat_aux):
             printConvError(err)
             return False
         ret = jax.lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err))*
-                           ((t_i - ini.HEART.cardiac_T * passed_cycles_i >= ini.HEART.cardiac_T)), 
+                           ((t_i - ini.CARDIAC_TS[0] * passed_cycles_i >= ini.CARDIAC_TS[0])), 
                             printConvErrorWrapper,
                             lambda: True)
         return ret
@@ -81,13 +81,13 @@ def simulation_loop(sim_dat, sim_dat_aux):
             err = computeConvError(P_t, P_l)
             printConvError(err)
 
-        jax.lax.cond(((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
+        jax.lax.cond(((t - ini.CARDIAC_TS[0] * passed_cycles >= ini.CARDIAC_TS[0])*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)
-        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                                            (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
-                                         lambda: (P_t,0,timepoints + ini.HEART.cardiac_T, passed_cycles+1), 
+        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - ini.CARDIAC_TS[0] * passed_cycles >= ini.CARDIAC_TS[0])*
+                                            (t - ini.CARDIAC_TS[0] * passed_cycles + dt > ini.CARDIAC_TS[0])), 
+                                         lambda: (P_t,0,timepoints + ini.CARDIAC_TS[0], passed_cycles+1), 
                                          lambda: (P_l,counter,timepoints, passed_cycles))
         
 
