@@ -53,14 +53,13 @@ def simulation_loop(sim_dat, sim_dat_aux):
     dt = 0 
 
     def cond_fun(args):
-        _, _, t, _, _, passed_cycles, dt, P_t, P_l = args
-        err = computeConvError(P_t, P_l)
+        _, _, t_i, _, _, passed_cycles_i, _, P_t_i, P_l_i = args
+        err = computeConvError(P_t_i, P_l_i)
         def printConvErrorWrapper():
             printConvError(err)
             return False
-        ret = jax.lax.cond((passed_cycles + 1 > 1)*(checkConvergence(err))*
-                           ((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                            (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)), 
+        ret = jax.lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err))*
+                           ((t_i - ini.HEART.cardiac_T * passed_cycles_i >= ini.HEART.cardiac_T)), 
                             printConvErrorWrapper,
                             lambda: True)
         return ret
@@ -83,7 +82,6 @@ def simulation_loop(sim_dat, sim_dat_aux):
             printConvError(err)
 
         jax.lax.cond(((t - ini.HEART.cardiac_T * passed_cycles >= ini.HEART.cardiac_T)*
-                       (t - ini.HEART.cardiac_T * passed_cycles + dt > ini.HEART.cardiac_T)*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)

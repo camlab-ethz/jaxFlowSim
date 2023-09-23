@@ -20,7 +20,7 @@ network:
 
     R0: 0.7581e-2
 
-    inlet: Q
+    inlet: 1
     inlet number: 1
     inlet file: test/aspirator/aspirator_inlet.dat
 
@@ -46,5 +46,5 @@ network:
 
     R0: 0.5492e-2
 
-    outlet: reflection
+    outlet: 1
     Rt: 0.0

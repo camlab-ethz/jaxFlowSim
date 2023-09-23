@@ -148,26 +148,8 @@ class Vessel:
 
 class Vessel_const:
     label: str
-    ID: int
-    sn: int
-    tn: int
-    inlet: bool
     heart: Heart
     M: int
-    dx: float
-    invDx: float
-    halfDx: float
-    beta: jnp.ndarray
-    gamma: jnp.ndarray
-    s_15_gamma: jnp.ndarray
-    gamma_ghost: jnp.ndarray
-    A0: jnp.ndarray
-    s_A0: jnp.ndarray
-    inv_A0: jnp.ndarray
-    s_inv_A0: jnp.ndarray
-    Pext: float
-    viscT: float
-    wallE: np.ndarray
     wallVa: np.ndarray
     wallVb: np.ndarray
     last_P_name: str
@@ -183,43 +165,16 @@ class Vessel_const:
     node2: int
     node3: int
     node4: int
-    Rt: float
-    R1: float
-    R2: float
-    Cc: float
     Pc: float
-    outlet: str
 
-    def __init__(self, Pc, label, ID, sn, tn, inlet, heart, M, dx, 
-                 invDx, halfDx, beta, gamma, s_15_gamma, gamma_ghost, 
-                 A0, s_A0, inv_A0, s_inv_A0, Pext, viscT, wallE, 
+    def __init__(self, label, heart, M,
                  wallVa, wallVb, last_P_name, 
                  last_Q_name, last_A_name, last_c_name, last_u_name, 
                  out_P_name, out_Q_name, out_A_name, out_c_name, 
-                 out_u_name, node2, node3, node4, Rt, R1, R2, Cc, 
-                 outlet):
-        self.Pc = Pc
+                 out_u_name, node2, node3, node4):
         self.label = label
-        self.ID = ID
-        self.sn = sn
-        self.tn = tn
-        self.inlet = inlet
         self.heart = heart
         self.M = M
-        self.dx = dx
-        self.invDx = invDx
-        self.halfDx = halfDx
-        self.beta = beta
-        self.gamma = gamma
-        self.s_15_gamma = s_15_gamma
-        self.gamma_ghost = gamma_ghost
-        self.A0 = A0
-        self.s_A0 = s_A0
-        self.inv_A0 = inv_A0
-        self.s_inv_A0 = s_inv_A0
-        self.Pext = Pext
-        self.viscT = viscT
-        self.wallE = wallE
         self.wallVa = wallVa
         self.wallVb = wallVb
         self.last_P_name = last_P_name
@@ -235,11 +190,6 @@ class Vessel_const:
         self.node2 = node2
         self.node3 = node3
         self.node4 = node4
-        self.Rt = Rt
-        self.R1 = R1
-        self.R2 = R2
-        self.Cc = Cc
-        self.outlet = outlet
     
     #def _tree_flatten(self):
     #    children = (self.A, self.Q, self.u, self.c, self.P, self.A_t, 
