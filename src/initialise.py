@@ -9,30 +9,14 @@ from src.components import Blood
 CCFL = None
 TOTAL_TIME = None
 CONV_TOLL = None
-EDGES = None
 BLOOD = None
 JUMP = None
 MESH_SIZE = None
 NUM_VESSELS = None
-INLET_TYPES = None
-OUTLET_TYPES = None
+SIM_DAT_AUX_CONST = None
+EDGES = None
 INPUT_DATAS = None
-CARDIAC_TS = None
-DXS = None
-GAMMAS = None
-S_15_GAMMA = None
-WALLES = None
-VISCTS = None
-A0S = None
-PEXTS = None
-BETAS = None
-RTS = None
-R1S = None
-R2S = None
-CCS = None
-NODE2S = None
-NODE3S = None
-NODE4S = None
+
 
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
@@ -197,34 +181,20 @@ def buildBlood(blood_data):
 def buildArterialNetwork(network):
     N = len(network)
     M = 1
+
     for i in range(0, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
         M = _M if _M>M else M
+
+    sim_dat = np.zeros((5, N*M), dtype=np.float64)
+    sim_dat_aux = np.zeros((11, N), dtype=np.float64)
+    sim_dat_const = np.zeros((5, N*M), dtype=np.float64)
+    sim_dat_const_aux = np.zeros((10, N), dtype=np.float64)
+    nodes = np.zeros((3, N), dtype=np.int64)
     edges = np.zeros((N, 10), dtype=np.int64)
-    outlet_types = np.zeros(N, dtype=np.int64)
-    inlet_types = np.zeros(N, dtype=np.int64)
     # make max input_data size non static
     input_datas = np.zeros((2*N,100), dtype=np.float64)
-    cardiac_Ts = np.zeros(N, dtype=np.float64)
-    Ls = np.zeros(N, dtype=np.float64)
-    betas = np.zeros((N,M), dtype=np.float64)
-    A0s = np.zeros((N,M), dtype=np.float64)
-    Pexts = np.zeros(N, dtype=np.float64)
-    gammas = np.zeros((N,M), dtype=np.float64)
-    s_15_gammas = np.zeros((N,M), dtype=np.float64)
-    viscTs = np.zeros(N, dtype=np.float64)
-    wallEs = np.zeros((N,M), dtype=np.float64)
-    Rts = np.zeros(N, dtype=np.float64)
-    R1s = np.zeros(N, dtype=np.float64)
-    R2s = np.zeros(N, dtype=np.float64)
-    node2s = np.zeros(N, dtype=np.int32)
-    node3s = np.zeros(N, dtype=np.int32)
-    node4s = np.zeros(N, dtype=np.int32)
-    Ccs = np.zeros(N, dtype=np.float64)
-    mesh_sizes = np.zeros(N, dtype=np.int32)
-    sim_dat = jnp.zeros((5, N*M), dtype=jnp.float64)
-    sim_dat_aux = jnp.zeros((11, N), dtype=jnp.float64)
 
 
     
@@ -232,67 +202,38 @@ def buildArterialNetwork(network):
     start = 0
     for i in range(0, len(network)):
         end = (i+1)*M
-        (A, Q, u, c, P, 
-            W1M0, W2M0, 
-            U00A, U00Q, U01A, U01Q, 
-            UM1A, UM1Q, UM2A, UM2Q, 
-            vessel_name, M, 
-            wallVa, wallVb, 
-            last_P_name, last_Q_name, 
-            last_A_name, last_c_name, 
-            last_u_name, 
-            out_P_name, out_Q_name, 
-            out_A_name, out_c_name, 
-            out_u_name, 
-            node2, node3, node4, ID, sn, tn, 
-            Rt, R1, R2, Cc, outlet, inlet, 
-            input_data, cardiac_T, 
-            dx, beta, A0, Pext, gamma, s_15_gamma, 
-            viscT, wallE, L)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
-        Ls[i] = L
-        outlet_types[i] = outlet
-        inlet_types[i] = inlet
-        input_datas[i:i+2,:input_data.shape[0]] = input_data.transpose()
-        cardiac_Ts[i] = cardiac_T
-        betas[i,:] = beta
-        A0s[i,:] = A0
-        Pexts[i] = Pext
-        gammas[i,:] = gamma
-        s_15_gammas[i,:] = s_15_gamma
-        viscTs[i] = viscT
-        wallEs[i,:] = wallE
-        Rts[i] = Rt
-        R1s[i] = R1
-        R2s[i] = R2
-        Ccs[i] = Cc
-        edges[i, 0] = ID
-        edges[i, 1] = sn
-        edges[i, 2] = tn
-        mesh_sizes[i] = M
-        sim_dat = sim_dat.at[0,start:end].set(u)
-        sim_dat = sim_dat.at[1,start:end].set(Q)
-        sim_dat = sim_dat.at[2,start:end].set(A)
-        sim_dat = sim_dat.at[3,start:end].set(c)
-        sim_dat = sim_dat.at[4,start:end].set(P)
-        sim_dat_aux = sim_dat_aux.at[0,i].set(W1M0)
-        sim_dat_aux = sim_dat_aux.at[1,i].set(W2M0)
-        sim_dat_aux = sim_dat_aux.at[2,i].set(U00Q)
-        sim_dat_aux = sim_dat_aux.at[3,i].set(U00A)
-        sim_dat_aux = sim_dat_aux.at[4,i].set(U01Q)
-        sim_dat_aux = sim_dat_aux.at[5,i].set(U01A)
-        sim_dat_aux = sim_dat_aux.at[6,i].set(UM1Q)
-        sim_dat_aux = sim_dat_aux.at[7,i].set(UM1A)
-        sim_dat_aux = sim_dat_aux.at[8,i].set(UM2Q)
-        sim_dat_aux = sim_dat_aux.at[9,i].set(UM2A)
-        sim_dat_aux = sim_dat_aux.at[10,i].set(0.0) #Pc
-        node2s[i] = node2
-        node3s[i] = node3
-        node4s[i] = node4
+        (_nodes, 
+        _edges,
+        _input_data,
+        _sim_dat, 
+        _sim_dat_aux,
+        #vessel_name,
+        #wallVa, wallVb, 
+        #last_P_name, last_Q_name, 
+        #last_A_name, last_c_name, 
+        #last_u_name, 
+        #out_P_name, out_Q_name, 
+        #out_A_name, out_c_name, 
+        #out_u_name, 
+        _sim_dat_const,
+        _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
+
+        sim_dat[:,start:end] = _sim_dat
+        sim_dat_aux[:-1,i] = _sim_dat_aux
+        sim_dat_const[:,start:end] = _sim_dat_const
+        sim_dat_const_aux[:,i] = _sim_dat_const_aux
+
+        nodes[:,i] = _nodes
+        edges[i, :3] = _edges
+        input_datas[i:i+2,:_input_data.shape[0]] = _input_data.transpose()
+
         start = end
+
+    sim_dat_const_aux[0,:] = sim_dat_const_aux[0,:]/M
 
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
-        if outlet == 0: #"none":
+        if sim_dat_const_aux[5,i] == 0: #"none":
             t = edges[j,2]
             edges[j,3] = jnp.where(edges[:, 1] == t,jnp.ones_like(edges[:,1]), jnp.zeros_like(edges[:,1])).sum().astype(int)
             edges[j,6] = jnp.where(edges[:, 2] == t,jnp.ones_like(edges[:,2]), jnp.zeros_like(edges[:,2])).sum().astype(int)
@@ -310,60 +251,21 @@ def buildArterialNetwork(network):
                 edges[j,8] = jnp.maximum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][1]
                 edges[j,9] = jnp.where(edges[:, 1] == t)[0][0]
 
-    global EDGES
-    EDGES = edges
 
     global MESH_SIZE
-    MESH_SIZE=mesh_sizes.max()
+    MESH_SIZE=M
     global NUM_VESSELS
-    NUM_VESSELS = len(network)
-    global OUTLET_TYPES
-    OUTLET_TYPES = outlet_types
-    global INLET_TYPES
-    INLET_TYPES = inlet_types
+    NUM_VESSELS = N
+    global EDGES
+    EDGES = edges
     global INPUT_DATAS
     INPUT_DATAS = input_datas
-    global CARDIAC_TS
-    CARDIAC_TS = cardiac_Ts
-    global BETAS
-    BETAS = betas
-    global A0S
-    A0S = A0s
-    global VISCTS
-    VISCTS = viscTs
-    global WALLES
-    WALLES = wallEs
-    global GAMMAS
-    GAMMAS = gammas
-    global S_15_GAMMA
-    S_15_GAMMA = s_15_gammas
-    global PEXTS
-    PEXTS = Pexts
-    global RTS
-    RTS = Rts
-    global R1S
-    R1S = R1s
-    global R2S
-    R2S = R2s
-    global CCS
-    CCS = Ccs
-    dxs = Ls/MESH_SIZE
-    
-    
-    global DXS
-    DXS = dxs
-    global NODE2S
-    NODE2S = node2s
-    global NODE3S
-    NODE3S = node3s
-    global NODE4S
-    NODE4S = node4s
 
-    return sim_dat, sim_dat_aux
+    return nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux
 
 
 def buildVessel(ID, vessel_data, blood, jump, M):
-    vessel_name = vessel_data["label"]
+    #vessel_name = vessel_data["label"]
     sn = int(vessel_data["sn"])
     tn = int(vessel_data["tn"])
     L = float(vessel_data["L"])
@@ -378,19 +280,19 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     inlet, inlet_type, cardiac_T, input_data, inlet_number = buildHeart(vessel_data)
     phi = getPhi(vessel_data)
 
-    Q = jnp.zeros(M, dtype=jnp.float64)
-    P = jnp.zeros(M, dtype=jnp.float64)
-    A = jnp.zeros(M, dtype=jnp.float64)
-    u = jnp.zeros(M, dtype=jnp.float64)
-    c = jnp.zeros(M, dtype=jnp.float64)
-    A0 = np.zeros(M, dtype=jnp.float64)
-    R0 = np.zeros(M, dtype=jnp.float64)
-    beta = np.zeros(M, dtype=jnp.float64)
-    wallE = np.zeros(M, dtype=jnp.float64)
-    gamma = np.zeros(M, dtype=jnp.float64)
-    wallVa = np.zeros(M, dtype=jnp.float64)
-    wallVb = np.zeros(M, dtype=jnp.float64)
-    s_15_gamma = np.zeros(M, dtype=jnp.float64)
+    Q = np.zeros(M, dtype=np.float64)
+    P = np.zeros(M, dtype=np.float64)
+    A = np.zeros(M, dtype=np.float64)
+    u = np.zeros(M, dtype=np.float64)
+    c = np.zeros(M, dtype=np.float64)
+    A0 = np.zeros(M, dtype=np.float64)
+    R0 = np.zeros(M, dtype=np.float64)
+    beta = np.zeros(M, dtype=np.float64)
+    wallE = np.zeros(M, dtype=np.float64)
+    gamma = np.zeros(M, dtype=np.float64)
+    wallVa = np.zeros(M, dtype=np.float64)
+    wallVb = np.zeros(M, dtype=np.float64)
+    s_15_gamma = np.zeros(M, dtype=np.float64)
 
     s_pi = np.sqrt(np.pi)
     s_pi_E_over_sigma_squared = s_pi * E / 0.75
@@ -408,19 +310,18 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     
     Cv = 0.5 * s_pi * phi * h0 / (blood.rho * 0.75)
 
-    for i in range(0,M):
-        R0[i] = radius_slope * i * dx + Rp
-        A0[i] = np.pi * R0[i] * R0[i]
-        A = A.at[i].set(A0[i])
-        beta[i] = 1/jnp.sqrt(A0)[i] * h0 * s_pi_E_over_sigma_squared
-        gamma[i] = beta[i] * one_over_rho_s_p / R0[i]
-        s_15_gamma[i] = np.sqrt(1.5 * gamma[i])
-        c = c.at[i].set(waveSpeed(A[i], gamma[i]))
-        wallE[i] = 3.0 * beta[i] * radius_slope * 1/A0[i] * s_pi * blood.rho_inv
-        if phi != 0.0:
-            wallVb[i] = Cv * 1/jnp.sqrt(A0)[i] * 1/np.sqrt(dx)
-            wallVa[i] = wallVa.at[i].set(0.5 * wallVb[i])
-    P = P.at[0:M].set(pressureSA(jnp.ones(M,jnp.float64), beta, Pext))
+    R0 = radius_slope * np.arange(0,M,1) * dx + Rp
+    A0 = np.pi * R0 * R0
+    A = A0
+    beta = 1/jnp.sqrt(A0) * h0 * s_pi_E_over_sigma_squared
+    gamma = beta * one_over_rho_s_p / R0
+    s_15_gamma = np.sqrt(1.5 * gamma)
+    c = waveSpeed(A, gamma)
+    wallE = 3.0 * beta * radius_slope * 1/A0 * s_pi * blood.rho_inv
+    if phi != 0.0:
+        wallVb = Cv * 1/jnp.sqrt(A0) * 1/np.sqrt(dx)
+        wallVa = 0.5 * wallVb
+    P[0:M] = pressureSA(jnp.ones(M,jnp.float64), beta, Pext)
     
 
 
@@ -441,40 +342,48 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     W1M0 = u[-1] - 4.0 * c[-1]
     W2M0 = u[-1] + 4.0 * c[-1]
 
-    node2 = int(jnp.floor(M * 0.25)) - 1
-    node3 = int(jnp.floor(M * 0.5)) - 1
-    node4 = int(jnp.floor(M * 0.75)) - 1
+    node2 = int(np.floor(M * 0.25)) - 1
+    node3 = int(np.floor(M * 0.5)) - 1
+    node4 = int(np.floor(M * 0.75)) - 1
 
 
-    last_A_name = f"{vessel_name}_A.last"
-    last_Q_name = f"{vessel_name}_Q.last"
-    last_u_name = f"{vessel_name}_u.last"
-    last_c_name = f"{vessel_name}_c.last"
-    last_P_name = f"{vessel_name}_P.last"
+    #last_A_name = f"{vessel_name}_A.last"
+    #last_Q_name = f"{vessel_name}_Q.last"
+    #last_u_name = f"{vessel_name}_u.last"
+    #last_c_name = f"{vessel_name}_c.last"
+    #last_P_name = f"{vessel_name}_P.last"
 
-    out_A_name = f"{vessel_name}_A.out"
-    out_Q_name = f"{vessel_name}_Q.out"
-    out_u_name = f"{vessel_name}_u.out"
-    out_c_name = f"{vessel_name}_c.out"
-    out_P_name = f"{vessel_name}_P.out"
+    #out_A_name = f"{vessel_name}_A.out"
+    #out_Q_name = f"{vessel_name}_Q.out"
+    #out_u_name = f"{vessel_name}_u.out"
+    #out_c_name = f"{vessel_name}_c.out"
+    #out_P_name = f"{vessel_name}_P.out"
 
-    return (A, Q, u, c, P, 
-            W1M0, W2M0, 
-            U00A, U00Q, U01A, U01Q, 
-            UM1A, UM1Q, UM2A, UM2Q, 
-            vessel_name, M, 
-            wallVa, wallVb, 
-            last_P_name, last_Q_name, 
-            last_A_name, last_c_name, 
-            last_u_name, 
-            out_P_name, out_Q_name, 
-            out_A_name, out_c_name, 
-            out_u_name, 
-            node2, node3, node4, ID, sn, tn, 
-            Rt, R1, R2, Cc, outlet, inlet, 
-            input_data, cardiac_T, 
-            dx, beta, A0, Pext, gamma, s_15_gamma, 
-            viscT, wallE, L)
+    sim_dat = np.stack((u,Q,A,c,P))
+    sim_dat_aux = np.array([W1M0, W2M0, 
+            U00Q, U00A, U01Q, U01A, 
+            UM1Q, UM1A, UM2Q, UM2A])
+    sim_dat_const = np.stack((A0, beta, gamma, s_15_gamma, wallE))
+    sim_dat_const_aux = np.array([L, cardiac_T, Pext,
+                                  viscT, inlet, outlet, 
+                                  Rt, R1, R2, Cc])
+    nodes = np.array([node2, node3, node4])
+    edges = np.array([ID, sn, tn])
+    return(nodes,
+           edges,
+           input_data,
+           sim_dat,
+           sim_dat_aux,
+           #vessel_name, 
+           #wallVa, wallVb, 
+           #last_P_name, last_Q_name, 
+           #last_A_name, last_c_name, 
+           #last_u_name, 
+           #out_P_name, out_Q_name, 
+           #out_A_name, out_c_name, 
+           #out_u_name, 
+           sim_dat_const,
+           sim_dat_const_aux)
 
 def computeRadiusSlope(Rp, Rd, L):
     return (Rd - Rp) / L
@@ -583,10 +492,10 @@ def parseCommandline():
 
     return input_filename, verbose, out_files, conv_ceil
 
-def buildConst(Ccfl, total_time, conv_toll):
+def buildConst(Ccfl, total_time, conv_toll, cardiac_T):
     global CCFL
     CCFL = Ccfl
     global TOTAL_TIME
-    TOTAL_TIME = total_time * float(CARDIAC_TS[0])
+    TOTAL_TIME = total_time * cardiac_T
     global CONV_TOLL
     CONV_TOLL = conv_toll

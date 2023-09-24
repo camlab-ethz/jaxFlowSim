@@ -7,19 +7,18 @@ import src.initialise as ini
 
 
 @jit
-def saveTempDatas(P):
+def saveTempDatas(P,nodes):
     P_t_temp = jnp.zeros(5*ini.NUM_VESSELS)
     for i in range(ini.NUM_VESSELS):
         start = i*ini.MESH_SIZE
         end = (i+1)*ini.MESH_SIZE
-        P_t_temp = P_t_temp.at[i*5:(i+1)*5].set(saveTempData(i, P[start:end]))
+        P_t_temp = P_t_temp.at[i*5:(i+1)*5].set(saveTempData(P[start:end], nodes[:,i]))
     
     return P_t_temp
 
-#@jit
-@partial(jit, static_argnums=(0))
-def saveTempData(i, P):
-    return [P[0], P[ini.NODE2S[i]], P[ini.NODE3S[i]], P[ini.NODE4S[i]], P[-1]]
+@jit
+def saveTempData(P, nodes):
+    return [P[0], P[nodes[0]], P[nodes[1]], P[nodes[2]], P[-1]]
     #v.A_t = v.A_t.at[counter, :].set([t, v.A[0], v.A[ini.VCS[i].node2], v.A[ini.VCS[i].node3], v.A[ini.VCS[i].node4], v.A[-1]])
     #v.Q_t = v.Q_t.at[counter, :].set([t, v.Q[0], v.Q[ini.VCS[i].node2], v.Q[ini.VCS[i].node3], v.Q[ini.VCS[i].node4], v.Q[-1]])
     #v.u_t = v.u_t.at[counter, :].set([t, v.u[0], v.u[ini.VCS[i].node2], v.u[ini.VCS[i].node3], v.u[ini.VCS[i].node4], v.u[-1]])

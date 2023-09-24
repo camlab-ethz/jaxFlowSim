@@ -72,7 +72,7 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 @jax.jit
-def setOutletBC(outlet, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, dt, dx, Rt, Cc, R1, R2, beta, gamma, A0, Pext):
+def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
     def outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0):
         P1 = 2.0 * P2 - P3
         u1, Q1, c1 = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
@@ -110,9 +110,9 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
 
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
-    sgamma = 2 * jnp.sqrt(6 * gamma[-1])
+    sgamma = 2 * jnp.sqrt(6 * gamma)
     sA0 = jnp.sqrt(A0)
-    bA0 = beta[-1] / sA0
+    bA0 = beta / sA0
 
     def fun(As):
         return As * R1 * (ul + sgamma * (ssAl - jnp.sqrt(jnp.sqrt(As)))) - (Pext + bA0 * (jnp.sqrt(As) - sA0)) + Pc
@@ -139,7 +139,7 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
         #print(f"\nNewton solver doesn't converge at {vlab} outlet!")
         raise e
 
-    us = (pressure(As, A0, beta[-1], Pext) - Pout) / (As * R1)
+    us = (pressure(As, A0, beta, Pext) - Pout) / (As * R1)
 
     A1 = As
     u1 = us
