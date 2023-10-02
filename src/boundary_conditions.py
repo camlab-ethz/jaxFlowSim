@@ -161,8 +161,8 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
 @jax.jit
 def updateGhostCells(sim_dat):
-    sim_dat_aux_temp = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
-    for i in range(ini.NUM_VESSELS):
+    sim_dat_aux = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
+    def body_fun(i,sim_dat_aux):
         start = i*ini.MESH_SIZE
         end = (i+1)*ini.MESH_SIZE
         Q0 = sim_dat[1,start]
@@ -175,14 +175,18 @@ def updateGhostCells(sim_dat):
         AM2 = sim_dat[2,end-2]
 
         U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[0,i].set(U00Q)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[1,i].set(U00A)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[2,i].set(U01Q)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[3,i].set(U01A)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[4,i].set(UM1Q)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[5,i].set(UM1A)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[6,i].set(UM2Q)
-        sim_dat_aux_temp = sim_dat_aux_temp.at[7,i].set(UM2A)
-        
-    return sim_dat_aux_temp
+        sim_dat_aux = sim_dat_aux.at[0,i].set(U00Q)
+        sim_dat_aux = sim_dat_aux.at[1,i].set(U00A)
+        sim_dat_aux = sim_dat_aux.at[2,i].set(U01Q)
+        sim_dat_aux = sim_dat_aux.at[3,i].set(U01A)
+        sim_dat_aux = sim_dat_aux.at[4,i].set(UM1Q)
+        sim_dat_aux = sim_dat_aux.at[5,i].set(UM1A)
+        sim_dat_aux = sim_dat_aux.at[6,i].set(UM2Q)
+        sim_dat_aux = sim_dat_aux.at[7,i].set(UM2A)
+
+        return sim_dat_aux
+
+    sim_dat_aux = jax.lax.fori_loop(0,ini.NUM_VESSELS, body_fun, sim_dat_aux)
+
+    return sim_dat_aux
     #return [updateGhostCell(vessel) for vessel in vessels]

@@ -22,7 +22,7 @@ network:
 
     E: 500.0e3 # Young's modulus (Pa)
 
-    inlet: Q
+    inlet: 1
     inlet file: test/conjunction/conjunction_inlet.dat
     inlet number: 1
 
@@ -37,5 +37,5 @@ network:
 
     E: 700.0e3 # Young's modulus (Pa)
 
-    outlet: reflection
+    outlet: 1 #reflection
     Rt: 0.0

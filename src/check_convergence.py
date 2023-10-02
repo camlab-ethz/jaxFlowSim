@@ -6,9 +6,11 @@ import src.initialise as ini
 @jax.jit
 def calcNorms(P_t, P_l):
     norms = jnp.zeros(ini.NUM_VESSELS,dtype=jnp.float64)
-    for i in range(ini.NUM_VESSELS):
+    def body_fun(i,norms):
         err = P_l[:, i*5 + 2] - P_t[:, i*5 + 2]
         norms = norms.at[i].set(jnp.sqrt(jnp.sum(err**2)))
+        return norms
+    norms = jax.lax.fori_loop(0,ini.NUM_VESSELS,body_fun, norms)
     return norms
 
 @jax.jit

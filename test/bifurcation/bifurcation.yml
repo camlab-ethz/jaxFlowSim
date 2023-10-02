@@ -22,7 +22,7 @@ network:
 
     E: 500.0e3 # Young's modulus (Pa)
 
-    inlet: Q
+    inlet: 1
     inlet file: test/bifurcation/bifurcation_inlet.dat
     inlet number: 1
 
@@ -37,7 +37,7 @@ network:
 
     E: 700.0e3 # Young's modulus (Pa)
 
-    outlet: wk3
+    outlet: 3
     R1: 6.8123e7
     R2: 3.1013e9
     Cc: 3.6664e-10
@@ -53,7 +53,7 @@ network:
 
     E: 700.0e3 # Young's modulus (Pa)
 
-    outlet: wk3
+    outlet: 3
     R1: 6.8123e7
     R2: 3.1013e9
     Cc: 3.6664e-10

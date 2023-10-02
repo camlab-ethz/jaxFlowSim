@@ -23,7 +23,7 @@ network:
     E: 400.0e3 # Young's modulus (Pa)
     h0: 0.82e-3
 
-    inlet: 0
+    inlet: 1
     inlet file: test/single-artery/single-artery_inlet.dat
     inlet number: 1
 

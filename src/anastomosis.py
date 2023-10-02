@@ -7,9 +7,13 @@ from functools import partial
 import jax
 
 
-#@jit
-@partial(jit, static_argnums=(0,1,2,))
-def solveAnastomosis(l, m, n, u1, u2, u3, A1, A2, A3):
+@jit
+def solveAnastomosis(u1, u2, u3, 
+                     A1, A2, A3,
+                     A01, A02, A03,
+                     beta1, beta2, beta3,
+                     gamma1, gamma2, gamma3,
+                     Pext1, Pext2, Pext3):
     U0 = jnp.array((u1,
                     u2,
                     u3,
@@ -17,22 +21,31 @@ def solveAnastomosis(l, m, n, u1, u2, u3, A1, A2, A3):
                     jnp.sqrt(jnp.sqrt(A2)),
                     jnp.sqrt(jnp.sqrt(A3))), dtype=jnp.float64)
 
-    k1 = ini.VCS[l].s_15_gamma[-1]
-    k2 = ini.VCS[m].s_15_gamma[-1]
-    k3 = ini.VCS[n].s_15_gamma[0]
+    k1 = jnp.sqrt(1.5*gamma1)
+    k2 = jnp.sqrt(1.5*gamma2)
+    k3 = jnp.sqrt(1.5*gamma3)
     k = jnp.array([k1, k2, k3], dtype=jnp.float64)
 
-    J = calculateJacobianAnastomosis((l, m, n), U0, k)
-    U = newtonRaphson((l, m, n), calculateWstarAnastomosis, calculateFAnastomosis, J, U0, k)[0]
+    J = calculateJacobianAnastomosis(U0, k,
+                                     A01, A02, A03,
+                                     beta1, beta2, beta3)
+    U = newtonRaphson(calculateWstarAnastomosis, calculateFAnastomosis, 
+                      J, U0, k,
+                      (A01, A02, A03),
+                      (beta1, beta2, beta3))[0]
         
     #jax.debug.breakpoint()
 
-    return updateAnastomosis(l, m, n, U)
+    return updateAnastomosis(U,
+                             A01, A02, A03,
+                             beta1, beta2, beta3,
+                             gamma1, gamma2, gamma3,
+                             Pext1, Pext2, Pext3)
 
-#@jit
-@partial(jit, static_argnums=(0,))
-def calculateJacobianAnastomosis(indices, U, k):
-    l, m, n = indices
+@jit
+def calculateJacobianAnastomosis(U, k,
+                                 A01, A02, A03,
+                                 beta1, beta2, beta3):
     U43 = U[3]**3
     U53 = U[4]**3
     U63 = U[5]**3
@@ -48,11 +61,11 @@ def calculateJacobianAnastomosis(indices, U, k):
     J45 =   4.0 * U[1] * U53
     J46 =  -4.0 * U[2] * U63
 
-    J54 =  2.0 * ini.VCS[l].beta[-1] * U[3] * ini.VCS[l].s_inv_A0[-1]
-    J56 = -2.0 * ini.VCS[n].beta[0] * U[5] * ini.VCS[n].s_inv_A0[0]
+    J54 =  2.0 * beta1 * U[3] * jnp.sqrt(1/A01)
+    J56 = -2.0 * beta3 * U[5] * jnp.sqrt(1/A03)
 
-    J65 =  2.0 * ini.VCS[m].beta[-1] * U[4] * ini.VCS[m].s_inv_A0[-1]
-    J66 = -2.0 * ini.VCS[n].beta[0] * U[5] * ini.VCS[n].s_inv_A0[0]
+    J65 =  2.0 * beta2 * U[4] * jnp.sqrt(1/A02)
+    J66 = -2.0 * beta3 * U[5] * jnp.sqrt(1/A03)
 
     return jnp.array([[1.0, 0.0, 0.0, J14, 0.0, 0.0],
                       [0.0, 1.0, 0.0, 0.0, J25, 0.0],
@@ -69,10 +82,12 @@ def calculateWstarAnastomosis(U, k):
 
     return jnp.array([W1, W2, W3], dtype=jnp.float64)
 
-#@jit
-@partial(jit, static_argnums=(0,))
-def calculateFAnastomosis(indices, U, k, W):
-    l, m, n = indices
+@jit
+def calculateFAnastomosis(U, k, W,
+                          A0s,
+                          betas):
+    A01, A02, A03 = A0s
+    beta1, beta2, beta3 = betas
 
     U42 = U[3]**2
     U52 = U[4]**2
@@ -83,14 +98,17 @@ def calculateFAnastomosis(indices, U, k, W):
     f3 = U[2] - 4 * k[2] * U[5] - W[2]
     f4 = U[0] * U42**2 + U[1] * U52**2 - U[2] * U62**2
 
-    f5 = ini.VCS[l].beta[-1] * (U42 * ini.VCS[l].s_inv_A0[-1] - 1.0) - (ini.VCS[n].beta[0] * (U62 * ini.VCS[n].s_inv_A0[0] - 1.0))
-    f6 = ini.VCS[m].beta[0] * (U52 * ini.VCS[m].s_inv_A0[-1] - 1.0) - (ini.VCS[n].beta[0] * (U62 * ini.VCS[n].s_inv_A0[0] - 1.0))
+    f5 = beta1 * (U42 * jnp.sqrt(1/A01) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
+    f6 = beta2 * (U52 * jnp.sqrt(1/A02) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
 
     return jnp.array([f1, f2, f3, f4, f5, f6], dtype=jnp.float64)
 
-#@jit
-@partial(jit, static_argnums=(0,1,2))
-def updateAnastomosis(l, m, n, U):
+@jit
+def updateAnastomosis(U,
+                      A01, A02, A03,
+                      beta1, beta2, beta3,
+                      gamma1, gamma2, gamma3,
+                      Pext1, Pext2, Pext3):
     u1 = U[0]
     u2 = U[1]
     u3 = U[2]
@@ -103,12 +121,12 @@ def updateAnastomosis(l, m, n, U):
     Q2 = u2 * A2
     Q3 = u3 * A3
 
-    c1 = waveSpeed(A1, ini.VCS[l].gamma[-1])
-    c2 = waveSpeed(A2, ini.VCS[m].gamma[-1])
-    c3 = waveSpeed(A3, ini.VCS[n].gamma[0])
+    c1 = waveSpeed(A1, gamma1)
+    c2 = waveSpeed(A2, gamma2)
+    c3 = waveSpeed(A3, gamma3)
 
-    P1 = pressure(A1, ini.VCS[l].A0[-1], ini.VCS[l].beta[-1], ini.VCS[l].Pext)
-    P2 = pressure(A2, ini.VCS[m].A0[-1], ini.VCS[m].beta[-1], ini.VCS[m].Pext)
-    P3 = pressure(A3, ini.VCS[n].A0[0], ini.VCS[n].beta[0], ini.VCS[n].Pext)
+    P1 = pressure(A1, A01, beta1, Pext1)
+    P2 = pressure(A2, A02, beta2, Pext2)
+    P3 = pressure(A3, A03, beta3, Pext3)
 
     return u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3

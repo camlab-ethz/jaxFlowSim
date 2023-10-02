@@ -12,7 +12,7 @@ def pressureSA(s_A_over_A0, beta, Pext):
 
 @jax.jit
 def waveSpeed(A, gamma):
-    return jnp.sqrt(3 * gamma * jnp.sqrt(A) * 0.5)
+    return jax.lax.sqrt(1.5* gamma * jnp.sqrt(A))
 
 @jax.jit
 def waveSpeedSA(sA, gamma):

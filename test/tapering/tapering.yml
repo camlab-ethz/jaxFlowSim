@@ -24,11 +24,11 @@ network:
     E: 400.0e3 # Young's modulus (Pa)
     h0: 1.2e-3
 
-    inlet: Q
+    inlet: 1
     inlet file: test/tapering/tapering_inlet.dat
     inlet number: 1
 
-    outlet: reflection
+    outlet: 1
     Rt: 0.0
     # R1: 1.8503e7
     # R2: 1.0492e8

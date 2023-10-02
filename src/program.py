@@ -1,8 +1,9 @@
 import jax
+from functools import partial
 import jax.numpy as jnp
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, buildConst, makeResultsFolder
-from src.IOutils import saveTempDatas, writeResults
+from src.IOutils import saveTempDatas#, writeResults
 from src.boundary_conditions import updateGhostCells
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
@@ -20,14 +21,13 @@ def runSimulation_opt(input_filename, verbose=False):
 
     ini.JUMP =  data["solver"]["jump"]
 
-    nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux = buildArterialNetwork(data["network"])
-    timepoints = np.linspace(0, sim_dat_const_aux[1,0], ini.JUMP)
+    sim_dat, sim_dat_aux = buildArterialNetwork(data["network"])
     makeResultsFolder(data, input_filename)
 
     buildConst(float(data["solver"]["Ccfl"]), 
                data["solver"]["cycles"], 
                data["solver"]["convergence tolerance"],
-               sim_dat_const_aux[1,0])
+               ini.SIM_DAT_CONST_AUX[0,1])
     
     if verbose:
         print("Start simulation")
@@ -37,7 +37,7 @@ def runSimulation_opt(input_filename, verbose=False):
         starting_time = time.time_ns()
 
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    simulation_loop(timepoints, nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux)
+    simulation_loop(sim_dat, sim_dat_aux)
 
     if verbose:
         #print("\n")
@@ -47,10 +47,11 @@ def runSimulation_opt(input_filename, verbose=False):
     #writeResults(vessels)
 
 @jax.jit
-def simulation_loop(timepoints, nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux):
+def simulation_loop(sim_dat, sim_dat_aux):
     t = 0.0
     passed_cycles = 0
     counter = 0
+    timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,1], ini.JUMP)
     P_t = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
     dt = 0 
@@ -62,20 +63,21 @@ def simulation_loop(timepoints, nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_
             printConvError(err)
             return False
         ret = jax.lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err))*
-                           ((t_i - sim_dat_const_aux[1,0] * passed_cycles_i >= sim_dat_const_aux[1,0])), 
+                           ((t_i - ini.SIM_DAT_CONST_AUX[0,1] * passed_cycles_i >= ini.SIM_DAT_CONST_AUX[0,1])), 
                             printConvErrorWrapper,
                             lambda: True)
         return ret
 
     def body_fun(args):
         sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l = args
-        dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:], sim_dat_const_aux[0,:])
-        sim_dat, sim_dat_aux = solveModel(t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux)
+        dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:], ini.SIM_DAT_CONST_AUX[:,0])
+        sim_dat, sim_dat_aux = solveModel(t, dt, sim_dat, sim_dat_aux)
         sim_dat_aux = sim_dat_aux.at[2:10,:].set(updateGhostCells(sim_dat))
+        #sim_dat_aux[2:10,:] = updateGhostCells(sim_dat)
 
 
         (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempDatas(sim_dat[4,:], nodes),counter+1), 
+                                         lambda: (saveTempDatas(sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         counter = counter_temp
@@ -84,13 +86,13 @@ def simulation_loop(timepoints, nodes, sim_dat, sim_dat_aux, sim_dat_const, sim_
             err = computeConvError(P_t, P_l)
             printConvError(err)
 
-        jax.lax.cond(((t - sim_dat_const_aux[1,0] * passed_cycles >= sim_dat_const_aux[1,0])*
+        jax.lax.cond(((t - ini.SIM_DAT_CONST_AUX[0,1] * passed_cycles >= ini.SIM_DAT_CONST_AUX[0,1])*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)
-        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - sim_dat_const_aux[1,0] * passed_cycles >= sim_dat_const_aux[1,0])*
-                                            (t - sim_dat_const_aux[1,0] * passed_cycles + dt > sim_dat_const_aux[1,0])), 
-                                         lambda: (P_t,0,timepoints + sim_dat_const_aux[1,0], passed_cycles+1), 
+        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - ini.SIM_DAT_CONST_AUX[0,1] * passed_cycles >= ini.SIM_DAT_CONST_AUX[0,1])*
+                                            (t - ini.SIM_DAT_CONST_AUX[0,1] * passed_cycles + dt > ini.SIM_DAT_CONST_AUX[0,1])), 
+                                         lambda: (P_t,0,timepoints + ini.SIM_DAT_CONST_AUX[0,1], passed_cycles+1), 
                                          lambda: (P_l,counter,timepoints, passed_cycles))
         
 

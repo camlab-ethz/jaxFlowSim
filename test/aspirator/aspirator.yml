@@ -33,7 +33,7 @@ network:
 
     R0: 0.7581e-2
 
-    inlet: Q
+    inlet: 1
     inlet number: 2
     inlet file: test/aspirator/aspirator_2_inlet.dat
 

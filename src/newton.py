@@ -4,14 +4,20 @@ from functools import partial
 import jax
 
 #@jit
-@partial(jit, static_argnums=(0,1,2,))
-def newtonRaphson(indices, fun_w, fun_f, J, U, k):
+@partial(jit, static_argnums=(0,1,))
+def newtonRaphson(fun_w, fun_f, 
+                  J, U, k,
+                  A0s,
+                  betas):
 
     nr_toll_U = 1e-5
     nr_toll_F = 1e-5
 
     W = fun_w(U, k)
-    F = fun_f(indices, U, k, W)
+    F = fun_f(U, k, W,
+              A0s,
+              betas)
+            
     dU = jnp.linalg.solve(J, -F)
     n = F.size
     ones = jnp.ones(n,dtype=jnp.int32)
@@ -21,6 +27,9 @@ def newtonRaphson(indices, fun_w, fun_f, J, U, k):
         #print(jnp.abs(val[0] - val[1]) <= 1e-5)
         #ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
         _, dU, F  = args
+        test = jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
+                                      ones,
+                                      zeros)
         ret = jax.lax.cond(jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
                                       ones,
                                       zeros).sum()==n,
@@ -31,7 +40,9 @@ def newtonRaphson(indices, fun_w, fun_f, J, U, k):
     def body_fun(args):
         U, _, _  = args
         W = fun_w(U, k)
-        F = fun_f(indices, U, k, W)
+        F = fun_f(U, k, W,
+                  A0s,
+                  betas)
         dU = jnp.linalg.solve(J, -F)
         return U+dU, dU, F
 
