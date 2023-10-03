@@ -48,7 +48,7 @@ def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pe
     #    A = areaFromPressure(P0, A0, beta, Pext)
     #    Q0 = u0 * A
     
-    return jax.lax.cond(inlet == 1, lambda: (Q0,  Q0/u0), lambda: (u0 * A, areaFromPressure(P0, A0, beta, Pext)))
+    return jax.lax.cond(inlet == 1, lambda: (Q0,  Q0/u0), lambda: (u0 * areaFromPressure(P0, A0, beta, Pext), areaFromPressure(P0, A0, beta, Pext)))
 
     #return Q0, A
 

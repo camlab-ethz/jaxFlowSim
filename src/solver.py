@@ -60,7 +60,8 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
 
 
         
-        def setOutletBC_wrapper(sim_dat, sim_dat_aux):
+        def setOutletBC_wrapper(sim_dat_all):
+            sim_dat, sim_dat_aux = sim_dat_all
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,end-2]
             Q1 = sim_dat[1,end-1]
@@ -86,7 +87,6 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
                                              sim_dat_const_aux[i,7],
                                              sim_dat_const_aux[i,8],
                                              sim_dat_const_aux[i,9])
-                                             #beta[i], gamma[i], A0[i,M-1])
             sim_dat = sim_dat.at[0,end-1].set(u)
             sim_dat = sim_dat.at[1,end-1].set(Q)
             sim_dat = sim_dat.at[2,end-1].set(A)
@@ -96,14 +96,8 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             #sim_dat_aux[10,i] = Pc
             return sim_dat, sim_dat_aux
 
-        (sim_dat, 
-         sim_dat_aux) = jax.lax.cond(sim_dat_const_aux[i,5] != 0,
-                                    lambda x, y: setOutletBC_wrapper(x, y), 
-                                    lambda x, y: (x, y), sim_dat, sim_dat_aux)
-
-
-
-        def solveBifurcation_wrapper(sim_dat):
+        def solveBifurcation_wrapper(sim_dat_all):
+            sim_dat, sim_dat_aux = sim_dat_all
             d1_i = edges[j,4]
             d2_i = edges[j,5]
             d1_i_start = d1_i*M #mesh_sizes[d1_i]
@@ -158,14 +152,10 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             sim_dat = sim_dat.at[4,d1_i_start].set(P2)
             sim_dat = sim_dat.at[4,d2_i_start].set(P3)
 
-            return sim_dat
+            return sim_dat, sim_dat_aux
 
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * (edges[j,3] == 2),
-                                    lambda x: solveBifurcation_wrapper(x), 
-                                    lambda x: (x), sim_dat)
-
-        #elif :
-        def solveConjunction_wrapper(sim_dat):
+        def solveConjunction_wrapper(sim_dat_all):
+            sim_dat, sim_dat_aux = sim_dat_all
             d_i = edges[j,7]
             d_i_start = d_i*M
             u1 = sim_dat[0,end-1]
@@ -194,16 +184,10 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             sim_dat = sim_dat.at[4,end-1].set(P1)
             sim_dat = sim_dat.at[4,d_i_start].set(P2)
 
-            return sim_dat
+            return sim_dat, sim_dat_aux
 
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * 
-                               (edges[j,3] != 2) *
-                               (edges[j,6] == 1),
-                                lambda x: solveConjunction_wrapper(x), 
-                                lambda x: (x), sim_dat)
-
-        #elif edges[j,6] == 2:                                           
-        def solveAnastomosis_wrapper(sim_dat):
+        def solveAnastomosis_wrapper(sim_dat_all):
+            sim_dat, sim_dat_aux = sim_dat_all
             p1_i = edges[j,7]
             p2_i = edges[j,8]
             d = edges[j,9]
@@ -258,24 +242,21 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
             sim_dat = sim_dat.at[4,d_start].set(P3)
 
-            return sim_dat
+            return sim_dat, sim_dat_aux
         
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * 
-                               (edges[j,3] != 2) *
-                               (edges[j,6] == 2),
-                                lambda x: solveAnastomosis_wrapper(x), 
-                                lambda x: (x), sim_dat)
+        
+        cond_vect = jnp.array([sim_dat_const_aux[i,5] != 0,
+         (sim_dat_const_aux[i,5] == 0) * (edges[j,3] == 2),
+         (sim_dat_const_aux[i,5] == 0) * (edges[j,3] != 2) * (edges[j,6] == 1),
+         (sim_dat_const_aux[i,5] == 0) * (edges[j,3] != 2) * (edges[j,6] == 2)])
+
+        index = jnp.where(cond_vect==True, jnp.array(range(4), dtype=jnp.int64), jnp.zeros(4, dtype=jnp.int64)).sum()
+        funs = [setOutletBC_wrapper, solveBifurcation_wrapper, solveConjunction_wrapper, solveAnastomosis_wrapper]
+
+        sim_dat, sim_dat_aux = jax.lax.switch(index, funs, (sim_dat, sim_dat_aux))
 
         return (edges, input_data, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux)
 
-    #for j in np.arange(0,,1):
-    
-    #def cond_fun(dat):
-    #    _, _, j = dat
-    #    return j < ini.EDGES.edges.shape[0]
-
-
-    #(sim_dat, sim_dat_aux), _ = jax.lax.scan(body_fun, (sim_dat, sim_dat_aux), jnp.arange(ini.NUM_VESSELS))
     (_, _, sim_dat, sim_dat_aux, _, _)  = jax.lax.fori_loop(0, ini.NUM_VESSELS, body_fun, 
                                                    (ini.EDGES, ini.INPUT_DATA, sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX))
 
