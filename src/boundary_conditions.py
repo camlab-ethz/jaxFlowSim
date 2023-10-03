@@ -73,17 +73,16 @@ def areaFromPressure(P, A0, beta, Pext):
 
 @jax.jit
 def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-    def outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0):
-        P1 = 2.0 * P2 - P3
-        u1, Q1, c1 = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
-        return u1, Q1, A1, c1, P1, Pc
-    def threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0):
-        u1, A1, Pc = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
-        return u1, Q1, A1, c1, P1, Pc
+    def outletCompatibility_wrapper():
+        P1_out = 2.0 * P2 - P3
+        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
+        return u1_out, Q1_out, A1, c1_out, P1_out, Pc
+    def threeElementWindkessel_wrapper():
+        u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
+        return u1_out, Q1, A1_out, c1, P1, Pc_out
     return jax.lax.cond(outlet == 1,
-                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0: outletCompatibility_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0),
-                  lambda u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0: threeElementWindkessel_wrapper(u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0), 
-                  u1, u2, A1, c1, c2, P2, P3, Pc, W1M0, W2M0)
+                  lambda: outletCompatibility_wrapper(),
+                  lambda: threeElementWindkessel_wrapper())
 
 @jax.jit
 def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
