@@ -1,10 +1,6 @@
 import jax.numpy as jnp
 from jax import jit
 from src.newton import newtonRaphson
-from src.utils import pressure, waveSpeed
-import src.initialise as ini
-from functools import partial
-import jax
 
 
 @jit
@@ -12,8 +8,7 @@ def solveAnastomosis(u1, u2, u3,
                      A1, A2, A3,
                      A01, A02, A03,
                      beta1, beta2, beta3,
-                     gamma1, gamma2, gamma3,
-                     Pext1, Pext2, Pext3):
+                     gamma1, gamma2, gamma3):
     U0 = jnp.array((u1,
                     u2,
                     u3,
@@ -36,11 +31,7 @@ def solveAnastomosis(u1, u2, u3,
         
     #jax.debug.breakpoint()
 
-    return updateAnastomosis(U,
-                             A01, A02, A03,
-                             beta1, beta2, beta3,
-                             gamma1, gamma2, gamma3,
-                             Pext1, Pext2, Pext3)
+    return updateAnastomosis(U)
 
 @jit
 def calculateJacobianAnastomosis(U, k,
@@ -104,11 +95,7 @@ def calculateFAnastomosis(U, k, W,
     return jnp.array([f1, f2, f3, f4, f5, f6], dtype=jnp.float64)
 
 @jit
-def updateAnastomosis(U,
-                      A01, A02, A03,
-                      beta1, beta2, beta3,
-                      gamma1, gamma2, gamma3,
-                      Pext1, Pext2, Pext3):
+def updateAnastomosis(U):
     u1 = U[0]
     u2 = U[1]
     u3 = U[2]
@@ -120,13 +107,4 @@ def updateAnastomosis(U,
     Q1 = u1 * A1
     Q2 = u2 * A2
     Q3 = u3 * A3
-
-    c1 = waveSpeed(A1, gamma1)
-    c2 = waveSpeed(A2, gamma2)
-    c3 = waveSpeed(A3, gamma3)
-
-    P1 = pressure(A1, A01, beta1, Pext1)
-    P2 = pressure(A2, A02, beta2, Pext2)
-    P3 = pressure(A3, A03, beta3, Pext3)
-
-    return u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3
+    return Q1, Q2, Q3, A1, A2, A3

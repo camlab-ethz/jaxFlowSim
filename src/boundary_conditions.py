@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from src.utils import pressure
-from functools import partial
 import src.initialise as ini
 
 @jax.jit
@@ -72,14 +71,13 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 @jax.jit
-def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
+def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
     def outletCompatibility_wrapper():
-        P1_out = 2.0 * P2 - P3
-        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
-        return u1_out, Q1_out, A1, c1_out, P1_out, Pc
+        u1_out, Q1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
+        return u1_out, Q1_out, A1, Pc
     def threeElementWindkessel_wrapper():
         u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
-        return u1_out, Q1, A1_out, c1, P1, Pc_out
+        return u1_out, Q1, A1_out, Pc_out
     return jax.lax.cond(outlet == 1,
                   lambda: outletCompatibility_wrapper(),
                   lambda: threeElementWindkessel_wrapper())
@@ -92,11 +90,11 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
     W2M += (W2M1 - W2M) * (u1 + c1) * dt / dx
     W1M = W1M0 - Rt * (W2M - W2M0)
 
-    u1, c1 = inverseRiemannInvariants(W1M, W2M)
+    u1, _ = inverseRiemannInvariants(W1M, W2M)
     Q1 = A1 * u1
     #jax.debug.breakpoint()
 
-    return u1, Q1, c1
+    return u1, Q1
 
 @jax.jit
 def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):

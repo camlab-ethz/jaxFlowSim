@@ -68,30 +68,25 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             A1 = sim_dat[2,end-1]
             c1 = sim_dat[3,end-1]
             c2 = sim_dat[3,end-2]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,end-2]
-            P3 = sim_dat[4,end-3]
             Pc = sim_dat_aux[10,i]
             W1M0 = sim_dat_aux[0,i]
             W2M0 = sim_dat_aux[1,i]
-            u, Q, A, c, P1, Pc = setOutletBC(dt,
-                                             u1, u2, Q1, A1, c1, c2, 
-                                             P1, P2, P3, Pc, W1M0, W2M0,
-                                             sim_dat_const[0,end-1],
-                                             sim_dat_const[1,end-1],
-                                             sim_dat_const[2,end-1],
-                                             sim_dat_const_aux[i,0],
-                                             sim_dat_const_aux[i,2],
-                                             sim_dat_const_aux[i,5], 
-                                             sim_dat_const_aux[i,6],
-                                             sim_dat_const_aux[i,7],
-                                             sim_dat_const_aux[i,8],
-                                             sim_dat_const_aux[i,9])
+            u, Q, A, Pc = setOutletBC(dt,
+                                      u1, u2, Q1, A1, c1, c2, 
+                                      Pc, W1M0, W2M0,
+                                      sim_dat_const[0,end-1],
+                                      sim_dat_const[1,end-1],
+                                      sim_dat_const[2,end-1],
+                                      sim_dat_const_aux[i,0],
+                                      sim_dat_const_aux[i,2],
+                                      sim_dat_const_aux[i,5], 
+                                      sim_dat_const_aux[i,6],
+                                      sim_dat_const_aux[i,7],
+                                      sim_dat_const_aux[i,8],
+                                      sim_dat_const_aux[i,9])
             sim_dat = sim_dat.at[0,end-1].set(u)
             sim_dat = sim_dat.at[1,end-1].set(Q)
             sim_dat = sim_dat.at[2,end-1].set(A)
-            sim_dat = sim_dat.at[3,end-1].set(c)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
             sim_dat_aux = sim_dat_aux.at[10,i].set(Pc)
             #sim_dat_aux[10,i] = Pc
             return sim_dat, sim_dat_aux
@@ -105,23 +100,11 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,d1_i_start]
             u3 = sim_dat[0,d2_i_start]
-            Q1 = sim_dat[1,end-1]
-            Q2 = sim_dat[1,d1_i_start]
-            Q3 = sim_dat[1,d2_i_start]
             A1 = sim_dat[2,end-1]
             A2 = sim_dat[2,d1_i_start]
             A3 = sim_dat[2,d2_i_start]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,d1_i_start]
-            c3 = sim_dat[3,d2_i_start]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,d1_i_start]
-            P3 = sim_dat[4,d2_i_start]
-            (u1, u2, u3, 
-             Q1, Q2, Q3, 
-             A1, A2, A3, 
-             c1, c2, c3, 
-             P1, P2, P3) = solveBifurcation(u1, u2, u3, 
+            (Q1, Q2, Q3, 
+             A1, A2, A3) = solveBifurcation(u1, u2, u3, 
                                             A1, A2, A3,
                                             sim_dat_const[0,end-1],
                                             sim_dat_const[0,d1_i_start],
@@ -132,25 +115,13 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
                                             sim_dat_const[2,end-1],
                                             sim_dat_const[2,d1_i_start],
                                             sim_dat_const[2,d2_i_start],
-                                            sim_dat_const_aux[i, 2],
-                                            sim_dat_const_aux[d1_i, 2],
-                                            sim_dat_const_aux[d2_i, 2],
                                             )
-            sim_dat = sim_dat.at[0,end-1].set(u1) 
-            sim_dat = sim_dat.at[0,d1_i_start].set(u2)    
-            sim_dat = sim_dat.at[0,d2_i_start].set(u3)
             sim_dat = sim_dat.at[1,end-1].set(Q1)
             sim_dat = sim_dat.at[1,d1_i_start].set(Q2)
             sim_dat = sim_dat.at[1,d2_i_start].set(Q3)
             sim_dat = sim_dat.at[2,end-1].set(A1)
             sim_dat = sim_dat.at[2,d1_i_start].set(A2)
             sim_dat = sim_dat.at[2,d2_i_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d1_i_start].set(c2)
-            sim_dat = sim_dat.at[3,d2_i_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d1_i_start].set(P2)
-            sim_dat = sim_dat.at[4,d2_i_start].set(P3)
 
             return sim_dat, sim_dat_aux
 
@@ -162,27 +133,19 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             u2 = sim_dat[0,d_i_start]
             A1 = sim_dat[2,end-1]
             A2 = sim_dat[2,d_i_start]
-            (u1, u2, Q1, Q2, 
-             A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
-                                                        A1, A2,
-                                                        sim_dat_const[0,end-1],
-                                                        sim_dat_const[0,d_i_start],
-                                                        sim_dat_const[1,end-1],
-                                                        sim_dat_const[1,d_i_start],
-                                                        sim_dat_const[2,end-1],
-                                                        sim_dat_const[2,d_i_start],
-                                                        sim_dat_const_aux[i, 2],
-                                                        sim_dat_const_aux[d_i, 2])
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start].set(u2)
+            (Q1, Q2, 
+             A1, A2) = solveConjunction(u1, u2, 
+                                        A1, A2,
+                                        sim_dat_const[0,end-1],
+                                        sim_dat_const[0,d_i_start],
+                                        sim_dat_const[1,end-1],
+                                        sim_dat_const[1,d_i_start],
+                                        sim_dat_const[2,end-1],
+                                        sim_dat_const[2,d_i_start])
             sim_dat = sim_dat.at[1,end-1].set(Q1)
             sim_dat = sim_dat.at[1,d_i_start].set(Q2)
             sim_dat = sim_dat.at[2,end-1].set(A1)
             sim_dat = sim_dat.at[2,d_i_start].set(A2)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start].set(c2)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start].set(P2)
 
             return sim_dat, sim_dat_aux
 
@@ -196,19 +159,10 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,p1_i_end-1]
             u3 = sim_dat[0,d_start]
-            Q1 = sim_dat[1,end-1]
-            Q2 = sim_dat[1,p1_i_end-1]
-            Q3 = sim_dat[1,d_start]
             A1 = sim_dat[2,end-1]
             A2 = sim_dat[2,p1_i_end-1]
             A3 = sim_dat[2,d_start]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,p1_i_end-1]
-            c3 = sim_dat[3,d_start]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,p1_i_end-1]
-            P3 = sim_dat[4,d_start]
-            u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = jax.lax.cond(
+            Q1, Q2, Q3, A1, A2, A3 = jax.lax.cond(
                 jnp.maximum(p1_i, p2_i) == i, 
                 lambda: solveAnastomosis(u1, u2, u3, 
                                          A1, A2, A3,
@@ -220,27 +174,18 @@ def solveModel(t, dt, sim_dat, sim_dat_aux):
                                          sim_dat_const[1,d_start],
                                          sim_dat_const[2,end-1],
                                          sim_dat_const[2,p1_i_end-1],
-                                         sim_dat_const[2,d_start],
-                                         sim_dat_const_aux[i, 2],
-                                         sim_dat_const_aux[p1_i, 2],
-                                         sim_dat_const_aux[d, 2],
+                                         sim_dat_const[2,d_start]
                                         ), 
-                lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,p1_i_end-1].set(u2)
-            sim_dat = sim_dat.at[0,d_start].set(u3)
+                lambda: (sim_dat[1,end-1],
+                        sim_dat[1,p1_i_end-1],
+                        sim_dat[1,d_start],
+                        A1, A2, A3))
             sim_dat = sim_dat.at[1,end-1].set(Q1)
             sim_dat = sim_dat.at[1,p1_i_end-1].set(Q2)
             sim_dat = sim_dat.at[1,d_start].set(Q3)
             sim_dat = sim_dat.at[2,end-1].set(A1)
             sim_dat = sim_dat.at[2,p1_i_end-1].set(A2)
             sim_dat = sim_dat.at[2,d_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,p1_i_end-1].set(c2)
-            sim_dat = sim_dat.at[3,d_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
-            sim_dat = sim_dat.at[4,d_start].set(P3)
 
             return sim_dat, sim_dat_aux
         
