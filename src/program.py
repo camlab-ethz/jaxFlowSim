@@ -1,4 +1,5 @@
 import jax
+from functools import partial
 import jax.numpy as jnp
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, buildConst, makeResultsFolder
@@ -51,8 +52,8 @@ def simulation_loop(sim_dat, sim_dat_aux):
     passed_cycles = 0
     counter = 0
     timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,1], ini.JUMP)
-    P_t = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
-    P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5), dtype=jnp.float64)
+    P_t = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5))
+    P_l = jnp.empty((ini.JUMP, ini.NUM_VESSELS*5))
     dt = 0 
 
     def cond_fun(args):
@@ -70,9 +71,9 @@ def simulation_loop(sim_dat, sim_dat_aux):
     def body_fun(args):
         sim_dat, sim_dat_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l = args
         dt = calculateDeltaT(sim_dat[0,:],sim_dat[3,:], ini.SIM_DAT_CONST_AUX[:,0])
-        sim_dat, sim_dat_aux = solveModel(t, dt, sim_dat, sim_dat_aux)
-        sim_dat_aux = sim_dat_aux.at[2:10,:].set(updateGhostCells(sim_dat))
-        #sim_dat_aux[2:10,:] = updateGhostCells(sim_dat)
+        sim_dat, sim_dat_aux = solveModel(t, dt, sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX, ini.EDGES, ini.INPUT_DATA)
+        sim_dat_aux = sim_dat_aux.at[:,2:10].set(updateGhostCells(sim_dat))
+        #sim_dat_aux[:,2:10] = updateGhostCells(sim_dat)
 
 
         (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 

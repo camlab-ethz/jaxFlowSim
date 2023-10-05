@@ -201,7 +201,7 @@ def buildArterialNetwork(network):
     nodes = np.array([node2, node3, node4])
 
     sim_dat = np.zeros((5, N*M), dtype=np.float64)
-    sim_dat_aux = np.zeros((11, N), dtype=np.float64)
+    sim_dat_aux = np.zeros((N,11), dtype=np.float64)
     sim_dat_const = np.zeros((4, N*M), dtype=np.float64)
     sim_dat_const_aux = np.zeros((N, 10), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
@@ -230,7 +230,7 @@ def buildArterialNetwork(network):
         _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
 
         sim_dat[:,start:end] = _sim_dat
-        sim_dat_aux[:-1,i] = _sim_dat_aux
+        sim_dat_aux[i,:-1] = _sim_dat_aux
         sim_dat_const[:,start:end] = _sim_dat_const
         sim_dat_const_aux[i,:] = _sim_dat_const_aux
         #sim_dat_const_aux = sim_dat_const_aux.at[:,i].set(_sim_dat_const_aux)

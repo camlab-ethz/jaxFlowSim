@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from src.utils import pressure
+from functools import partial
 import src.initialise as ini
 
 @jax.jit
@@ -71,13 +72,14 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 @jax.jit
-def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
+def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
     def outletCompatibility_wrapper():
-        u1_out, Q1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
-        return u1_out, Q1_out, A1, Pc
+        P1_out = 2.0 * P2 - P3
+        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
+        return u1_out, Q1_out, A1, c1_out, P1_out, Pc
     def threeElementWindkessel_wrapper():
         u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
-        return u1_out, Q1, A1_out, Pc_out
+        return u1_out, Q1, A1_out, c1, P1, Pc_out
     return jax.lax.cond(outlet == 1,
                   lambda: outletCompatibility_wrapper(),
                   lambda: threeElementWindkessel_wrapper())
@@ -90,11 +92,11 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
     W2M += (W2M1 - W2M) * (u1 + c1) * dt / dx
     W1M = W1M0 - Rt * (W2M - W2M0)
 
-    u1, _ = inverseRiemannInvariants(W1M, W2M)
+    u1, c1 = inverseRiemannInvariants(W1M, W2M)
     Q1 = A1 * u1
     #jax.debug.breakpoint()
 
-    return u1, Q1
+    return u1, Q1, c1
 
 @jax.jit
 def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
@@ -158,7 +160,7 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
 @jax.jit
 def updateGhostCells(sim_dat):
-    sim_dat_aux = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
+    sim_dat_aux = jnp.zeros((ini.NUM_VESSELS,8), dtype=jnp.float64)
     def body_fun(i,sim_dat_aux):
         start = i*ini.MESH_SIZE
         end = (i+1)*ini.MESH_SIZE
@@ -172,14 +174,14 @@ def updateGhostCells(sim_dat):
         AM2 = sim_dat[2,end-2]
 
         U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
-        sim_dat_aux = sim_dat_aux.at[0,i].set(U00Q)
-        sim_dat_aux = sim_dat_aux.at[1,i].set(U00A)
-        sim_dat_aux = sim_dat_aux.at[2,i].set(U01Q)
-        sim_dat_aux = sim_dat_aux.at[3,i].set(U01A)
-        sim_dat_aux = sim_dat_aux.at[4,i].set(UM1Q)
-        sim_dat_aux = sim_dat_aux.at[5,i].set(UM1A)
-        sim_dat_aux = sim_dat_aux.at[6,i].set(UM2Q)
-        sim_dat_aux = sim_dat_aux.at[7,i].set(UM2A)
+        sim_dat_aux = sim_dat_aux.at[i,0].set(U00Q)
+        sim_dat_aux = sim_dat_aux.at[i,1].set(U00A)
+        sim_dat_aux = sim_dat_aux.at[i,2].set(U01Q)
+        sim_dat_aux = sim_dat_aux.at[i,3].set(U01A)
+        sim_dat_aux = sim_dat_aux.at[i,4].set(UM1Q)
+        sim_dat_aux = sim_dat_aux.at[i,5].set(UM1A)
+        sim_dat_aux = sim_dat_aux.at[i,6].set(UM2Q)
+        sim_dat_aux = sim_dat_aux.at[i,7].set(UM2A)
 
         return sim_dat_aux
 

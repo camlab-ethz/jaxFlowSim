@@ -2,12 +2,14 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 from src.newton import newtonRaphson
+from src.utils import pressure, waveSpeed
 import src.initialise as ini
+from functools import partial
 
 @jit
 def solveConjunction(u1, u2, A1, A2, 
                      A01, A02, beta1, beta2, 
-                     gamma1, gamma2):
+                     gamma1, gamma2, Pext1, Pext2):
     U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))), dtype=jnp.float64)
 
     k1 = jnp.sqrt(1.5*gamma1)
@@ -23,7 +25,11 @@ def solveConjunction(u1, u2, A1, A2,
                       (A01, A02),
                       (beta1, beta2))[0]
 
-    return updateConjunction(U)
+    return updateConjunction(U,
+                             A01, A02,
+                             beta1, beta2,
+                             gamma1, gamma2,
+                             Pext1, Pext2)
 
 
 @jit
@@ -81,7 +87,11 @@ def calculateFConjunction(U, k, W,
 
 
 @jax.jit
-def updateConjunction(U):
+def updateConjunction(U,
+                      A01, A02, 
+                      beta1, beta2,
+                      gamma1, gamma2,
+                      Pext1, Pext2):
     u1 = U[0]
     u2 = U[1]
 
@@ -91,4 +101,10 @@ def updateConjunction(U):
     A2  = U[3]*U[3]*U[3]*U[3]
     Q2  = u2 * A2
 
-    return Q1, Q2, A1, A2
+    P1 = pressure(A1, A01, beta1, Pext1)
+    P2 = pressure(A2, A02, beta2, Pext2)
+
+    c1 = waveSpeed(A1, gamma1)
+    c2 = waveSpeed(A2, gamma2)
+
+    return u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2
