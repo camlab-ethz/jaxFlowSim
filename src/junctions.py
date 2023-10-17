@@ -1,10 +1,7 @@
 import jax
-import jax.numpy as jnp
 from src.conjunctions import solveConjunction
-from src.bifurcations import solveBifurcation
 
 
-@jax.jit
 def joinVessels(*args):
     if len(args) == 6:
         return solveConjunction(args[0], args[1], args[2], args[3], args[4], args[5])

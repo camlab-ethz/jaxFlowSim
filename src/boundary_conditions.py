@@ -2,9 +2,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 from src.utils import pressure
-import src.initialise as ini
+from functools import partial
 
-@jax.jit
 def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext):
     #if inlet == 1: #"Q":
     Q0, P0 = jax.lax.cond(inlet==1, lambda:(inputFromData(t, input_data.transpose(), cardiac_T),0.0), lambda:(0.0,inputFromData(t, input_data.transpose(), cardiac_T)))
@@ -13,7 +12,6 @@ def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0
     return inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext)
 
 
-@jax.jit
 def inputFromData(t, input_data, cardiac_T):
     idt = input_data[:, 0]
     idt1 = idt
@@ -30,7 +28,6 @@ def inputFromData(t, input_data, cardiac_T):
 
     return qu
 
-@jax.jit
 def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext):
     W11, W21 = riemannInvariants(u0, c0)
     W12, _ = riemannInvariants(u1, c1)
@@ -51,7 +48,6 @@ def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pe
 
     #return Q0, A
 
-@jax.jit
 def riemannInvariants(u, c):
     W1 = u - 4.0 * c
     W2 = u + 4.0 * c
@@ -59,30 +55,27 @@ def riemannInvariants(u, c):
     return W1, W2
 
 
-@jax.jit
 def inverseRiemannInvariants(W1, W2):
     u = 0.5 * (W1 + W2)
     c = (W2 - W1) * 0.125
 
     return u, c
 
-@jax.jit
 def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
-@jax.jit
-def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
+def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
     def outletCompatibility_wrapper():
-        u1_out, Q1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
-        return u1_out, Q1_out, A1, Pc
+        P1_out = 2.0 * P2 - P3
+        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
+        return u1_out, Q1_out, A1, c1_out, P1_out, Pc
     def threeElementWindkessel_wrapper():
         u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
-        return u1_out, Q1, A1_out, Pc_out
+        return u1_out, Q1, A1_out, c1, P1, Pc_out
     return jax.lax.cond(outlet == 1,
                   lambda: outletCompatibility_wrapper(),
                   lambda: threeElementWindkessel_wrapper())
 
-@jax.jit
 def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
     _, W2M1 = riemannInvariants(u2, c2)
     W1M, W2M = riemannInvariants(u1, c1)
@@ -90,13 +83,12 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
     W2M += (W2M1 - W2M) * (u1 + c1) * dt / dx
     W1M = W1M0 - Rt * (W2M - W2M0)
 
-    u1, _ = inverseRiemannInvariants(W1M, W2M)
+    u1, c1 = inverseRiemannInvariants(W1M, W2M)
     Q1 = A1 * u1
     #jax.debug.breakpoint()
 
-    return u1, Q1
+    return u1, Q1, c1
 
-@jax.jit
 def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     Pout = 0.0
 
@@ -143,7 +135,6 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
 
     return u1, A1, Pc
 
-@jax.jit
 def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
     U00Q = Q0
     U00A = A0
@@ -156,12 +147,12 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
     return U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A
 
-@jax.jit
-def updateGhostCells(sim_dat):
-    sim_dat_aux = jnp.zeros((8,ini.NUM_VESSELS), dtype=jnp.float64)
+@partial(jax.jit, static_argnums=(0, 1))
+def updateGhostCells(M,N,sim_dat):
+    sim_dat_aux = jnp.zeros((N,8), dtype=jnp.float64)
     def body_fun(i,sim_dat_aux):
-        start = i*ini.MESH_SIZE
-        end = (i+1)*ini.MESH_SIZE
+        start = i*M
+        end = (i+1)*M
         Q0 = sim_dat[1,start]
         Q1 = sim_dat[1,start+1]
         QM1 = sim_dat[1,end-1]
@@ -172,18 +163,18 @@ def updateGhostCells(sim_dat):
         AM2 = sim_dat[2,end-2]
 
         U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
-        sim_dat_aux = sim_dat_aux.at[0,i].set(U00Q)
-        sim_dat_aux = sim_dat_aux.at[1,i].set(U00A)
-        sim_dat_aux = sim_dat_aux.at[2,i].set(U01Q)
-        sim_dat_aux = sim_dat_aux.at[3,i].set(U01A)
-        sim_dat_aux = sim_dat_aux.at[4,i].set(UM1Q)
-        sim_dat_aux = sim_dat_aux.at[5,i].set(UM1A)
-        sim_dat_aux = sim_dat_aux.at[6,i].set(UM2Q)
-        sim_dat_aux = sim_dat_aux.at[7,i].set(UM2A)
+        sim_dat_aux = sim_dat_aux.at[i,0].set(U00Q)
+        sim_dat_aux = sim_dat_aux.at[i,1].set(U00A)
+        sim_dat_aux = sim_dat_aux.at[i,2].set(U01Q)
+        sim_dat_aux = sim_dat_aux.at[i,3].set(U01A)
+        sim_dat_aux = sim_dat_aux.at[i,4].set(UM1Q)
+        sim_dat_aux = sim_dat_aux.at[i,5].set(UM1A)
+        sim_dat_aux = sim_dat_aux.at[i,6].set(UM2Q)
+        sim_dat_aux = sim_dat_aux.at[i,7].set(UM2A)
 
         return sim_dat_aux
 
-    sim_dat_aux = jax.lax.fori_loop(0,ini.NUM_VESSELS, body_fun, sim_dat_aux)
+    sim_dat_aux = jax.lax.fori_loop(0,N, body_fun, sim_dat_aux)
 
     return sim_dat_aux
     #return [updateGhostCell(vessel) for vessel in vessels]

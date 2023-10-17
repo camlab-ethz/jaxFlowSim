@@ -1,27 +1,26 @@
-import numpy as np
 import jax.numpy as jnp
 import jax
 from jax import jit
-from jax.experimental import host_callback
+#from jax.experimental import host_callback
 from functools import partial
-import src.initialise as ini
 
 
-@jit
-def saveTempDatas(P):
-    P_t = jnp.zeros(5*ini.NUM_VESSELS)
+#@jit
+@partial(jit, static_argnums=(0,1))
+def saveTempDatas(M, N, nodes, P):
+    P_t = jnp.zeros(5*N)
     def body_fun(i,P_t):
-        start = i*ini.MESH_SIZE
-        end = (i+1)*ini.MESH_SIZE
+        start = i*M
+        end = (i+1)*M
         P_t = P_t.at[i*5].set(P[start])
-        P_t = P_t.at[i*5+1].set(P[start+ini.NODES[0]])
-        P_t = P_t.at[i*5+2].set(P[start+ini.NODES[1]])
-        P_t = P_t.at[i*5+3].set(P[start+ini.NODES[2]])
+        P_t = P_t.at[i*5+1].set(P[start+nodes[0]])
+        P_t = P_t.at[i*5+2].set(P[start+nodes[1]])
+        P_t = P_t.at[i*5+3].set(P[start+nodes[2]])
         P_t = P_t.at[i*5+4].set(P[end-1])
         return P_t
 
 
-    return jax.lax.fori_loop(0, ini.NUM_VESSELS, body_fun, P_t)
+    return jax.lax.fori_loop(0, N, body_fun, P_t)
     
 
 #@jit

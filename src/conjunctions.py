@@ -2,17 +2,17 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 from src.newton import newtonRaphson
-import src.initialise as ini
+from src.utils import pressure, waveSpeed
 
-@jit
 def solveConjunction(u1, u2, A1, A2, 
                      A01, A02, beta1, beta2, 
-                     gamma1, gamma2):
+                     gamma1, gamma2, Pext1, Pext2,
+                     rho):
     U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))), dtype=jnp.float64)
 
     k1 = jnp.sqrt(1.5*gamma1)
     k2 = jnp.sqrt(1.5*gamma2)
-    k3 = ini.BLOOD.rho
+    k3 = rho
     k = jnp.array([k1, k2, k3])
 
     J = calculateJacobianConjunction(U0, k, 
@@ -23,10 +23,13 @@ def solveConjunction(u1, u2, A1, A2,
                       (A01, A02),
                       (beta1, beta2))[0]
 
-    return updateConjunction(U)
+    return updateConjunction(U,
+                             A01, A02,
+                             beta1, beta2,
+                             gamma1, gamma2,
+                             Pext1, Pext2)
 
 
-@jit
 def calculateJacobianConjunction(U, k, 
                                  A01, A02, 
                                  beta1, beta2):
@@ -52,7 +55,6 @@ def calculateJacobianConjunction(U, k,
                       [J41, J42, J43, J44]], dtype=jnp.float64)
 
 
-@jax.jit
 def calculateWStarConjunction(U, k):
     W1 = U[0] + 4.0 * k[0] * U[2]
     W2 = U[1] - 4.0 * k[1] * U[3]
@@ -60,7 +62,6 @@ def calculateWStarConjunction(U, k):
     return jnp.array([W1, W2], dtype=jnp.float64)
 
 
-@jax.jit
 def calculateFConjunction(U, k, W,
                           A0s,
                           betas):
@@ -80,8 +81,11 @@ def calculateFConjunction(U, k, W,
     return jnp.array([f1, f2, f3, f4], dtype=jnp.float64)
 
 
-@jax.jit
-def updateConjunction(U):
+def updateConjunction(U,
+                      A01, A02, 
+                      beta1, beta2,
+                      gamma1, gamma2,
+                      Pext1, Pext2):
     u1 = U[0]
     u2 = U[1]
 
@@ -91,4 +95,10 @@ def updateConjunction(U):
     A2  = U[3]*U[3]*U[3]*U[3]
     Q2  = u2 * A2
 
-    return Q1, Q2, A1, A2
+    P1 = pressure(A1, A01, beta1, Pext1)
+    P2 = pressure(A2, A02, beta2, Pext2)
+
+    c1 = waveSpeed(A1, gamma1)
+    c2 = waveSpeed(A2, gamma2)
+
+    return u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2
