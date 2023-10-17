@@ -36,12 +36,34 @@ def calculateDeltaT(M, N, Ccfl, u, c, dx):
 @partial(jax.jit, static_argnums=(0, 1))
 def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
+    inlet = sim_dat_const_aux[0,4] 
+    u0 = sim_dat[0,0]
+    u1 = sim_dat[0,1]
+    A0 = sim_dat[2,0]
+    c0 = sim_dat[3,0]
+    c1 = sim_dat[3,1]
+    cardiac_T = sim_dat_const_aux[0,1]
+    dx = sim_dat_const_aux[0,0]
+    A00 = sim_dat_const[0,0]
+    beta0 = sim_dat_const[1,0]
+    Pext = sim_dat_const_aux[0,2]
+    sim_dat = sim_dat.at[1:3,0].set(jnp.array(setInletBC(inlet, u0, u1, A0, 
+                        c0, c1, t, dt, 
+                        input_data, cardiac_T, 1/dx, A00, 
+                        beta0, Pext)).transpose())
+    #_Q, _A = setInletBC(inlet, u0, u1, A0, 
+    #                    c0, c1, t, dt, 
+    #                    input_data, cardiac_T, 1/dx, A00, 
+    #                    beta0, Pext)
+    #sim_dat = sim_dat.at[1,0].set(_Q)
+    #sim_dat = sim_dat.at[2,0].set(_A)
 
-    def body_fun(j, dat):
+
+
+    def body_fun1(j, dat):
         (t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho) = dat
         i = edges[j,0]-1
         start = i*M
-        end = (i+1)*M
         size = input_data.shape[1]
         sim_dat = jax.lax.dynamic_update_slice(
             sim_dat,
@@ -66,7 +88,14 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                         jax.lax.dynamic_slice(input_data, (2*i,0), (2,size))), 
             (0,start))
 
+        return (t, dt, sim_dat, sim_dat_aux, 
+                sim_dat_const, sim_dat_const_aux, 
+                edges, input_data, rho)
 
+    def body_fun2(j, dat):
+        (t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho) = dat
+        i = edges[j,0]-1
+        end = (i+1)*M
         
         def setOutletBC_wrapper(sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
@@ -270,7 +299,6 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
         return (t, dt, sim_dat, sim_dat_aux, 
                 sim_dat_const, sim_dat_const_aux, 
                 edges, input_data, rho)
-
     #for j in np.arange(0,,1):
     
     #def cond_fun(dat):
@@ -279,7 +307,11 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
 
 
     #(sim_dat, sim_dat_aux), _ = jax.lax.scan(body_fun, (sim_dat, sim_dat_aux), jnp.arange(ini.NUM_VESSELS))
-    (_, _, sim_dat, sim_dat_aux, _, _, _, _, _)  = jax.lax.fori_loop(0, N, body_fun, 
+    (_, _, sim_dat, sim_dat_aux, _, _, _, _, _)  = jax.lax.fori_loop(0, N, body_fun1, 
+                                                   (t, dt, sim_dat, sim_dat_aux, 
+                                                    sim_dat_const, sim_dat_const_aux, 
+                                                    edges, input_data, rho))
+    (_, _, sim_dat, sim_dat_aux, _, _, _, _, _)  = jax.lax.fori_loop(0, N, body_fun2, 
                                                    (t, dt, sim_dat, sim_dat_aux, 
                                                     sim_dat_const, sim_dat_const_aux, 
                                                     edges, input_data, rho))
@@ -296,9 +328,9 @@ def solveVessel(M, dt, t,
                 dx, cardiac_T, Pext, viscT, inlet,
                 A0, beta, gamma, wallE,
                 input_data):
-    _Q, _A = jax.lax.cond(inlet > 0, lambda: setInletBC(inlet, u0, u1, A[0], c0, c1, t, dt, input_data, cardiac_T, 1/dx, A0[0], beta[0], Pext), lambda: (Q[0],A[0]))
-    Q = Q.at[0].set(_Q)
-    A = A.at[0].set(_A)
+    #_Q, _A = jax.lax.cond(inlet > 0, lambda: setInletBC(inlet, u0, u1, A[0], c0, c1, t, dt, input_data, cardiac_T, 1/dx, A0[0], beta[0], Pext), lambda: (Q[0],A[0]))
+    #Q = Q.at[0].set(_Q)
+    #A = A.at[0].set(_A)
 
     #if inlet > 0:
     #    Q0, A0 = setInletBC(i, u0, u1, A[0], c0, c1, t, dt)
