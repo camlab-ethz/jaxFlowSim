@@ -1,8 +1,6 @@
 import jax.numpy as jnp
-from jax import jit
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
-
 
 def solveAnastomosis(u1, u2, u3, 
                      A1, A2, A3,

@@ -2,6 +2,9 @@ from src.program import runSimulation_opt
 import os
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 from jax.config import config
+import jax
+import os
+#os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
 
 #jax.devices("gpu")[0]
 config.update("jax_enable_x64", True)
