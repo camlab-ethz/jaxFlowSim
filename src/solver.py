@@ -66,21 +66,20 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
         start = i*M
         sim_dat = jax.lax.dynamic_update_slice(
             sim_dat,
-            muscl(M, 
+            muscl(M, dt, 
+                  jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).flatten(),
+                  jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).flatten(), 
                   sim_dat_aux[i,2], 
                   sim_dat_aux[i,3], 
                   sim_dat_aux[i,6], 
                   sim_dat_aux[i,7],
-                  jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).flatten(),
-                  jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).flatten(), 
                   jax.lax.dynamic_slice(sim_dat_const, (0,start), (1,M)).flatten(), 
-                  dt, 
-                  sim_dat_const_aux[i,0], 
                   jax.lax.dynamic_slice(sim_dat_const, (1,start), (1,M)).flatten(), 
-                  sim_dat_const_aux[i,2], 
                   jax.lax.dynamic_slice(sim_dat_const, (2,start), (1,M)).flatten(), 
-                  sim_dat_const_aux[i,3], 
-                  jax.lax.dynamic_slice(sim_dat_const, (3,start), (1,M)).flatten()),
+                  jax.lax.dynamic_slice(sim_dat_const, (3,start), (1,M)).flatten(),
+                  sim_dat_const_aux[i,0], 
+                  sim_dat_const_aux[i,2], 
+                  sim_dat_const_aux[i,3]),
             (0,start))
 
         return (dt, sim_dat, sim_dat_aux, 
@@ -318,7 +317,11 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
 @partial(jax.jit, static_argnums=(0,))
-def muscl(M, U00Q, U00A, UM1Q, UM1A, Q, A, A0, dt, dx, beta, Pext, gamma, viscT, wallE):
+def muscl(M, dt, 
+          Q, A, 
+          U00Q, U00A, UM1Q, UM1A, 
+          A0, beta,  gamma, wallE,
+          dx, Pext,viscT):
     M = ini.MESH_SIZE
     #s_A0 = jax.block_until_ready(shard_map(lambda a: jnp.sqrt(a), mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(A0))
     #jax.debug.print("{x}", x = s_A0)
