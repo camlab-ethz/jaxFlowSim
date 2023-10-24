@@ -200,10 +200,10 @@ def buildArterialNetwork(network):
     node4 = int(np.floor(M * 0.75)) - 1
     nodes = np.array([node2, node3, node4])
 
-    sim_dat = np.zeros((5, N*M), dtype=np.float64)
-    sim_dat_aux = np.zeros((N,11), dtype=np.float64)
-    sim_dat_const = np.zeros((4, N*M), dtype=np.float64)
-    sim_dat_const_aux = np.zeros((N, 10), dtype=np.float64)
+    sim_dat = np.zeros((5*N, M), dtype=np.float64)
+    sim_dat_aux = np.zeros((N*11), dtype=np.float64)
+    sim_dat_const = np.zeros((4*N, M), dtype=np.float64)
+    sim_dat_const_aux = np.zeros((N*10), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
     input_data = np.ones((2*N,100), dtype=np.float64)*1000
@@ -211,9 +211,7 @@ def buildArterialNetwork(network):
 
     
 
-    start = 0
     for i in range(0, len(network)):
-        end = (i+1)*M
         (_edges,
         _input_data,
         _sim_dat, 
@@ -229,23 +227,47 @@ def buildArterialNetwork(network):
         _sim_dat_const,
         _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
 
-        sim_dat[:,start:end] = _sim_dat
-        sim_dat_aux[i,:-1] = _sim_dat_aux
-        sim_dat_const[:,start:end] = _sim_dat_const
-        sim_dat_const_aux[i,:] = _sim_dat_const_aux
+        sim_dat[i,:] = _sim_dat[0,:]
+        sim_dat[i + N,:] = _sim_dat[1,:]
+        sim_dat[i + 2*N,:] = _sim_dat[2,:]
+        sim_dat[i + 3*N,:] = _sim_dat[3,:]
+        sim_dat[i + 4*N,:] = _sim_dat[4,:]
+        sim_dat_aux[i] = _sim_dat_aux[0]
+        sim_dat_aux[i+ N] = _sim_dat_aux[1]
+        sim_dat_aux[i+ 2*N] = _sim_dat_aux[2]
+        sim_dat_aux[i+ 3*N] = _sim_dat_aux[3]
+        sim_dat_aux[i+ 4*N] = _sim_dat_aux[4]
+        sim_dat_aux[i+ 5*N] = _sim_dat_aux[5]
+        sim_dat_aux[i+ 6*N] = _sim_dat_aux[6]
+        sim_dat_aux[i+ 7*N] = _sim_dat_aux[7]
+        sim_dat_aux[i+ 8*N] = _sim_dat_aux[8]
+        sim_dat_aux[i+ 9*N] = _sim_dat_aux[9]
+        sim_dat_const[i,:] = _sim_dat_const[0,:]
+        sim_dat_const[i + N,:] = _sim_dat_const[1,:]
+        sim_dat_const[i + 2*N,:] = _sim_dat_const[2,:]
+        sim_dat_const[i + 3*N,:] = _sim_dat_const[3,:]
+        sim_dat_const_aux[i] = _sim_dat_const_aux[0]
+        sim_dat_const_aux[i+ N] = _sim_dat_const_aux[1]
+        sim_dat_const_aux[i+ 2*N] = _sim_dat_const_aux[2]
+        sim_dat_const_aux[i+ 3*N] = _sim_dat_const_aux[3]
+        sim_dat_const_aux[i+ 4*N] = _sim_dat_const_aux[4]
+        sim_dat_const_aux[i+ 5*N] = _sim_dat_const_aux[5]
+        sim_dat_const_aux[i+ 6*N] = _sim_dat_const_aux[6]
+        sim_dat_const_aux[i+ 7*N] = _sim_dat_const_aux[7]
+        sim_dat_const_aux[i+ 8*N] = _sim_dat_const_aux[8]
+        sim_dat_const_aux[i+ 9*N] = _sim_dat_const_aux[9]
         #sim_dat_const_aux = sim_dat_const_aux.at[:,i].set(_sim_dat_const_aux)
 
         edges[i, :3] = _edges
         input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
 
-        start = end
 
-    sim_dat_const_aux[:,0] = sim_dat_const_aux[:,0]/M
+    sim_dat_const_aux[0:N] = sim_dat_const_aux[0:N]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)
 
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
-        if sim_dat_const_aux[i,5] == 0: #"none":
+        if sim_dat_const_aux[i + 5*N] == 0: #"none":
             t = edges[j,2]
             edges[j,3] = jnp.where(edges[:, 1] == t,jnp.ones_like(edges[:,1]), jnp.zeros_like(edges[:,1])).sum().astype(int)
             edges[j,6] = jnp.where(edges[:, 2] == t,jnp.ones_like(edges[:,2]), jnp.zeros_like(edges[:,2])).sum().astype(int)

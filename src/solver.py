@@ -22,8 +22,7 @@ from jax.experimental.shard_map import shard_map
 def calculateDeltaT(M, N, Ccfl, u, c, dx):
     dt = 1.0
     def body_fun(i,dt):
-        start = i*M
-        Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice_in_dim(u,start,M) + jax.lax.dynamic_slice_in_dim(c,start,M)))
+        Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice(u,(i,0), (1,M)) + jnp.abs(jax.lax.dynamic_slice(c,(i,0), (1,M)))))
         vessel_dt = dx[i] * Ccfl / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
         return dt
@@ -36,21 +35,24 @@ def calculateDeltaT(M, N, Ccfl, u, c, dx):
 @partial(jax.jit, static_argnums=(0, 1))
 def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
-    inlet = sim_dat_const_aux[0,4] 
+    inlet = sim_dat_const_aux[0+4*N] 
     u0 = sim_dat[0,0]
     u1 = sim_dat[0,1]
-    A0 = sim_dat[2,0]
-    c0 = sim_dat[3,0]
-    c1 = sim_dat[3,1]
-    cardiac_T = sim_dat_const_aux[0,1]
-    dx = sim_dat_const_aux[0,0]
+    A0 = sim_dat[2*N,0]
+    c0 = sim_dat[3*N,0]
+    c1 = sim_dat[3*N,1]
+    cardiac_T = sim_dat_const_aux[0+1*N]
+    dx = sim_dat_const_aux[0+0*N]
     A00 = sim_dat_const[0,0]
-    beta0 = sim_dat_const[1,0]
-    Pext = sim_dat_const_aux[0,2]
-    sim_dat = sim_dat.at[1:3,0].set(setInletBC(inlet, u0, u1, A0, 
+    beta0 = sim_dat_const[N,0]
+    Pext = sim_dat_const_aux[0+2*N]
+    new_sim_dat = setInletBC(inlet, u0, u1, A0, 
                         c0, c1, t, dt, 
                         input_data, cardiac_T, 1/dx, A00, 
-                        beta0, Pext))
+                        beta0, Pext)
+    sim_dat = sim_dat.at[N,0].set(new_sim_dat[0])
+    sim_dat = sim_dat.at[2*N,0].set(new_sim_dat[1])
+    #_Q, _A = setInletBC(inlet, u0, u1, A0, 
     #_Q, _A = setInletBC(inlet, u0, u1, A0, 
     #                    c0, c1, t, dt, 
     #                    input_data, cardiac_T, 1/dx, A00, 
@@ -63,27 +65,47 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
     def body_fun1(j, dat):
         (dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux) = dat
         i = edges[j,0]-1
-        start = i*M
-        sim_dat = jax.lax.dynamic_update_slice(
-            sim_dat,
-            muscl(M, dt, 
-                  jax.lax.dynamic_slice(sim_dat, (1,start), (1,M)).flatten(),
-                  jax.lax.dynamic_slice(sim_dat, (2,start), (1,M)).flatten(), 
-                  sim_dat_aux[i,2], 
-                  sim_dat_aux[i,3], 
-                  sim_dat_aux[i,6], 
-                  sim_dat_aux[i,7],
-                  jax.lax.dynamic_slice(sim_dat_const, (0,start), (1,M)).flatten(), 
-                  jax.lax.dynamic_slice(sim_dat_const, (1,start), (1,M)).flatten(), 
-                  jax.lax.dynamic_slice(sim_dat_const, (2,start), (1,M)).flatten(), 
-                  jax.lax.dynamic_slice(sim_dat_const, (3,start), (1,M)).flatten(),
-                  sim_dat_const_aux[i,0], 
-                  sim_dat_const_aux[i,2], 
-                  sim_dat_const_aux[i,3]),
-            (0,start))
+        new_sim_dat = muscl(M, dt, 
+                  jax.lax.dynamic_slice(sim_dat, (i+N,0), (1,M)).flatten(),
+                  jax.lax.dynamic_slice(sim_dat, (i+2*N,0), (1,M)).flatten(), 
+                  sim_dat_aux[i+2*N], 
+                  sim_dat_aux[i+3*N], 
+                  sim_dat_aux[i+6*N], 
+                  sim_dat_aux[i+7*N],
+                  jax.lax.dynamic_slice(sim_dat_const, (i+0,0), (1,M)).flatten(), 
+                  jax.lax.dynamic_slice(sim_dat_const, (i+1*N,0), (1,M)).flatten(), 
+                  jax.lax.dynamic_slice(sim_dat_const, (i+2*N,0), (1,M)).flatten(), 
+                  jax.lax.dynamic_slice(sim_dat_const, (i+3*N,0), (1,M)).flatten(),
+                  sim_dat_const_aux[i+0*N], 
+                  sim_dat_const_aux[i+2*N], 
+                  sim_dat_const_aux[i+3*N])
+        sim_dat = sim_dat.at[i,:].set(new_sim_dat[0,:])
+        sim_dat = sim_dat.at[i + N,:].set(new_sim_dat[1,:])
+        sim_dat = sim_dat.at[i + 2*N,:].set(new_sim_dat[2,:])
+        sim_dat = sim_dat.at[i + 3*N,:].set(new_sim_dat[3,:])
+        sim_dat = sim_dat.at[i + 4*N,:].set(new_sim_dat[4,:])
+
 
         return (dt, sim_dat, sim_dat_aux, 
                 sim_dat_const, sim_dat_const_aux)
+        
+    #sim_dat = jax.vmap(lambda a, b, c, d, e, f, g, h, i, j, k, l, m: muscl(M, dt, 
+    #                                                             a, b, c, 
+    #                                                             d, e, f, 
+    #                                                             g, h, i, 
+    #                                                             j, k, l, m))(sim_dat[N:2*N,:], 
+    #                                                                          sim_dat[2*N:3*N,:],
+    #                                                                          sim_dat_aux[2*N:3*N],
+    #                                                                          sim_dat_aux[3*N:4*N],
+    #                                                                          sim_dat_aux[6*N:7*N],
+    #                                                                          sim_dat_aux[7*N:8*N],
+    #                                                                          sim_dat_const[:1*N,:], 
+    #                                                                          sim_dat_const[1*N:2*N,:],
+    #                                                                          sim_dat_const[2*N:3*N,:], 
+    #                                                                          sim_dat_const[3*N:4*N,:],
+    #                                                                          sim_dat_const_aux[:N],
+    #                                                                          sim_dat_const_aux[2*N:3*N],
+    #                                                                          sim_dat_const_aux[3*N:4*N]).reshape((5*N,M))
 
     (_, sim_dat, sim_dat_aux, _, _)  = jax.lax.fori_loop(0, N, body_fun1, 
                                                    (dt, sim_dat, sim_dat_aux, 
@@ -95,44 +117,44 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
         end = (i+1)*M
         
         def setOutletBC_wrapper(sim_dat, sim_dat_aux):
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,end-2]
-            Q1 = sim_dat[1,end-1]
-            A1 = sim_dat[2,end-1]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,end-2]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,end-2]
-            P3 = sim_dat[4,end-3]
-            Pc = sim_dat_aux[i,10]
-            W1M0 = sim_dat_aux[i,0]
-            W2M0 = sim_dat_aux[i,1]
+            u1 = sim_dat[i+N*0,-1]
+            u2 = sim_dat[i+N*0,-2]
+            Q1 = sim_dat[i+N*1,-1]
+            A1 = sim_dat[i+N*2,-1]
+            c1 = sim_dat[i+N*3,-1]
+            c2 = sim_dat[i+N*3,-2]
+            P1 = sim_dat[i+N*4,-1]
+            P2 = sim_dat[i+N*4,-2]
+            P3 = sim_dat[i+N*4,-3]
+            Pc = sim_dat_aux[i+10*N]
+            W1M0 = sim_dat_aux[i+0*N]
+            W2M0 = sim_dat_aux[i+1*N]
             u, Q, A, c, P1, Pc = setOutletBC(dt,
                                              u1, u2, Q1, A1, c1, c2, 
                                              P1, P2, P3, Pc, W1M0, W2M0,
-                                             sim_dat_const[0,end-1],
-                                             sim_dat_const[1,end-1],
-                                             sim_dat_const[2,end-1],
-                                             sim_dat_const_aux[i,0],
-                                             sim_dat_const_aux[i,2],
-                                             sim_dat_const_aux[i,5], 
-                                             sim_dat_const_aux[i,6],
-                                             sim_dat_const_aux[i,7],
-                                             sim_dat_const_aux[i,8],
-                                             sim_dat_const_aux[i,9])
+                                             sim_dat_const[i+N*0,-1],
+                                             sim_dat_const[i+N*1,-1],
+                                             sim_dat_const[i+N*2,-1],
+                                             sim_dat_const_aux[i+N*0],
+                                             sim_dat_const_aux[i+N*2],
+                                             sim_dat_const_aux[i+N*5], 
+                                             sim_dat_const_aux[i+N*6],
+                                             sim_dat_const_aux[i+N*7],
+                                             sim_dat_const_aux[i+N*8],
+                                             sim_dat_const_aux[i+N*9])
                                              #beta[i], gamma[i], A0[i,M-1])
-            sim_dat = sim_dat.at[0,end-1].set(u)
-            sim_dat = sim_dat.at[1,end-1].set(Q)
-            sim_dat = sim_dat.at[2,end-1].set(A)
-            sim_dat = sim_dat.at[3,end-1].set(c)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat_aux = sim_dat_aux.at[i,10].set(Pc)
+            sim_dat = sim_dat.at[i+N*0,-1].set(u)
+            sim_dat = sim_dat.at[i+N*1,-1].set(Q)
+            sim_dat = sim_dat.at[i+N*2,-1].set(A)
+            sim_dat = sim_dat.at[i+N*3,-1].set(c)
+            sim_dat = sim_dat.at[i+N*4,-1].set(P1)
+            sim_dat_aux = sim_dat_aux.at[i+10*N].set(Pc)
             #sim_dat_aux_out = sim_dat_aux
             #sim_dat_aux_out[i,10] = Pc
             return sim_dat, sim_dat_aux
 
         (sim_dat, 
-         sim_dat_aux) = jax.lax.cond(sim_dat_const_aux[i,5] != 0,
+         sim_dat_aux) = jax.lax.cond(sim_dat_const_aux[i+5*N] != 0,
                                     lambda x, y: setOutletBC_wrapper(x,y), 
                                     lambda x, y: (x,y), sim_dat, sim_dat_aux)
 
@@ -141,89 +163,90 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
         def solveBifurcation_wrapper(sim_dat):
             d1_i = edges[j,4]
             d2_i = edges[j,5]
-            d1_i_start = d1_i*M #mesh_sizes[d1_i]
-            d2_i_start = d2_i*M #mesh_sizes[d2_i]
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,d1_i_start]
-            u3 = sim_dat[0,d2_i_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,d1_i_start]
-            A3 = sim_dat[2,d2_i_start]
+            u1 = sim_dat[i + N*0,-1]
+            u2 = sim_dat[d1_i + N*0,0]
+            u3 = sim_dat[d2_i + N*0,0]
+            A1 = sim_dat[i + N*2,-1]
+            A2 = sim_dat[d1_i + N*2,0]
+            A3 = sim_dat[d2_i + N*2,0]
             (u1, u2, u3, 
              Q1, Q2, Q3, 
              A1, A2, A3, 
              c1, c2, c3, 
              P1, P2, P3) = solveBifurcation(u1, u2, u3, 
                                             A1, A2, A3,
-                                            sim_dat_const[0,end-1],
-                                            sim_dat_const[0,d1_i_start],
-                                            sim_dat_const[0,d2_i_start],
-                                            sim_dat_const[1,end-1],
-                                            sim_dat_const[1,d1_i_start],
-                                            sim_dat_const[1,d2_i_start],
-                                            sim_dat_const[2,end-1],
-                                            sim_dat_const[2,d1_i_start],
-                                            sim_dat_const[2,d2_i_start],
-                                            sim_dat_const_aux[i, 2],
-                                            sim_dat_const_aux[d1_i, 2],
-                                            sim_dat_const_aux[d2_i, 2],
+                                            sim_dat_const[i + 0*N,-1],
+                                            sim_dat_const[d1_i + 0*N,0],
+                                            sim_dat_const[d2_i + 0*N,0],
+                                            sim_dat_const[i + 1*N,-1],
+                                            sim_dat_const[d1_i + 1*N,0],
+                                            sim_dat_const[d2_i + 1*N,0],
+                                            sim_dat_const[i + 2*N,-1],
+                                            sim_dat_const[d1_i + 2*N,0],
+                                            sim_dat_const[d2_i + 2*N,0],
+                                            sim_dat_const_aux[i + 2*N],
+                                            sim_dat_const_aux[d1_i + 2*N],
+                                            sim_dat_const_aux[d2_i + 2*N],
                                             )
-            sim_dat = sim_dat.at[0,end-1].set(u1) 
-            sim_dat = sim_dat.at[0,d1_i_start].set(u2)    
-            sim_dat = sim_dat.at[0,d2_i_start].set(u3)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,d1_i_start].set(Q2)
-            sim_dat = sim_dat.at[1,d2_i_start].set(Q3)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,d1_i_start].set(A2)
-            sim_dat = sim_dat.at[2,d2_i_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d1_i_start].set(c2)
-            sim_dat = sim_dat.at[3,d2_i_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d1_i_start].set(P2)
-            sim_dat = sim_dat.at[4,d2_i_start].set(P3)
+            sim_dat = sim_dat.at[i + 0*N,-1].set(u1) 
+            sim_dat = sim_dat.at[d1_i + 0*N,0].set(u2)    
+            sim_dat = sim_dat.at[d2_i + 0*N,0].set(u3)
+            sim_dat = sim_dat.at[i + 1*N,-1].set(Q1)
+            sim_dat = sim_dat.at[d1_i + 1*N,0].set(Q2)
+            sim_dat = sim_dat.at[d2_i + 1*N,0].set(Q3)
+            sim_dat = sim_dat.at[i + 2*N,-1].set(A1)
+            sim_dat = sim_dat.at[d1_i + 2*N,0].set(A2)
+            sim_dat = sim_dat.at[d2_i + 2*N,0].set(A3)
+            sim_dat = sim_dat.at[i + 3*N,-1].set(c1)
+            sim_dat = sim_dat.at[d1_i + 3*N,0].set(c2)
+            sim_dat = sim_dat.at[d2_i + 3*N,0].set(c3)
+            sim_dat = sim_dat.at[i + 4*N,-1].set(P1)
+            sim_dat = sim_dat.at[d1_i + 4*N,0].set(P2)
+            sim_dat = sim_dat.at[d2_i + 4*N,0].set(P3)
 
             return sim_dat
 
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * (edges[j,3] == 2),
+        sim_dat = jax.lax.cond((sim_dat_const_aux[i + 5*N] == 0) * (edges[j,3] == 2),
                                     lambda x: solveBifurcation_wrapper(x), 
                                     lambda x: x, sim_dat)
 
         #elif :
         def solveConjunction_wrapper(sim_dat, rho):
             d_i = edges[j,7]
-            d_i_start = d_i*M
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,d_i_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,d_i_start]
+            u1 = sim_dat[i + 0*N,-1]
+            u2 = sim_dat[d_i + 0*N,0]
+            A1 = sim_dat[i + 2*N,-1]
+            A2 = sim_dat[d_i + 2*N,0]
             (u1, u2, Q1, Q2, 
              A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
                                                         A1, A2,
-                                                        sim_dat_const[0,end-1],
-                                                        sim_dat_const[0,d_i_start],
-                                                        sim_dat_const[1,end-1],
-                                                        sim_dat_const[1,d_i_start],
-                                                        sim_dat_const[2,end-1],
-                                                        sim_dat_const[2,d_i_start],
-                                                        sim_dat_const_aux[i, 2],
-                                                        sim_dat_const_aux[d_i, 2],
+                                                        sim_dat_const[i + 0*N,-1],
+                                                        sim_dat_const[d_i + 0*N,0],
+                                                        sim_dat_const[i + 1*N,-1],
+                                                        sim_dat_const[d_i + 1*N,0],
+                                                        sim_dat_const[i + 2*N,-1],
+                                                        sim_dat_const[d_i + 2*N,0],
+                                                        sim_dat_const_aux[i + 2*N],
+                                                        sim_dat_const_aux[d_i + 2*N],
                                                         rho)
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start].set(u2)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start].set(Q2)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start].set(A2)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start].set(c2)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start].set(P2)
+            sim_dat = sim_dat.at[i + 0*N,-1].set(u1)
+            sim_dat = sim_dat.at[d_i + 0*N,0].set(u2)
+            sim_dat = sim_dat.at[i + 1*N,-1].set(Q1)
+            sim_dat = sim_dat.at[d_i + 1*N,0].set(Q2)
+            sim_dat = sim_dat.at[i + 2*N,-1].set(A1)
+            sim_dat = sim_dat.at[d_i + 2*N,0].set(A2)
+            sim_dat = sim_dat.at[i + 3*N,-1].set(c1)
+            sim_dat = sim_dat.at[d_i + 3*N,0].set(c2)
+            sim_dat = sim_dat.at[i + 4*N,-1].set(P1)
+            sim_dat = sim_dat.at[d_i + 4*N,0].set(P2)
+
+            #jax.debug.print("{x}", x = (u1, u2, Q1, Q2, 
+            #                            A1, A2, c1, c2, 
+            #                            P1, P2))
 
             return sim_dat
 
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * 
+        sim_dat = jax.lax.cond((sim_dat_const_aux[i+5*N] == 0) * 
                                (edges[j,3] != 2) *
                                (edges[j,6] == 1),
                                 lambda x, y: solveConjunction_wrapper(x, y), 
@@ -234,60 +257,58 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
             p1_i = edges[j,7]
             p2_i = edges[j,8]
             d = edges[j,9]
-            p1_i_end = (p1_i+1)*M
-            d_start = d*M
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,p1_i_end-1]
-            u3 = sim_dat[0,d_start]
-            Q1 = sim_dat[1,end-1]
-            Q2 = sim_dat[1,p1_i_end-1]
-            Q3 = sim_dat[1,d_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,p1_i_end-1]
-            A3 = sim_dat[2,d_start]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,p1_i_end-1]
-            c3 = sim_dat[3,d_start]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,p1_i_end-1]
-            P3 = sim_dat[4,d_start]
+            u1 = sim_dat[i + 0*N,-1]
+            u2 = sim_dat[p1_i + 0*N,-1]
+            u3 = sim_dat[d + 0*N,0]
+            Q1 = sim_dat[i + 1*N,-1]
+            Q2 = sim_dat[p1_i + 1*N,-1]
+            Q3 = sim_dat[d + 1*N,0]
+            A1 = sim_dat[i + 2*N,-1]
+            A2 = sim_dat[p1_i + 2*N,-1]
+            A3 = sim_dat[d + 2*N,0]
+            c1 = sim_dat[i + 3*N,-1]
+            c2 = sim_dat[p1_i + 3*N,-1]
+            c3 = sim_dat[d + 3*N,0]
+            P1 = sim_dat[i + 4*N,-1]
+            P2 = sim_dat[p1_i + 4*N,-1]
+            P3 = sim_dat[d + 4,0]
             u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = jax.lax.cond(
                 jnp.maximum(p1_i, p2_i) == i, 
                 lambda: solveAnastomosis(u1, u2, u3, 
                                          A1, A2, A3,
-                                         sim_dat_const[0,end-1],
-                                         sim_dat_const[0,p1_i_end-1],
-                                         sim_dat_const[0,d_start],
-                                         sim_dat_const[1,end-1],
-                                         sim_dat_const[1,p1_i_end-1],
-                                         sim_dat_const[1,d_start],
-                                         sim_dat_const[2,end-1],
-                                         sim_dat_const[2,p1_i_end-1],
-                                         sim_dat_const[2,d_start],
-                                         sim_dat_const_aux[i, 2],
-                                         sim_dat_const_aux[p1_i, 2],
-                                         sim_dat_const_aux[d, 2],
+                                         sim_dat_const[i + 0*N,-1],
+                                         sim_dat_const[p1_i + 0*N,-1],
+                                         sim_dat_const[d + 0*N,0],
+                                         sim_dat_const[i + 1*N,-1],
+                                         sim_dat_const[p1_i + 1*N,-1],
+                                         sim_dat_const[d + 1*N,0],
+                                         sim_dat_const[i + 2*N,-1],
+                                         sim_dat_const[p1_i + 2*N,-1],
+                                         sim_dat_const[d + 2*N,0],
+                                         sim_dat_const_aux[i + 2*N],
+                                         sim_dat_const_aux[p1_i + 2*N],
+                                         sim_dat_const_aux[d + 2*N],
                                         ), 
                 lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,p1_i_end-1].set(u2)
-            sim_dat = sim_dat.at[0,d_start].set(u3)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,p1_i_end-1].set(Q2)
-            sim_dat = sim_dat.at[1,d_start].set(Q3)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,p1_i_end-1].set(A2)
-            sim_dat = sim_dat.at[2,d_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,p1_i_end-1].set(c2)
-            sim_dat = sim_dat.at[3,d_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
-            sim_dat = sim_dat.at[4,d_start].set(P3)
+            sim_dat = sim_dat.at[i+ 0*N,-1].set(u1)
+            sim_dat = sim_dat.at[p1_i + 0*N,-1].set(u2)
+            sim_dat = sim_dat.at[d + 0*N,0].set(u3)
+            sim_dat = sim_dat.at[i+ 1*N,-1].set(Q1)
+            sim_dat = sim_dat.at[p1_i + 1*N,-1].set(Q2)
+            sim_dat = sim_dat.at[d + 1*N,0].set(Q3)
+            sim_dat = sim_dat.at[i+ 2*N,-1].set(A1)
+            sim_dat = sim_dat.at[p1_i + 2*N,-1].set(A2)
+            sim_dat = sim_dat.at[d + 2*N,0].set(A3)
+            sim_dat = sim_dat.at[i+ 3*N,-1].set(c1)
+            sim_dat = sim_dat.at[p1_i + 3*N,-1].set(c2)
+            sim_dat = sim_dat.at[d + 3*N,0].set(c3)
+            sim_dat = sim_dat.at[i+ 4*N,-1].set(P1)
+            sim_dat = sim_dat.at[p1_i + 4*N,-1].set(P2)
+            sim_dat = sim_dat.at[d + 4*N,0].set(P3)
 
             return sim_dat
         
-        sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * 
+        sim_dat = jax.lax.cond((sim_dat_const_aux[i + 5*N] == 0) * 
                                (edges[j,3] != 2) *
                                (edges[j,6] == 2),
                                 lambda x: solveAnastomosis_wrapper(x), 

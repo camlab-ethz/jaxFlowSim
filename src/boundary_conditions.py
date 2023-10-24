@@ -149,28 +149,26 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
 @partial(jax.jit, static_argnums=(0, 1))
 def updateGhostCells(M,N,sim_dat):
-    sim_dat_aux = jnp.zeros((N,8), dtype=jnp.float64)
+    sim_dat_aux = jnp.zeros((N*8), dtype=jnp.float64)
     def body_fun(i,sim_dat_aux):
-        start = i*M
-        end = (i+1)*M
-        Q0 = sim_dat[1,start]
-        Q1 = sim_dat[1,start+1]
-        QM1 = sim_dat[1,end-1]
-        QM2 = sim_dat[1,end-2]
-        A0 = sim_dat[2,start]
-        A1 = sim_dat[2,start+1]
-        AM1 = sim_dat[2,end-1]
-        AM2 = sim_dat[2,end-2]
+        Q0 = sim_dat[i + 1*N,0]
+        Q1 = sim_dat[i + 1*N,1]
+        QM1 = sim_dat[i + 1*N,-1]
+        QM2 = sim_dat[i + 1*N,-2]
+        A0 = sim_dat[i + 2*N,0]
+        A1 = sim_dat[i + 2*N,1]
+        AM1 = sim_dat[i + 2*N,-1]
+        AM2 = sim_dat[i + 2*N,-2]
 
         U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
-        sim_dat_aux = sim_dat_aux.at[i,0].set(U00Q)
-        sim_dat_aux = sim_dat_aux.at[i,1].set(U00A)
-        sim_dat_aux = sim_dat_aux.at[i,2].set(U01Q)
-        sim_dat_aux = sim_dat_aux.at[i,3].set(U01A)
-        sim_dat_aux = sim_dat_aux.at[i,4].set(UM1Q)
-        sim_dat_aux = sim_dat_aux.at[i,5].set(UM1A)
-        sim_dat_aux = sim_dat_aux.at[i,6].set(UM2Q)
-        sim_dat_aux = sim_dat_aux.at[i,7].set(UM2A)
+        sim_dat_aux = sim_dat_aux.at[i + 0*N].set(U00Q)
+        sim_dat_aux = sim_dat_aux.at[i + 1*N].set(U00A)
+        sim_dat_aux = sim_dat_aux.at[i + 2*N].set(U01Q)
+        sim_dat_aux = sim_dat_aux.at[i + 3*N].set(U01A)
+        sim_dat_aux = sim_dat_aux.at[i + 4*N].set(UM1Q)
+        sim_dat_aux = sim_dat_aux.at[i + 5*N].set(UM1A)
+        sim_dat_aux = sim_dat_aux.at[i + 6*N].set(UM2Q)
+        sim_dat_aux = sim_dat_aux.at[i + 7*N].set(UM2A)
 
         return sim_dat_aux
 

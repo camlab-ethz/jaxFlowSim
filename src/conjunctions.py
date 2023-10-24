@@ -22,6 +22,11 @@ def solveConjunction(u1, u2, A1, A2,
                       J, U0, k,
                       (A01, A02),
                       (beta1, beta2))[0]
+    
+    #jax.debug.print("{x}", x = (u1, u2, A1, A2, 
+    #                            A01, A02, beta1, beta2, 
+    #                            gamma1, gamma2, Pext1, Pext2, 
+    #                            rho))
 
     return updateConjunction(U,
                              A01, A02,
