@@ -21,5 +21,5 @@ import jax
 
 a = jax.numpy.arange(12).reshape((3, 4))
 b = jax.numpy.arange(12).reshape((3,4))
-print(jax.vmap(lambda x, y: jax.numpy.stack((x, x)))(a, b).reshape((6,4)))
+print(jax.vmap(lambda x, y: jax.numpy.stack((x, x)), out_axes=1)(a, b))
 print(a, b)

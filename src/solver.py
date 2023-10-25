@@ -52,12 +52,49 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                         beta0, Pext)
     sim_dat = sim_dat.at[N,0].set(new_sim_dat[0])
     sim_dat = sim_dat.at[2*N,0].set(new_sim_dat[1])
+    #_Q, _A = setInletBC(inlet, u0, u1, A0, 
+    #_Q, _A = setInletBC(inlet, u0, u1, A0, 
+    #                    c0, c1, t, dt, 
+    #                    input_data, cardiac_T, 1/dx, A00, 
+    #                    beta0, Pext)
+    #sim_dat = sim_dat.at[1,0].set(_Q)
+    #sim_dat = sim_dat.at[2,0].set(_A)
+
+
+
+    #def body_fun1(j, dat):
+    #    (dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux) = dat
+    #    i = edges[j,0]-1
+    #    new_sim_dat = muscl(M, dt, 
+    #              jax.lax.dynamic_slice(sim_dat, (i+N,0), (1,M)).flatten(),
+    #              jax.lax.dynamic_slice(sim_dat, (i+2*N,0), (1,M)).flatten(), 
+    #              sim_dat_aux[i+2*N], 
+    #              sim_dat_aux[i+3*N], 
+    #              sim_dat_aux[i+6*N], 
+    #              sim_dat_aux[i+7*N],
+    #              jax.lax.dynamic_slice(sim_dat_const, (i+0,0), (1,M)).flatten(), 
+    #              jax.lax.dynamic_slice(sim_dat_const, (i+1*N,0), (1,M)).flatten(), 
+    #              jax.lax.dynamic_slice(sim_dat_const, (i+2*N,0), (1,M)).flatten(), 
+    #              jax.lax.dynamic_slice(sim_dat_const, (i+3*N,0), (1,M)).flatten(),
+    #              sim_dat_const_aux[i+0*N], 
+    #              sim_dat_const_aux[i+2*N], 
+    #              sim_dat_const_aux[i+3*N])
+    #    sim_dat = sim_dat.at[i,:].set(new_sim_dat[0,:])
+    #    sim_dat = sim_dat.at[i + N,:].set(new_sim_dat[1,:])
+    #    sim_dat = sim_dat.at[i + 2*N,:].set(new_sim_dat[2,:])
+    #    sim_dat = sim_dat.at[i + 3*N,:].set(new_sim_dat[3,:])
+    #    sim_dat = sim_dat.at[i + 4*N,:].set(new_sim_dat[4,:])
+
+
+    #    return (dt, sim_dat, sim_dat_aux, 
+    #            sim_dat_const, sim_dat_const_aux)
         
+    #jax.debug.print("{x}", x=sim_dat)
     sim_dat = jax.vmap(lambda a, b, c, d, e, f, g, h, i, j, k, l, m: muscl(M, dt, 
                                                                  a, b, c, 
                                                                  d, e, f, 
                                                                  g, h, i, 
-                                                                 j, k, l, m))(sim_dat[N:2*N,:], 
+                                                                 j, k, l, m), out_axes=1)(sim_dat[N:2*N,:], 
                                                                               sim_dat[2*N:3*N,:],
                                                                               sim_dat_aux[2*N:3*N],
                                                                               sim_dat_aux[3*N:4*N],
@@ -70,6 +107,13 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                                                                               sim_dat_const_aux[:N],
                                                                               sim_dat_const_aux[2*N:3*N],
                                                                               sim_dat_const_aux[3*N:4*N]).reshape((5*N,M))
+
+    #jax.debug.print("{x}", x=sim_dat)
+    #jax.debug.print("{x}", x=sim_dat)
+
+    #(_, sim_dat, sim_dat_aux, _, _)  = jax.lax.fori_loop(0, N, body_fun1, 
+    #                                               (dt, sim_dat, sim_dat_aux, 
+    #                                                sim_dat_const, sim_dat_const_aux))
 
     def body_fun2(j, dat):
         (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho) = dat
