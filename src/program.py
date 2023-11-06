@@ -36,7 +36,7 @@ def runSimulation_opt(input_filename, verbose=False):
         #print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
 
-    timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,1], ini.JUMP)
+    timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,0], ini.JUMP)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
     jax.block_until_ready(simulation_loop(ini.MESH_SIZE, ini.NUM_VESSELS, ini.JUMP, sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX, timepoints, ini.CONV_TOLL, ini.CCFL, ini.EDGES, ini.INPUT_DATA, ini.BLOOD.rho, ini.TOTAL_TIME, ini.NODES))
 
@@ -64,19 +64,19 @@ def simulation_loop(M, N, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
             printConvError(err)
             return False
         ret = jax.lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err, conv_toll))*
-                           ((t_i - sim_dat_const_aux[0,1] * passed_cycles_i >= sim_dat_const_aux[0,1])), 
+                           ((t_i - sim_dat_const_aux[0,0] * passed_cycles_i >= sim_dat_const_aux[0,0])), 
                             printConvErrorWrapper,
                             lambda: True)
         return ret
 
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, _, Ccfl, edges, input_data, rho, total_time, nodes = args
-        dt = calculateDeltaT(M, N, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const_aux[:,0])
+        dt = calculateDeltaT(M, N, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
         sim_dat, sim_dat_aux = solveModel(M, N, 
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho)
-        sim_dat_aux = sim_dat_aux.at[:,2:10].set(updateGhostCells(M, N, sim_dat))
+        #sim_dat_aux = sim_dat_aux.at[:,2:10].set(updateGhostCells(M, N, sim_dat))
         #sim_dat_aux[:,2:10] = updateGhostCells(M, N, sim_dat)
 
 
@@ -85,18 +85,19 @@ def simulation_loop(M, N, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         counter = counter_temp
+        #jax.debug.print("{x}", x = counter)
 
         def checkConv():
             err = computeConvError(N, P_t, P_l)
             printConvError(err)
 
-        jax.lax.cond(((t - sim_dat_const_aux[0,1] * passed_cycles >= sim_dat_const_aux[0,1])*
+        jax.lax.cond(((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0])*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)
-        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - sim_dat_const_aux[0,1] * passed_cycles >= sim_dat_const_aux[0,1])*
-                                            (t - sim_dat_const_aux[0,1] * passed_cycles + dt > sim_dat_const_aux[0,1])), 
-                                         lambda: (P_t,0,timepoints + sim_dat_const_aux[0,1], passed_cycles+1), 
+        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond(((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0])*
+                                            (t - sim_dat_const_aux[0,0] * passed_cycles + dt > sim_dat_const_aux[0,0])), 
+                                         lambda: (P_t,0,timepoints + sim_dat_const_aux[0,0], passed_cycles+1), 
                                          lambda: (P_l,counter,timepoints, passed_cycles))
         
 

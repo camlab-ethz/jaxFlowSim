@@ -10,8 +10,8 @@ from functools import partial
 def saveTempDatas(M, N, nodes, P):
     P_t = jnp.zeros(5*N)
     def body_fun(i,P_t):
-        start = i*M
-        end = (i+1)*M
+        start = i*M + 1 + 2*i
+        end = (i+1)*M + 1 + 2*i
         P_t = P_t.at[i*5].set(P[start])
         P_t = P_t.at[i*5+1].set(P[start+nodes[0]])
         P_t = P_t.at[i*5+2].set(P[start+nodes[1]])
@@ -20,7 +20,9 @@ def saveTempDatas(M, N, nodes, P):
         return P_t
 
 
+    #jax.debug.print("{x}", x = (M, N, nodes, P, P_t))
     return jax.lax.fori_loop(0, N, body_fun, P_t)
+
     
 
 #@jit

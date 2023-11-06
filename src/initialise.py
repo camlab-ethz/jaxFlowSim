@@ -200,10 +200,10 @@ def buildArterialNetwork(network):
     node4 = int(np.floor(M * 0.75)) - 1
     nodes = np.array([node2, node3, node4])
 
-    sim_dat = np.zeros((5, N*M), dtype=np.float64)
-    sim_dat_aux = np.zeros((N,11), dtype=np.float64)
-    sim_dat_const = np.zeros((4, N*M), dtype=np.float64)
-    sim_dat_const_aux = np.zeros((N, 10), dtype=np.float64)
+    sim_dat = np.zeros((5, N*M + 2*N), dtype=np.float64)
+    sim_dat_aux = np.zeros((N,3), dtype=np.float64)
+    sim_dat_const = np.zeros((11, N*M + 2*N), dtype=np.float64)
+    sim_dat_const_aux = np.zeros((N, 3), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
     input_data = np.ones((2*N,100), dtype=np.float64)*1000
@@ -211,13 +211,13 @@ def buildArterialNetwork(network):
 
     
 
-    start = 0
+    start = 1
     for i in range(0, len(network)):
-        end = (i+1)*M
+        end = (i+1)*M + 1 + 2*i
         (_edges,
         _input_data,
         _sim_dat, 
-        _sim_dat_aux,
+        _sim_dat_aux, 
         #vessel_name,
         #wallVa, wallVb, 
         #last_P_name, last_Q_name, 
@@ -230,22 +230,26 @@ def buildArterialNetwork(network):
         _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
 
         sim_dat[:,start:end] = _sim_dat
-        sim_dat_aux[i,:-1] = _sim_dat_aux
+        sim_dat[:,start-1] = _sim_dat[:,0]
+        sim_dat[:,end] = _sim_dat[:,-1]
+        sim_dat_aux[i,0:2] = _sim_dat_aux
         sim_dat_const[:,start:end] = _sim_dat_const
+        sim_dat_const[:,start-1] = _sim_dat_const[:,0]
+        sim_dat_const[:,end] = _sim_dat_const[:,-1]
         sim_dat_const_aux[i,:] = _sim_dat_const_aux
         #sim_dat_const_aux = sim_dat_const_aux.at[:,i].set(_sim_dat_const_aux)
 
         edges[i, :3] = _edges
         input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
 
-        start = end
+        start = end + 2 
 
-    sim_dat_const_aux[:,0] = sim_dat_const_aux[:,0]/M
+    sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)
 
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
-        if sim_dat_const_aux[i,5] == 0: #"none":
+        if sim_dat_const_aux[i,2] == 0: #"none":
             t = edges[j,2]
             edges[j,3] = jnp.where(edges[:, 1] == t,jnp.ones_like(edges[:,1]), jnp.zeros_like(edges[:,1])).sum().astype(int)
             edges[j,6] = jnp.where(edges[:, 2] == t,jnp.ones_like(edges[:,2]), jnp.zeros_like(edges[:,2])).sum().astype(int)
@@ -339,15 +343,15 @@ def buildVessel(ID, vessel_data, blood, jump, M):
         R1, R2 = computeWindkesselInletImpedance(R2, blood, A0, gamma)
         outlet = "wk3"
 
-    U00A = A0[0]
-    U01A = A0[1]
-    UM1A = A0[-1]
-    UM2A = A0[-2]
+    #U00A = A0[0]
+    #U01A = A0[1]
+    #UM1A = A0[-1]
+    #UM2A = A0[-2]
 
-    U00Q = 0.0
-    U01Q = 0.0
-    UM1Q = 0.0
-    UM2Q = 0.0
+    #U00Q = 0.0
+    #U01Q = 0.0
+    #UM1Q = 0.0
+    #UM2Q = 0.0
 
     W1M0 = u[-1] - 4.0 * c[-1]
     W2M0 = u[-1] + 4.0 * c[-1]
@@ -367,13 +371,18 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     #out_P_name = f"{vessel_name}_P.out"
 
     sim_dat = np.stack((u,Q,A,c,P))
-    sim_dat_aux = np.array([W1M0, W2M0, 
-            U00Q, U00A, U01Q, U01A, 
-            UM1Q, UM1A, UM2Q, UM2A])
-    sim_dat_const = np.stack((A0, beta, gamma, wallE))
-    sim_dat_const_aux = np.array([L, cardiac_T, Pext,
-                                  viscT, inlet, outlet, 
-                                  Rt, R1, R2, Cc])
+    sim_dat_aux = np.array([W1M0, W2M0])
+    #        U00Q, U00A, U01Q, U01A, 
+    #        UM1Q, UM1A, UM2Q, UM2A])
+    sim_dat_const = np.stack((A0, beta, gamma, wallE, 
+                              Pext*np.ones(M),
+                              viscT*np.ones(M),
+                              Rt*np.ones(M),
+                              R1*np.ones(M),
+                              R2*np.ones(M),
+                              Cc*np.ones(M),
+                              L*np.ones(M)))
+    sim_dat_const_aux = np.array([cardiac_T, inlet, outlet])
     edges = np.array([ID, sn, tn])
     return(edges,
            input_data,

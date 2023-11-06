@@ -65,16 +65,19 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-    def outletCompatibility_wrapper():
+    #jax.debug.print("{x}", x = Cc)
+    def outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
         P1_out = 2.0 * P2 - P3
         u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
         return u1_out, Q1_out, A1, c1_out, P1_out, Pc
-    def threeElementWindkessel_wrapper():
+    def threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
+        #jax.debug.print("{x}", x = Cc)
         u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
         return u1_out, Q1, A1_out, c1, P1, Pc_out
     return jax.lax.cond(outlet == 1,
-                  lambda: outletCompatibility_wrapper(),
-                  lambda: threeElementWindkessel_wrapper())
+                  lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc),
+                  lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc), dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc)
+
 
 def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
     _, W2M1 = riemannInvariants(u2, c2)
@@ -94,8 +97,9 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
 
     Al = A1
     ul = u1
-
     Pc += dt / Cc * (Al * ul - (Pc - Pout) / R2)
+    #jax.debug.print("{x}", x = (Pc, dt, Cc, Al, ul, Pc, Pout, R2))
+    #jax.debug.print("{x}", x = (Cc))
 
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
