@@ -191,7 +191,7 @@ def buildArterialNetwork(network):
         _M = meshVessel(network[i], L)
         M = _M if _M>M else M
 
-    M = 40
+    M = 10
     print(M)
 
     
@@ -200,9 +200,9 @@ def buildArterialNetwork(network):
     node4 = int(np.floor(M * 0.75)) - 1
     nodes = np.array([node2, node3, node4])
 
-    sim_dat = np.zeros((5, N*M + 2*N), dtype=np.float64)
+    sim_dat = np.zeros((5, N*M + 20*N), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
-    sim_dat_const = np.zeros((11, N*M + 2*N), dtype=np.float64)
+    sim_dat_const = np.zeros((11, N*M + 20*N), dtype=np.float64)
     sim_dat_const_aux = np.zeros((N, 3), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
@@ -211,9 +211,9 @@ def buildArterialNetwork(network):
 
     
 
-    start = 1
+    start = 10
     for i in range(0, len(network)):
-        end = (i+1)*M + 1 + 2*i
+        end = (i+1)*M + 10 + 20*i
         (_edges,
         _input_data,
         _sim_dat, 
@@ -231,18 +231,54 @@ def buildArterialNetwork(network):
 
         sim_dat[:,start:end] = _sim_dat
         sim_dat[:,start-1] = _sim_dat[:,0]
+        sim_dat[:,start-2] = _sim_dat[:,0]
+        sim_dat[:,start-3] = _sim_dat[:,0]
+        sim_dat[:,start-4] = _sim_dat[:,0]
+        sim_dat[:,start-5] = _sim_dat[:,0]
+        sim_dat[:,start-6] = _sim_dat[:,0]
+        sim_dat[:,start-7] = _sim_dat[:,0]
+        sim_dat[:,start-8] = _sim_dat[:,0]
+        sim_dat[:,start-9] = _sim_dat[:,0]
+        sim_dat[:,start-10] = _sim_dat[:,0]
         sim_dat[:,end] = _sim_dat[:,-1]
+        sim_dat[:,end+1] = _sim_dat[:,-1]
+        sim_dat[:,end+2] = _sim_dat[:,-1]
+        sim_dat[:,end+3] = _sim_dat[:,-1]
+        sim_dat[:,end+4] = _sim_dat[:,-1]
+        sim_dat[:,end+5] = _sim_dat[:,-1]
+        sim_dat[:,end+6] = _sim_dat[:,-1]
+        sim_dat[:,end+7] = _sim_dat[:,-1]
+        sim_dat[:,end+8] = _sim_dat[:,-1]
+        sim_dat[:,end+9] = _sim_dat[:,-1]
         sim_dat_aux[i,0:2] = _sim_dat_aux
         sim_dat_const[:,start:end] = _sim_dat_const
         sim_dat_const[:,start-1] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-2] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-3] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-4] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-5] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-6] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-7] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-8] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-9] = _sim_dat_const[:,0]
+        sim_dat_const[:,start-10] = _sim_dat_const[:,0]
         sim_dat_const[:,end] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+1] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+2] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+3] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+4] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+5] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+6] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+7] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+8] = _sim_dat_const[:,-1]
+        sim_dat_const[:,end+9] = _sim_dat_const[:,-1]
         sim_dat_const_aux[i,:] = _sim_dat_const_aux
         #sim_dat_const_aux = sim_dat_const_aux.at[:,i].set(_sim_dat_const_aux)
 
         edges[i, :3] = _edges
         input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
 
-        start = end + 2 
+        start = end + 20
 
     sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)

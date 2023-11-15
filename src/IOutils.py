@@ -10,8 +10,8 @@ from functools import partial
 def saveTempDatas(M, N, nodes, P):
     P_t = jnp.zeros(5*N)
     def body_fun(i,P_t):
-        start = i*M + 1 + 2*i
-        end = (i+1)*M + 1 + 2*i
+        start = i*M + 10 + 20*i
+        end = (i+1)*M + 10 + 20*i
         P_t = P_t.at[i*5].set(P[start])
         P_t = P_t.at[i*5+1].set(P[start+nodes[0]])
         P_t = P_t.at[i*5+2].set(P[start+nodes[1]])
