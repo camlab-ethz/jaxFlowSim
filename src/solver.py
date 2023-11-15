@@ -161,8 +161,8 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
         def solveBifurcation_wrapper(sim_dat):
             d1_i = edges[j,4]
             d2_i = edges[j,5]
-            d1_i_start = d1_i*M + 1 + 2*i#mesh_sizes[d1_i]
-            d2_i_start = d2_i*M + 1 + 2*i#mesh_sizes[d2_i]
+            d1_i_start = d1_i*M + B + 2*B*d1_i
+            d2_i_start = d2_i*M + B + 2*B*d2_i
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,d1_i_start]
             u3 = sim_dat[0,d2_i_start]
@@ -188,43 +188,26 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
                                             sim_dat_const[4, d1_i_start],
                                             sim_dat_const[4, d2_i_start],
                                             )
-            sim_dat = sim_dat.at[0,end-1].set(u1) 
-            sim_dat = sim_dat.at[0,d1_i_start].set(u2)    
-            sim_dat = sim_dat.at[0,d2_i_start].set(u3)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,d1_i_start].set(Q2)
-            sim_dat = sim_dat.at[1,d2_i_start].set(Q3)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,d1_i_start].set(A2)
-            sim_dat = sim_dat.at[2,d2_i_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d1_i_start].set(c2)
-            sim_dat = sim_dat.at[3,d2_i_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d1_i_start].set(P2)
-            sim_dat = sim_dat.at[4,d2_i_start].set(P3)
-            sim_dat = sim_dat.at[0,end].set(u1) 
-            sim_dat = sim_dat.at[0,d1_i_start-1].set(u2)    
-            sim_dat = sim_dat.at[0,d2_i_start-1].set(u3)
-            sim_dat = sim_dat.at[1,end].set(Q1)
-            sim_dat = sim_dat.at[1,d1_i_start-1].set(Q2)
-            sim_dat = sim_dat.at[1,d2_i_start-1].set(Q3)
-            sim_dat = sim_dat.at[2,end].set(A1)
-            sim_dat = sim_dat.at[2,d1_i_start-1].set(A2)
-            sim_dat = sim_dat.at[2,d2_i_start-1].set(A3)
-            sim_dat = sim_dat.at[3,end].set(c1)
-            sim_dat = sim_dat.at[3,d1_i_start-1].set(c2)
-            sim_dat = sim_dat.at[3,d2_i_start-1].set(c3)
-            sim_dat = sim_dat.at[4,end].set(P1)
-            sim_dat = sim_dat.at[4,d1_i_start-1].set(P2)
-            sim_dat = sim_dat.at[4,d2_i_start-1].set(P3)
-
-
+            temp1 = jnp.array((u1, Q1, A1, c1, P1))
+            temp2 = jnp.array((u2, Q2, A2, c2, P2))
+            temp3 = jnp.array((u3, Q3, A3, c3, P3))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,end-1))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,d1_i_start-B))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,d2_i_start-B))
             return sim_dat
 
-        #sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * (edges[j,3] == 2),
-        #                            lambda x: solveBifurcation_wrapper(x), 
-        #                            lambda x: x, sim_dat)
+        sim_dat = jax.lax.cond((sim_dat_const_aux[i,2] == 0) * (edges[j,3] == 2),
+                                    lambda x: solveBifurcation_wrapper(x), 
+                                    lambda x: x, sim_dat)
 
         #elif :
         def solveConjunction_wrapper(sim_dat, rho):
