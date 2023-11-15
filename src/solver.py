@@ -18,11 +18,11 @@ from jax.experimental.shard_map import shard_map
 
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0, 1))
-def calculateDeltaT(M, N, Ccfl, u, c, dx):
+@partial(jax.jit, static_argnums=(0, 1, 2))
+def calculateDeltaT(M, N, B, Ccfl, u, c, dx):
     dt = 1.0
     def body_fun(i,dt):
-        start = i*M + 10 + 20*i 
+        start = i*M + B + 2*B*i 
         Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice_in_dim(u,start,M) + jax.lax.dynamic_slice_in_dim(c,start,M)))
         vessel_dt = dx[start] * Ccfl / Smax
         dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
@@ -35,20 +35,20 @@ def calculateDeltaT(M, N, Ccfl, u, c, dx):
 
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0, 1))
-def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+@partial(jax.jit, static_argnums=(0, 1, 2))
+def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
-    u0 = sim_dat[0,10]
-    u1 = sim_dat[0,11]
-    A0 = sim_dat[2,10]
-    c0 = sim_dat[3,10]
-    c1 = sim_dat[3,11]
+    u0 = sim_dat[0,B]
+    u1 = sim_dat[0,B+1]
+    A0 = sim_dat[2,B]
+    c0 = sim_dat[3,B]
+    c1 = sim_dat[3,B+1]
     cardiac_T = sim_dat_const_aux[0,0]
-    dx = sim_dat_const[-1,10]
-    A00 = sim_dat_const[0,10]
-    beta0 = sim_dat_const[1,10]
-    Pext = sim_dat_const[4,10]
+    dx = sim_dat_const[-1,B]
+    A00 = sim_dat_const[0,B]
+    beta0 = sim_dat_const[1,B]
+    Pext = sim_dat_const[4,B]
     #jax.debug.print("{x}", x = (inlet, u0, u1, A0, c0, c1,
     #                            cardiac_T, dx, A00, beta0,
     #                            Pext))
@@ -56,7 +56,7 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
     #                    c0, c1, t, dt, 
     #                    input_data, cardiac_T, 1/dx, A00, 
     #                    beta0, Pext))
-    sim_dat = sim_dat.at[1:3,10].set(setInletBC(inlet, u0, u1, A0, 
+    sim_dat = sim_dat.at[1:3,B].set(setInletBC(inlet, u0, u1, A0, 
                         c0, c1, t, dt, 
                         input_data, cardiac_T, 1/dx, A00, 
                         beta0, Pext))
@@ -99,23 +99,23 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                                                 
     jax.debug.print("{x}", x = sim_dat_const[2,:])
 
-    sim_dat = sim_dat.at[:,10:-10].set(muscl(N, M, dt, 
-                  sim_dat[1,10:-10],
-                  sim_dat[2,10:-10], 
-                  sim_dat_const[0,10:-10], 
-                  sim_dat_const[1,10:-10], 
-                  sim_dat_const[2,10:-10], 
-                  sim_dat_const[3,10:-10],
-                  sim_dat_const[-1,10:-10],
-                  sim_dat_const[4,10:-10],
-                  sim_dat_const[5,10:-10]))
+    sim_dat = sim_dat.at[:,B:-B].set(muscl(N, M, B, dt, 
+                  sim_dat[1,B:-B],
+                  sim_dat[2,B:-B], 
+                  sim_dat_const[0,B:-B], 
+                  sim_dat_const[1,B:-B], 
+                  sim_dat_const[2,B:-B], 
+                  sim_dat_const[3,B:-B],
+                  sim_dat_const[-1,B:-B],
+                  sim_dat_const[4,B:-B],
+                  sim_dat_const[5,B:-B]))
     
     #jax.debug.print("{x}", x = sim_dat[0:2,:])
 
     def body_fun2(j, dat):
         (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho) = dat
         i = edges[j,0]-1
-        end = (i+1)*M + 10 + i*20
+        end = (i+1)*M + B + i*2*B
         
         def setOutletBC_wrapper(sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
@@ -130,8 +130,6 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
             Pc = sim_dat_aux[i,2]
             W1M0 = sim_dat_aux[i,0]
             W2M0 = sim_dat_aux[i,1]
-            #jax.debug.print("{x}", x = (u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0))
-            #jax.debug.print("{x}", x = (Pc, 0))
             u, Q, A, c, P1, Pc = setOutletBC(dt,
                                              u1, u2, Q1, A1, c1, c2, 
                                              P1, P2, P3, Pc, W1M0, W2M0,
@@ -145,80 +143,12 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                                              sim_dat_const[7, end-1],
                                              sim_dat_const[8, end-1],
                                              sim_dat_const[9, end-1])
-                                             #beta[i], gamma[i], A0[i,M-1])
-            #jax.debug.print("{x}", x = (dt,
-            #                                 u1, u2, Q1, A1, c1, c2, 
-            #                                 P1, P2, P3, Pc, W1M0, W2M0,
-            #                                 sim_dat_const[0,end-1],
-            #                                 sim_dat_const[1,end-1],
-            #                                 sim_dat_const[2,end-1],
-            #                                 sim_dat_const[-1, end-1],
-            #                                 sim_dat_const[4, end-1],
-            #                                 sim_dat_const_aux[i, 2], 
-            #                                 sim_dat_const[6, end-1],
-            #                                 sim_dat_const[7, end-1],
-            #                                 sim_dat_const[8, end-1],
-            #                                 sim_dat_const[9, end-1]))
-            #jax.debug.print("{x}", x = (Pc, 1))
-            sim_dat = sim_dat.at[0,end-1].set(u)
-            sim_dat = sim_dat.at[1,end-1].set(Q)
-            sim_dat = sim_dat.at[2,end-1].set(A)
-            sim_dat = sim_dat.at[3,end-1].set(c)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[0,end].set(u)
-            sim_dat = sim_dat.at[1,end].set(Q)
-            sim_dat = sim_dat.at[2,end].set(A)
-            sim_dat = sim_dat.at[3,end].set(c)
-            sim_dat = sim_dat.at[4,end].set(P1)
-            sim_dat = sim_dat.at[0,end+1].set(u)
-            sim_dat = sim_dat.at[1,end+1].set(Q)
-            sim_dat = sim_dat.at[2,end+1].set(A)
-            sim_dat = sim_dat.at[3,end+1].set(c)
-            sim_dat = sim_dat.at[4,end+1].set(P1)
-            sim_dat = sim_dat.at[0,end+2].set(u)
-            sim_dat = sim_dat.at[1,end+2].set(Q)
-            sim_dat = sim_dat.at[2,end+2].set(A)
-            sim_dat = sim_dat.at[3,end+2].set(c)
-            sim_dat = sim_dat.at[4,end+2].set(P1)
-            sim_dat = sim_dat.at[0,end+3].set(u)
-            sim_dat = sim_dat.at[1,end+3].set(Q)
-            sim_dat = sim_dat.at[2,end+3].set(A)
-            sim_dat = sim_dat.at[3,end+3].set(c)
-            sim_dat = sim_dat.at[4,end+3].set(P1)
-            sim_dat = sim_dat.at[0,end+4].set(u)
-            sim_dat = sim_dat.at[1,end+4].set(Q)
-            sim_dat = sim_dat.at[2,end+4].set(A)
-            sim_dat = sim_dat.at[3,end+4].set(c)
-            sim_dat = sim_dat.at[4,end+4].set(P1)
-            sim_dat = sim_dat.at[0,end+5].set(u)
-            sim_dat = sim_dat.at[1,end+5].set(Q)
-            sim_dat = sim_dat.at[2,end+5].set(A)
-            sim_dat = sim_dat.at[3,end+5].set(c)
-            sim_dat = sim_dat.at[4,end+5].set(P1)
-            sim_dat = sim_dat.at[0,end+6].set(u)
-            sim_dat = sim_dat.at[1,end+6].set(Q)
-            sim_dat = sim_dat.at[2,end+6].set(A)
-            sim_dat = sim_dat.at[3,end+6].set(c)
-            sim_dat = sim_dat.at[4,end+6].set(P1)
-            sim_dat = sim_dat.at[0,end+7].set(u)
-            sim_dat = sim_dat.at[1,end+7].set(Q)
-            sim_dat = sim_dat.at[2,end+7].set(A)
-            sim_dat = sim_dat.at[3,end+7].set(c)
-            sim_dat = sim_dat.at[4,end+7].set(P1)
-            sim_dat = sim_dat.at[0,end+8].set(u)
-            sim_dat = sim_dat.at[1,end+8].set(Q)
-            sim_dat = sim_dat.at[2,end+8].set(A)
-            sim_dat = sim_dat.at[3,end+8].set(c)
-            sim_dat = sim_dat.at[4,end+8].set(P1)
-            sim_dat = sim_dat.at[0,end+9].set(u)
-            sim_dat = sim_dat.at[1,end+9].set(Q)
-            sim_dat = sim_dat.at[2,end+9].set(A)
-            sim_dat = sim_dat.at[3,end+9].set(c)
-            sim_dat = sim_dat.at[4,end+9].set(P1)
+            temp = jnp.array((u,Q,A,c,P1))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,end-1))
             sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
-            #jax.debug.print("{x}", x = (u,Q,A,c,P1,Pc))
-            #sim_dat_aux_out = sim_dat_aux
-            #sim_dat_aux_out[i,10] = Pc
             return sim_dat, sim_dat_aux
 
         (sim_dat, 
@@ -299,12 +229,11 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
         #elif :
         def solveConjunction_wrapper(sim_dat, rho):
             d_i = edges[j,7]
-            d_i_start = d_i*M + 10 + 20*d_i
+            d_i_start = d_i*M + B + 2*B*d_i
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,d_i_start]
             A1 = sim_dat[2,end-1]
             A2 = sim_dat[2,d_i_start]
-            #jax.debug.print("{x}", x = (u1, u2, A1, A2))
             (u1, u2, Q1, Q2, 
              A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
                                                         A1, A2,
@@ -317,127 +246,16 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                                                         sim_dat_const[4, end-1],
                                                         sim_dat_const[4, d_i_start],
                                                         rho)
-            #jax.debug.print("{x}", x = (u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2))
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start].set(u2)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start].set(Q2)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start].set(A2)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start].set(c2)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start].set(P2)
-            sim_dat = sim_dat.at[0,end].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-1].set(u2)
-            sim_dat = sim_dat.at[1,end].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-1].set(Q2)
-            sim_dat = sim_dat.at[2,end].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-1].set(A2)
-            sim_dat = sim_dat.at[3,end].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-1].set(c2)
-            sim_dat = sim_dat.at[4,end].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-1].set(P2)
-            sim_dat = sim_dat.at[0,end+1].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-2].set(u2)
-            sim_dat = sim_dat.at[1,end+1].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-2].set(Q2)
-            sim_dat = sim_dat.at[2,end+1].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-2].set(A2)
-            sim_dat = sim_dat.at[3,end+1].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-2].set(c2)
-            sim_dat = sim_dat.at[4,end+1].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-2].set(P2)
-            sim_dat = sim_dat.at[0,end+2].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-3].set(u2)
-            sim_dat = sim_dat.at[1,end+2].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-3].set(Q2)
-            sim_dat = sim_dat.at[2,end+2].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-3].set(A2)
-            sim_dat = sim_dat.at[3,end+2].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-3].set(c2)
-            sim_dat = sim_dat.at[4,end+2].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-3].set(P2)
-            sim_dat = sim_dat.at[0,end+3].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-4].set(u2)
-            sim_dat = sim_dat.at[1,end+3].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-4].set(Q2)
-            sim_dat = sim_dat.at[2,end+3].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-4].set(A2)
-            sim_dat = sim_dat.at[3,end+3].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-4].set(c2)
-            sim_dat = sim_dat.at[4,end+3].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-4].set(P2)
-            sim_dat = sim_dat.at[0,end+4].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-5].set(u2)
-            sim_dat = sim_dat.at[1,end+4].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-5].set(Q2)
-            sim_dat = sim_dat.at[2,end+4].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-5].set(A2)
-            sim_dat = sim_dat.at[3,end+4].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-5].set(c2)
-            sim_dat = sim_dat.at[4,end+4].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-5].set(P2)
-            sim_dat = sim_dat.at[0,end+5].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-6].set(u2)
-            sim_dat = sim_dat.at[1,end+5].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-6].set(Q2)
-            sim_dat = sim_dat.at[2,end+5].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-6].set(A2)
-            sim_dat = sim_dat.at[3,end+5].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-6].set(c2)
-            sim_dat = sim_dat.at[4,end+5].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-6].set(P2)
-            sim_dat = sim_dat.at[0,end+6].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-7].set(u2)
-            sim_dat = sim_dat.at[1,end+6].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-7].set(Q2)
-            sim_dat = sim_dat.at[2,end+6].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-7].set(A2)
-            sim_dat = sim_dat.at[3,end+6].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-7].set(c2)
-            sim_dat = sim_dat.at[4,end+6].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-7].set(P2)
-            sim_dat = sim_dat.at[0,end+7].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-8].set(u2)
-            sim_dat = sim_dat.at[1,end+7].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-8].set(Q2)
-            sim_dat = sim_dat.at[2,end+7].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-8].set(A2)
-            sim_dat = sim_dat.at[3,end+7].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-8].set(c2)
-            sim_dat = sim_dat.at[4,end+7].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-8].set(P2)
-            sim_dat = sim_dat.at[0,end+8].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-9].set(u2)
-            sim_dat = sim_dat.at[1,end+8].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-9].set(Q2)
-            sim_dat = sim_dat.at[2,end+8].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-9].set(A2)
-            sim_dat = sim_dat.at[3,end+8].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-9].set(c2)
-            sim_dat = sim_dat.at[4,end+8].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-9].set(P2)
-            sim_dat = sim_dat.at[0,end+9].set(u1)
-            sim_dat = sim_dat.at[0,d_i_start-10].set(u2)
-            sim_dat = sim_dat.at[1,end+9].set(Q1)
-            sim_dat = sim_dat.at[1,d_i_start-10].set(Q2)
-            sim_dat = sim_dat.at[2,end+9].set(A1)
-            sim_dat = sim_dat.at[2,d_i_start-10].set(A2)
-            sim_dat = sim_dat.at[3,end+9].set(c1)
-            sim_dat = sim_dat.at[3,d_i_start-10].set(c2)
-            sim_dat = sim_dat.at[4,end+9].set(P1)
-            sim_dat = sim_dat.at[4,d_i_start-10].set(P2)
-
-
-
-
-
-
-
-
-
-
+            temp1 = jnp.array((u1, Q1, A1, c1, P1))
+            temp2 = jnp.array((u2, Q2, A2, c2, P2))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,end-1))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,d_i_start-B))
             return sim_dat
 
         sim_dat = jax.lax.cond((sim_dat_const_aux[i,2] == 0) * 
@@ -536,13 +354,12 @@ def solveModel(M, N, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
 #@jax.jit
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
-@partial(jax.jit, static_argnums=(0,))
-def muscl(N, M, dt, 
+@partial(jax.jit, static_argnums=(0, 1, 2))
+def muscl(N, M, B, dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
           dx, Pext,viscT):
     #jax.debug.print("{x}", x = A)
-    M = ini.MESH_SIZE
     #jax.debug.print("{x}", x = (M, dt, Q, A, 
     #                            A0, beta, gamma, wallE, 
     #                            dx, Pext, viscT))
@@ -556,12 +373,12 @@ def muscl(N, M, dt,
     #s_inv_A0 = 1/jnp.sqrt(A0)
     halfDx = 0.5*dx
     invDx = 1/dx
-    gamma_ghost = jnp.zeros(N*M+N*20-18)
+    gamma_ghost = jnp.zeros(N*M+(N-1)*2*B+2)
     gamma_ghost = gamma_ghost.at[1:-1].set(gamma)
     gamma_ghost = gamma_ghost.at[0].set(gamma[0])
     gamma_ghost = gamma_ghost.at[-1].set(gamma[-1])
-    vA = jnp.empty(N*M + N*20 - 18)
-    vQ = jnp.empty(N*M + N*20 - 18)
+    vA = jnp.empty(N*M + (N-1)*2*B + 2)
+    vQ = jnp.empty(N*M + (N-1)*2*B + 2)
     vA = vA.at[0].set(A[0])
     vA = vA.at[-1].set(A[-1])
 
@@ -608,8 +425,8 @@ def muscl(N, M, dt,
     
     invDxDt = dt / dx
 
-    flux = jnp.empty((2,M*N + 20*N - 19))
-    dxDt_temp = jnp.empty(M*N + 20*N - 19)
+    flux = jnp.empty((2,M*N + (N-1)*2*B + 1))
+    dxDt_temp = jnp.empty(M*N + (N-1)*2*B + 1)
     dxDt_temp = dxDt_temp.at[0:-1].set(dxDt)
     dxDt_temp = dxDt_temp.at[-1].set(dxDt[-1])
     #flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - jnp.concatenate((invDx, jnp.array([invDx[-1]])))*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1]))
@@ -620,7 +437,7 @@ def muscl(N, M, dt,
     #                  0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))), dtype=jnp.float64)
     jax.debug.print("{x}", x = flux)
 
-    uStar = jnp.empty((2,N*M + 20*N - 18))
+    uStar = jnp.empty((2,N*M + (N-1)*2*B + 2))
     #invDxDt_temp = jnp.empty(M*N + 20*N - 18)
     #invDxDt_temp = invDxDt_temp.at[1:-1].set(invDxDt)
     #invDxDt_temp = invDxDt_temp.at[-1].set(invDxDt[0])
@@ -643,15 +460,15 @@ def muscl(N, M, dt,
     #                   jnp.concatenate((jnp.array([uStar2[0]]),uStar2,jnp.array([uStar2[-1]])))))
 
 
-    indices = jnp.arange(0, N*M + 20*N - 16, 1)
-    uStar1 = jnp.zeros((2,N*M + 20*N - 16))
+    indices = jnp.arange(0, N*M + (N-1)*2*B + 4, 1)
+    uStar1 = jnp.zeros((2,N*M + (N-1)*2*B + 4))
     uStar1 = uStar1.at[:,0:-2].set(uStar)
-    uStar2 = jnp.zeros((2,N*M + 20*N - 16))
+    uStar2 = jnp.zeros((2,N*M + (N-1)*2*B + 4))
     uStar2 = uStar1.at[:,1:-1].set(uStar)
-    uStar3 = jnp.zeros((2,N*M + 20*N - 16))
+    uStar3 = jnp.zeros((2,N*M + (N-1)*2*B + 4))
     uStar3 = uStar1.at[:,2:].set(uStar)
-    uStar2 = jnp.where(indices%(M+2*10)==1, uStar1, uStar2) 
-    uStar2 = jnp.where(indices%(M+2*10)==M+2, uStar3, uStar2) 
+    uStar2 = jnp.where(indices%(M+2*B)==1, uStar1, uStar2) 
+    uStar2 = jnp.where(indices%(M+2*B)==M+2, uStar3, uStar2) 
     uStar = uStar2[:,1:-1]
     #uStar = uStar.at[0,0].set(uStar[0,1])
     #uStar = uStar.at[1,0].set(uStar[1,1])
@@ -694,8 +511,9 @@ def muscl(N, M, dt,
     Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
     jax.debug.print("{x}", x = Fr)
     jax.debug.print("{x}", x = Fl)
+    jax.debug.print ("(ˊ̱˂˃ˋ̱ )")
 
-    flux = jnp.empty((2,M*N + 20*N - 19))
+    flux = jnp.empty((2,M*N + (N-1)*2*B + 1))
     #flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt_temp*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1]))
     #flux = flux.at[1,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt_temp*(c-d)))(Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1]))
     #jax.debug.print("{x}", x = flux)
@@ -758,7 +576,7 @@ def muscl(N, M, dt,
     #    v.Q = v.Q.at[mask].set(jax.scipy.linalg.solve_banded((1, 1), jnp.array([Tlu[:-1], Td, Tlu[1:]]), d))
 
     #u = jax.vmap(lambda a, b: a/b)(Q, A)
-    u = jax.numpy.where(jnp.abs(A) > 1e-21, Q/A, jnp.zeros(N*M + (N-1)*20))
+    u =  Q/A
     #jax.debug.print("{x}", x = A)
     #jax.debug.print("{x}", x = u)
     #jax.debug.print("{x}", x = (M, dt, Q, A, 
@@ -776,9 +594,7 @@ def computeFlux(gamma_ghost, A, Q):
     #Flux = Flux.at[1,:].set(Q * Q / A + gamma_ghost * A * jnp.sqrt(A))
 
     #return Flux
-    return Q, jax.numpy.where(jnp.abs(A) > 1e-21, 
-                              Q * Q / A + gamma_ghost * A * jnp.sqrt(A), 
-                              jnp.zeros(ini.NUM_VESSELS*ini.MESH_SIZE + (ini.NUM_VESSELS)*20 - 18))
+    return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
     #return jnp.stack((Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)))
 
 def computeFlux_par(gamma_ghost, A, Q):
@@ -795,9 +611,7 @@ def computeFlux_par(gamma_ghost, A, Q):
     #jax.debug.print("{x}", x = Q.transpose())
     #jax.debug.print("{x}", x = 3)
     #jax.debug.print("{x}", x = (Q * Q / A + gamma_ghost * A * jnp.sqrt(A)).transpose())
-    return Q, jax.numpy.where(jnp.abs(A) > 1e-21, 
-                              Q * Q / A + gamma_ghost * A * jnp.sqrt(A), 
-                              jnp.zeros(ini.NUM_VESSELS*ini.MESH_SIZE + (ini.NUM_VESSELS)*20 - 18))
+    return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
 
 
 def maxMod(a, b):

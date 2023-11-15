@@ -6,12 +6,12 @@ from functools import partial
 
 
 #@jit
-@partial(jit, static_argnums=(0,1))
-def saveTempDatas(M, N, nodes, P):
+@partial(jit, static_argnums=(0,1,2))
+def saveTempDatas(M, N, B, nodes, P):
     P_t = jnp.zeros(5*N)
     def body_fun(i,P_t):
-        start = i*M + 10 + 20*i
-        end = (i+1)*M + 10 + 20*i
+        start = i*M + B + 2*B*i
+        end = (i+1)*M + B + 2*B*i
         P_t = P_t.at[i*5].set(P[start])
         P_t = P_t.at[i*5+1].set(P[start+nodes[0]])
         P_t = P_t.at[i*5+2].set(P[start+nodes[1]])

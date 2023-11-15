@@ -38,7 +38,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,0], ini.JUMP)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    jax.block_until_ready(simulation_loop(ini.MESH_SIZE, ini.NUM_VESSELS, ini.JUMP, sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX, timepoints, ini.CONV_TOLL, ini.CCFL, ini.EDGES, ini.INPUT_DATA, ini.BLOOD.rho, ini.TOTAL_TIME, ini.NODES))
+    jax.block_until_ready(simulation_loop(ini.MESH_SIZE, ini.NUM_VESSELS, ini.PADDING, ini.JUMP, sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX, timepoints, ini.CONV_TOLL, ini.CCFL, ini.EDGES, ini.INPUT_DATA, ini.BLOOD.rho, ini.TOTAL_TIME, ini.NODES))
 
     if verbose:
         #print("\n")
@@ -48,8 +48,8 @@ def runSimulation_opt(input_filename, verbose=False):
     #writeResults(vessels)
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0, 1, 2))
-def simulation_loop(M, N, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes):
+@partial(jax.jit, static_argnums=(0, 1, 2, 3))
+def simulation_loop(M, N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -71,8 +71,8 @@ def simulation_loop(M, N, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, _, Ccfl, edges, input_data, rho, total_time, nodes = args
-        dt = calculateDeltaT(M, N, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(M, N, 
+        dt = calculateDeltaT(M, N, B, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
+        sim_dat, sim_dat_aux = solveModel(M, N, B, 
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho)
@@ -81,7 +81,7 @@ def simulation_loop(M, N, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
 
         (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempDatas(M, N, nodes, sim_dat[4,:]),counter+1), 
+                                         lambda: (saveTempDatas(M, N, B, nodes, sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         counter = counter_temp
