@@ -17,17 +17,40 @@ from jax.experimental.shard_map import shard_map
 
 
 
-#@jax.jit
-@partial(jax.jit, static_argnums=(0, 1))
-def calculateDeltaT(M, N, starts, Ccfl, u, c, dx):
-    dt = 1.0
-    def body_fun(i,dt):
-        start = starts[i]
-        Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice_in_dim(u,start,M) + jax.lax.dynamic_slice_in_dim(c,start,M)))
-        vessel_dt = dx[start] * Ccfl / Smax
-        dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
-        return dt
-    dt = jax.lax.fori_loop(0, N, body_fun, dt)
+#@partial(jax.jit, static_argnums=(0))
+@jax.jit
+def calculateDeltaT(starts_rep, ends_rep, Ccfl, u, c, dx):
+    #dt = 1.0
+    #def body_fun(i,dt):
+    #    start = starts[i]
+    #    end = ends[i]
+    #    M = 40
+    #    Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice_in_dim(u,start,M) + jax.lax.dynamic_slice_in_dim(c,start,M)))
+    #    vessel_dt = dx[start] * Ccfl / Smax
+    #    dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
+    #    return dt
+    #dt = jax.lax.fori_loop(0, N, body_fun, dt)
+
+    K = len(u)
+    indices = jnp.arange(0, K, 1)
+    #U = jnp.ones(K)*jnp.max(u)
+    #C = jnp.ones(K)*jnp.max(c)
+    #u = jnp.where((indices>=starts_rep)*(indices>ends_rep), u, U)
+    #c = jnp.where((indices>=starts_rep)*(indices>ends_rep), c, C)
+    #u = u.at[:B].set(jnp.ones(B)*u[B]) 
+    #c = c.at[:B].set(jnp.ones(B)*c[B]) 
+    Smax = jnp.abs(u + c)
+    #Smaxmin = jnp.ones(K)*jnp.min(Smax)
+    #Smaxmin = jnp.where((indices>=starts_rep)*(indices<ends_rep), Smax, Smaxmin)
+    vessel_dt = dx * Ccfl / Smax
+    max = jnp.ones(K)*100
+    vessel_dt = jnp.where((indices>=starts_rep)*(indices<ends_rep), vessel_dt, max)
+    #jax.debug.print("{x}", x = (indices>=starts_rep)*(indices<ends_rep))
+    #jax.debug.print("{x}", x = u)
+    #jax.debug.print("{x}", x = c)
+    #jax.debug.print("{x}", x = Smax)
+    dt = jnp.min(vessel_dt)
+
     #jax.debug.print("{x}", x = (dt, M, N, Ccfl, u, c, dx))
 
     return dt
@@ -35,8 +58,8 @@ def calculateDeltaT(M, N, starts, Ccfl, u, c, dx):
 
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0, 1, 2))
-def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+@partial(jax.jit, static_argnums=(0, 1))
+def solveModel(N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -73,7 +96,8 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
     #Pext = sim_dat_const[4,B+M+2*B]
 
     # uncomment the following to make aspirator test work
-    #sim_dat = sim_dat.at[1:3,M+2*B:B+M+2*B+1].set(sim_dat[1:3,B+M+2*B][:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:])
+    #M = ini.ENDS[0]-ini.STARTS[0]
+    #sim_dat = sim_dat.at[1:3,ini.STARTS[1]-B:ini.STARTS[1]+1].set(sim_dat[1:3,ini.STARTS[1]][:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:])
 
     #_Q, _A = setInletBC(inlet, u0, u1, A0, 
     #                    c0, c1, t, dt, 
@@ -114,7 +138,7 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
                                                 
     #jax.debug.print("{x}", x = sim_dat_const[2,:])
 
-    sim_dat = sim_dat.at[:,B:-B].set(muscl(N, M, B, ini.STARTS_REP, ini.ENDS_REP, dt, 
+    sim_dat = sim_dat.at[:,B:-B].set(muscl(ini.STARTS_REP, ini.ENDS_REP, dt, 
                   sim_dat[1,B:-B],
                   sim_dat[2,B:-B], 
                   sim_dat_const[0,B:-B], 
@@ -359,8 +383,9 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
 #@jax.jit
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
-@partial(jax.jit, static_argnums=(0, 1, 2))
-def muscl(N, M, B, starts_rep, ends_rep, dt, 
+#@partial(jax.jit, static_argnums=(0, 1))
+#@jax.jit
+def muscl(starts_rep, ends_rep, dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
           dx, Pext,viscT):
@@ -475,9 +500,9 @@ def muscl(N, M, B, starts_rep, ends_rep, dt,
     uStar3 = jnp.zeros((2, K+2))
     uStar3 = uStar1.at[:,2:].set(uStar)
     #uStar2 = jnp.where(indices%(M+2*B)==1, uStar1, uStar2) 
-    uStar2 = jnp.where(indices-starts_rep==0, uStar1, uStar2) 
+    uStar2 = jnp.where(indices-starts_rep==-starts_rep[0]+1, uStar1, uStar2) 
     #uStar2 = jnp.where(indices%(M+2*B)==M+2, uStar3, uStar2) 
-    uStar2 = jnp.where(indices-ends_rep==1, uStar3, uStar2) 
+    uStar2 = jnp.where(indices-ends_rep==-starts_rep[0]+2, uStar3, uStar2) 
     uStar = uStar2[:,1:-1]
     #uStar = uStar.at[0,0].set(uStar[0,1])
     #uStar = uStar.at[1,0].set(uStar[1,1])
@@ -560,7 +585,7 @@ def muscl(N, M, B, starts_rep, ends_rep, dt,
     s_A = jax.vmap(lambda a: jnp.sqrt(a))(A)
     #Si = - ini.VCS[i].viscT * Q / A - ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A
     #jax.debug.print("{x}", x = Q)
-    #Q = jax.vmap(lambda a, b, c, d, e: a - dt*(viscT[0]*a/b + c*(d - e)*b))(Q, A, wallE, s_A, s_A0)
+    Q = jax.vmap(lambda a, b, c, d, e: a - dt*(viscT[0]*a/b + c*(d - e)*b))(Q, A, wallE, s_A, s_A0)
     #jax.debug.print("Q = {x}", x = Q)
     #jax.debug.print("A = {x}", x = A)
     #jax.debug.print("{x}", x = wallE)
