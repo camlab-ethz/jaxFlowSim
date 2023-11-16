@@ -368,7 +368,6 @@ def muscl(N, M, B, dt,
     #jax.debug.print("A = {x}", x = A)
 
 
-    print("test")
     s_A0 = jax.vmap(lambda a: jnp.sqrt(a))(A0)
     #s_A0 = jnp.sqrt(A0)
     s_inv_A0 = jax.vmap(lambda a: 1/jnp.sqrt(a))(A0)

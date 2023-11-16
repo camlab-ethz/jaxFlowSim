@@ -13,6 +13,8 @@ BLOOD = None
 JUMP = None
 MESH_SIZE = None
 NUM_VESSELS = None
+STARTS = None
+ENDS = None
 PADDING = None
 
 SIM_DAT_CONST = None
@@ -284,6 +286,10 @@ def buildArterialNetwork(network):
     MESH_SIZE = M
     global NUM_VESSELS
     NUM_VESSELS = N
+    global STARTS
+    STARTS = starts
+    global ENDS
+    ENDS = ends
     global PADDING
     PADDING = B
 
