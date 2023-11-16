@@ -71,7 +71,7 @@ def simulation_loop(M, N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_
 
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, _, Ccfl, edges, input_data, rho, total_time, nodes = args
-        dt = calculateDeltaT(M, N, B, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
+        dt = calculateDeltaT(M, N, ini.STARTS, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
         sim_dat, sim_dat_aux = solveModel(M, N, B, 
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
@@ -81,7 +81,7 @@ def simulation_loop(M, N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_
 
 
         (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempDatas(M, N, B, nodes, sim_dat[4,:]),counter+1), 
+                                         lambda: (saveTempDatas(M, N, B, ini.STARTS, ini.ENDS, nodes, sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         counter = counter_temp

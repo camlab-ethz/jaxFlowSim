@@ -15,6 +15,8 @@ MESH_SIZE = None
 NUM_VESSELS = None
 STARTS = None
 ENDS = None
+STARTS_REP = None
+ENDS_REP = None
 PADDING = None
 
 SIM_DAT_CONST = None
@@ -190,23 +192,38 @@ def buildArterialNetwork(network):
     B = 2
     N = len(network)
     M = meshVessel(network[0], float(network[0]["L"]))
-    starts = np.zeros(N)
-    ends = np.zeros(N)
+    starts = np.zeros(N, dtype=np.int64)
+    ends = np.zeros(N, dtype=np.int64)
 
     starts[0] = B
-    #ends[0] = M + B
-    ends[0] = 40 + B
+    ends[0] = M + B
+    #ends[0] = 40 + B
 
     for i in range(1, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
         starts[i] = ends[i-1] + 2*B
-        #end[i] = starts[i] + _M
-        ends[i] = starts[i] + 40
-        M = _M if _M>M else M
+        ends[i] = starts[i] + _M
+        #ends[i] = starts[i] + 40
+        #M = _M if _M>M else M
 
     M = 40
-    print(M)
+    #print(M)
+
+    K = ends[-1] + B
+    print(starts)
+    print(ends)
+    starts_rep = np.zeros(ends[-1] + B, dtype=np.int64)
+    ends_rep = np.zeros(ends[-1] + B, dtype=np.int64)
+
+    for i in range(0, N):
+        starts_rep[starts[i]-B:ends[i]+B] = starts[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
+        ends_rep[starts[i]-B:ends[i]+B] = ends[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
+    
+    starts_rep = starts_rep-B+1 
+    ends_rep = ends_rep-B+1 
+    print(len(starts_rep))
+    print(len(ends_rep))
 
     
     node2 = int(np.floor(M * 0.25)) - 1
@@ -214,9 +231,9 @@ def buildArterialNetwork(network):
     node4 = int(np.floor(M * 0.75)) - 1
     nodes = np.array([node2, node3, node4])
 
-    sim_dat = np.zeros((5, N*M + 2*B*N), dtype=np.float64)
+    sim_dat = np.zeros((5, K), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
-    sim_dat_const = np.zeros((11, N*M + 2*B*N), dtype=np.float64)
+    sim_dat_const = np.zeros((11, K), dtype=np.float64)
     sim_dat_const_aux = np.zeros((N, 3), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
@@ -225,9 +242,10 @@ def buildArterialNetwork(network):
 
     
 
-    start = B
     for i in range(0, len(network)):
-        end = (i+1)*M + B + 2*B*i
+        end = ends[i]
+        start = starts[i]
+        print(i)
         (_edges,
         _input_data,
         _sim_dat, 
@@ -241,7 +259,7 @@ def buildArterialNetwork(network):
         #out_A_name, out_c_name, 
         #out_u_name, 
         _sim_dat_const,
-        _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
+        _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, ends[i]-starts[i])
 
         sim_dat[:,start:end] = _sim_dat
         sim_dat[:,start-B:start:] = _sim_dat[:,0,np.newaxis]*np.ones(B)[np.newaxis,:]
@@ -256,9 +274,10 @@ def buildArterialNetwork(network):
         edges[i, :3] = _edges
         input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
 
-        start = end + 2*B
+        sim_dat_const[-1,starts[i]-B:ends[i]+B] = sim_dat_const[-1,starts[i]-B:ends[i]+B]/(ends[i]-starts[i])
+    
 
-    sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
+    #sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)
 
     for j in np.arange(0,edges.shape[0],1):
@@ -290,6 +309,10 @@ def buildArterialNetwork(network):
     STARTS = starts
     global ENDS
     ENDS = ends
+    global STARTS_REP
+    STARTS_REP = starts_rep
+    global ENDS_REP
+    ENDS_REP = ends_rep
     global PADDING
     PADDING = B
 
