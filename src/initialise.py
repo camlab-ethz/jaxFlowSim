@@ -184,15 +184,26 @@ def buildBlood(blood_data):
 
 
 def buildArterialNetwork(network):
-    N = len(network)
-    M = 1
 
-    for i in range(0, N):
+    B = 2
+    N = len(network)
+    M = meshVessel(network[0], float(network[0]["L"]))
+    starts = np.zeros(N)
+    ends = np.zeros(N)
+
+    starts[0] = B
+    #ends[0] = M + B
+    ends[0] = 40 + B
+
+    for i in range(1, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
+        starts[i] = ends[i-1] + 2*B
+        #end[i] = starts[i] + _M
+        ends[i] = starts[i] + 40
         M = _M if _M>M else M
 
-    M = 10
+    M = 40
     print(M)
 
     
@@ -201,7 +212,6 @@ def buildArterialNetwork(network):
     node4 = int(np.floor(M * 0.75)) - 1
     nodes = np.array([node2, node3, node4])
 
-    B = 2
     sim_dat = np.zeros((5, N*M + 2*B*N), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
     sim_dat_const = np.zeros((11, N*M + 2*B*N), dtype=np.float64)
