@@ -14,6 +14,7 @@ def solveAnastomosis(u1, u2, u3,
                     jnp.sqrt(jnp.sqrt(A1)),
                     jnp.sqrt(jnp.sqrt(A2)),
                     jnp.sqrt(jnp.sqrt(A3))), dtype=jnp.float64)
+    
 
     k1 = jnp.sqrt(1.5*gamma1)
     k2 = jnp.sqrt(1.5*gamma2)

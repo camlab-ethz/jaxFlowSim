@@ -56,10 +56,22 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
     #                    c0, c1, t, dt, 
     #                    input_data, cardiac_T, 1/dx, A00, 
     #                    beta0, Pext))
-    sim_dat = sim_dat.at[1:3,B].set(setInletBC(inlet, u0, u1, A0, 
+    sim_dat = sim_dat.at[1:3,0:B+1].set(jnp.array(setInletBC(inlet, u0, u1, A0, 
                         c0, c1, t, dt, 
                         input_data, cardiac_T, 1/dx, A00, 
-                        beta0, Pext))
+                        beta0, Pext))[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:])
+    inlet = sim_dat_const_aux[1,1] 
+    u0 = sim_dat[0,B+M+2*B]
+    u1 = sim_dat[0,B+M+2*B+1]
+    A0 = sim_dat[2,B+M+2*B]
+    c0 = sim_dat[3,B+M+2*B]
+    c1 = sim_dat[3,B+M+2*B+1]
+    cardiac_T = sim_dat_const_aux[1,0]
+    dx = sim_dat_const[-1,B+M+2*B]
+    A00 = sim_dat_const[0,B+M+2*B]
+    beta0 = sim_dat_const[1,B+M+2*B]
+    Pext = sim_dat_const[4,B+M+2*B]
+    sim_dat = sim_dat.at[1:3,M+2*B:B+M+2*B+1].set(sim_dat[1:3,B+M+2*B][:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:])
     #_Q, _A = setInletBC(inlet, u0, u1, A0, 
     #                    c0, c1, t, dt, 
     #                    input_data, cardiac_T, 1/dx, A00, 
@@ -97,7 +109,7 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
     #                                               (dt, sim_dat, sim_dat_aux, 
     #                                                sim_dat_const, sim_dat_const_aux))
                                                 
-    jax.debug.print("{x}", x = sim_dat_const[2,:])
+    #jax.debug.print("{x}", x = sim_dat_const[2,:])
 
     sim_dat = sim_dat.at[:,B:-B].set(muscl(N, M, B, dt, 
                   sim_dat[1,B:-B],
@@ -130,6 +142,7 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
             Pc = sim_dat_aux[i,2]
             W1M0 = sim_dat_aux[i,0]
             W2M0 = sim_dat_aux[i,1]
+            #jax.debug.print("{x}", x = (u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0))
             u, Q, A, c, P1, Pc = setOutletBC(dt,
                                              u1, u2, Q1, A1, c1, c2, 
                                              P1, P2, P3, Pc, W1M0, W2M0,
@@ -143,6 +156,7 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
                                              sim_dat_const[7, end-1],
                                              sim_dat_const[8, end-1],
                                              sim_dat_const[9, end-1])
+            #jax.debug.print("{x}", x = (u,Q,A,c,P1))
             temp = jnp.array((u,Q,A,c,P1))
             sim_dat = jax.lax.dynamic_update_slice( 
                 sim_dat, 
@@ -249,11 +263,12 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
 
         #elif edges[j,6] == 2:                                           
         def solveAnastomosis_wrapper(sim_dat):
+            end = (i+1)*M + B + i*2*B
             p1_i = edges[j,7]
             p2_i = edges[j,8]
             d = edges[j,9]
-            p1_i_end = (p1_i+1)*M
-            d_start = d*M
+            p1_i_end = (p1_i+1)*M + B + p1_i*2*B
+            d_start = d*M + B + 2*B*d
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,p1_i_end-1]
             u3 = sim_dat[0,d_start]
@@ -269,6 +284,8 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
             P1 = sim_dat[4,end-1]
             P2 = sim_dat[4,p1_i_end-1]
             P3 = sim_dat[4,d_start]
+            #jax.debug.print("0")
+            #jax.debug.print("{x}", x = (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
             u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = jax.lax.cond(
                 jnp.maximum(p1_i, p2_i) == i, 
                 lambda: solveAnastomosis(u1, u2, u3, 
@@ -282,34 +299,35 @@ def solveModel(M, N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_cons
                                          sim_dat_const[2,end-1],
                                          sim_dat_const[2,p1_i_end-1],
                                          sim_dat_const[2,d_start],
-                                         sim_dat_const_aux[i, 2],
-                                         sim_dat_const_aux[p1_i, 2],
-                                         sim_dat_const_aux[d, 2],
+                                         sim_dat_const[4,end-1],
+                                         sim_dat_const[4,p1_i_end-1],
+                                         sim_dat_const[4,d_start],
                                         ), 
                 lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-            sim_dat = sim_dat.at[0,end-1].set(u1)
-            sim_dat = sim_dat.at[0,p1_i_end-1].set(u2)
-            sim_dat = sim_dat.at[0,d_start].set(u3)
-            sim_dat = sim_dat.at[1,end-1].set(Q1)
-            sim_dat = sim_dat.at[1,p1_i_end-1].set(Q2)
-            sim_dat = sim_dat.at[1,d_start].set(Q3)
-            sim_dat = sim_dat.at[2,end-1].set(A1)
-            sim_dat = sim_dat.at[2,p1_i_end-1].set(A2)
-            sim_dat = sim_dat.at[2,d_start].set(A3)
-            sim_dat = sim_dat.at[3,end-1].set(c1)
-            sim_dat = sim_dat.at[3,p1_i_end-1].set(c2)
-            sim_dat = sim_dat.at[3,d_start].set(c3)
-            sim_dat = sim_dat.at[4,end-1].set(P1)
-            sim_dat = sim_dat.at[4,p1_i_end-1].set(P2)
-            sim_dat = sim_dat.at[4,d_start].set(P3)
-
+            #jax.debug.print("1")
+            #jax.debug.print("{x}", x = (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
+            temp1 = jnp.array((u1, Q1, A1, c1, P1))
+            temp2 = jnp.array((u2, Q2, A2, c2, P2))
+            temp3 = jnp.array((u3, Q3, A3, c3, P3))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,end-1))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,p1_i_end-1))
+            sim_dat = jax.lax.dynamic_update_slice( 
+                sim_dat, 
+                temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+                (0,d_start-B))
             return sim_dat
         
-        #sim_dat = jax.lax.cond((sim_dat_const_aux[i,5] == 0) * 
-        #                       (edges[j,3] != 2) *
-        #                       (edges[j,6] == 2),
-        #                        lambda x: solveAnastomosis_wrapper(x), 
-        #                        lambda x: x, sim_dat)
+        sim_dat = jax.lax.cond((sim_dat_const_aux[i,2] == 0) * 
+                               (edges[j,3] != 2) *
+                               (edges[j,6] == 2),
+                                lambda x: solveAnastomosis_wrapper(x), 
+                                lambda x: x, sim_dat)
 
 
         return (sim_dat, sim_dat_aux, 
@@ -347,7 +365,7 @@ def muscl(N, M, B, dt,
     #                            A0, beta, gamma, wallE, 
     #                            dx, Pext, viscT))
     #s_A0 = jax.block_until_ready(shard_map(lambda a: jnp.sqrt(a), mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(A0))
-    jax.debug.print("{x}", x = A)
+    jax.debug.print("A = {x}", x = A)
 
 
     s_A0 = jax.vmap(lambda a: jnp.sqrt(a))(A0)
@@ -374,8 +392,8 @@ def muscl(N, M, B, dt,
 
     slopeA_halfDx = computeLimiter(vA, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
     slopeQ_halfDx = computeLimiter(vQ, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
-    jax.debug.print("{x}", x = slopeQ_halfDx)
-    jax.debug.print("{x}", x = slopeA_halfDx)
+    jax.debug.print("slopeQ_halfDx = {x}", x = slopeQ_halfDx)
+    jax.debug.print("slopeA_halfDx = {x}", x = slopeA_halfDx)
 
     #slopeA_halfDx = slopesA * ini.VCS[i].halfDx
     #slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
@@ -392,17 +410,17 @@ def muscl(N, M, B, dt,
     Ar = vA - slopeA_halfDx
     Ql = vQ + slopeQ_halfDx
     Qr = vQ - slopeQ_halfDx
-    jax.debug.print("{x}", x = Qr)
-    jax.debug.print("{x}", x = Ql)
-    jax.debug.print("{x}", x = Ar)
-    jax.debug.print("{x}", x = Al)
+    jax.debug.print("Qr = {x}", x = Qr)
+    jax.debug.print("Ql = {x}", x = Ql)
+    jax.debug.print("Ar = {x}", x = Ar)
+    jax.debug.print("Al = {x}", x = Al)
 
     #Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
     #Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
     Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
     Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
-    jax.debug.print("{x}", x = Fr)
-    jax.debug.print("{x}", x = Fl)
+    jax.debug.print("Fr = {x}", x = Fr)
+    jax.debug.print("Fl = {x}", x = Fl)
 
     dxDt = dx / dt
     
@@ -418,7 +436,7 @@ def muscl(N, M, B, dt,
     flux = flux.at[1,:].set(0.5 * (Fr[1, 1:] + Fl[1, 0:-1] - dxDt_temp * (Qr[1:] - Ql[0:-1])))
     #flux = jnp.stack((0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])), 
     #                  0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))), dtype=jnp.float64)
-    jax.debug.print("{x}", x = flux)
+    jax.debug.print("flux = {x}", x = flux)
 
     uStar = jnp.empty((2,N*M + (N-1)*2*B + 2))
     #invDxDt_temp = jnp.empty(M*N + 20*N - 18)
@@ -457,12 +475,12 @@ def muscl(N, M, B, dt,
     #uStar = uStar.at[1,0].set(uStar[1,1])
     #uStar = uStar.at[0,-1].set(uStar[0,-2])
     #uStar = uStar.at[1,-1].set(uStar[1,-2])
-    jax.debug.print("{x}", x = uStar)
+    jax.debug.print("uStar = {x}", x = uStar)
 
     slopesA = computeLimiterIdx(uStar, 0, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
     slopesQ = computeLimiterIdx(uStar, 1, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
-    jax.debug.print("{x}", x = slopesQ)
-    jax.debug.print("{x}", x = slopesA)
+    jax.debug.print("slopesQ = {x}", x = slopesQ)
+    jax.debug.print("slopesA = {x}", x = slopesA)
 
     #Al = uStar[0,0:M+2] + slopesA
     #Ar = uStar[0,0:M+2] - slopesA
@@ -472,10 +490,10 @@ def muscl(N, M, B, dt,
     Ar = jax.vmap(lambda a, b: a-b)(uStar[0,:], slopesA)
     Ql = jax.vmap(lambda a, b: a+b)(uStar[1,:], slopesQ)
     Qr = jax.vmap(lambda a, b: a-b)(uStar[1,:], slopesQ)
-    jax.debug.print("{x}", x = Qr)
-    jax.debug.print("{x}", x = Ql)
-    jax.debug.print("{x}", x = Ar)
-    jax.debug.print("{x}", x = Al)
+    jax.debug.print("Qr = {x}", x = Qr)
+    jax.debug.print("Ql = {x}", x = Ql)
+    jax.debug.print("Ar = {x}", x = Ar)
+    jax.debug.print("Al = {x}", x = Al)
     
     #Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
     #Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
@@ -492,9 +510,9 @@ def muscl(N, M, B, dt,
     #jax.debug.print("{x}", x = Fl)
     Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
     Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
-    jax.debug.print("{x}", x = Fr)
-    jax.debug.print("{x}", x = Fl)
-    jax.debug.print ("(ˊ̱˂˃ˋ̱ )")
+    jax.debug.print("Fr = {x}", x = Fr)
+    jax.debug.print("Fl = {x}", x = Fl)
+    #jax.debug.print ("(ˊ̱˂˃ˋ̱ )")
 
     flux = jnp.empty((2,M*N + (N-1)*2*B + 1))
     #flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt_temp*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1]))
@@ -512,7 +530,7 @@ def muscl(N, M, B, dt,
     #A = A.at[0:M].set(0.5*(A[0:M] + uStar[0,1:M+1] + invDxDt * (flux[0, 0:M] - flux[0, 1:M+1])))
     #jax.debug.print("{x}", x = Q)
     #jax.debug.print("{x}", x = uStar)
-    #jax.debug.print("{x}", x = flux)
+    jax.debug.print("flux = {x}", x = flux)
     #A = jax.vmap(lambda a, b, c, d: 0.5*(a+b+invDxDt[0]*(c-d)))(A[:],
     #                                                         uStar[0,1:-1],
     #                                                         flux[0,0:-1],
@@ -523,8 +541,8 @@ def muscl(N, M, B, dt,
     #                                                         flux[1,1:])
     A = 0.5*(A + uStar[0,1:-1] + invDxDt*(flux[0,0:-1]-flux[0,1:]))
     Q = 0.5*(Q + uStar[1,1:-1] + invDxDt*(flux[1,0:-1]-flux[1,1:]))
-    jax.debug.print("{x}", x = A)
-    jax.debug.print("{x}", x = Q)
+    #jax.debug.print("{x}", x = A)
+    #jax.debug.print("{x}", x = Q)
     #uStar = uStar.at[1,1:M+1].set(jax.vmap(lambda a, b, c: a+invDxDt*(b-c))(vQ[1:M+1],
     #                                                         flux[1,0:M],
     #                                                         flux[1,1:M+1]))
@@ -535,8 +553,8 @@ def muscl(N, M, B, dt,
     #Si = - ini.VCS[i].viscT * Q / A - ini.VCS[i].wallE * (s_A - ini.VCS[i].s_A0) * A
     #jax.debug.print("{x}", x = Q)
     #Q = jax.vmap(lambda a, b, c, d, e: a - dt*(viscT[0]*a/b + c*(d - e)*b))(Q, A, wallE, s_A, s_A0)
-    #jax.debug.print("{x}", x = Q)
-    #jax.debug.print("{x}", x = A)
+    jax.debug.print("Q = {x}", x = Q)
+    jax.debug.print("A = {x}", x = A)
     #jax.debug.print("{x}", x = wallE)
     #jax.debug.print("{x}", x = s_A)
     #jax.debug.print("{x}", x = s_A0)
@@ -561,7 +579,7 @@ def muscl(N, M, B, dt,
     #u = jax.vmap(lambda a, b: a/b)(Q, A)
     u =  Q/A
     #jax.debug.print("{x}", x = A)
-    #jax.debug.print("{x}", x = u)
+    jax.debug.print("u = {x}", x = u)
     #jax.debug.print("{x}", x = (M, dt, Q, A, 
     #                            A0, beta, gamma, wallE, 
     #                            dx, Pext, viscT))
