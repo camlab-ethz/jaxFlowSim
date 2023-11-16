@@ -195,15 +195,15 @@ def buildArterialNetwork(network):
     ends = np.zeros(N, dtype=np.int64)
 
     starts[0] = B
-    ends[0] = M0 + B
-    #ends[0] = 40 + B
+    #ends[0] = M0 + B
+    ends[0] = 40 + B
 
     for i in range(1, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
         starts[i] = ends[i-1] + 2*B
-        ends[i] = starts[i] + _M
-        #ends[i] = starts[i] + 40
+        #ends[i] = starts[i] + _M
+        ends[i] = starts[i] + 40
         #M = _M if _M>M else M
 
     #M = 40

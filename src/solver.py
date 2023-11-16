@@ -19,40 +19,10 @@ from jax.experimental.shard_map import shard_map
 
 #@partial(jax.jit, static_argnums=(0))
 @jax.jit
-def calculateDeltaT(starts_rep, ends_rep, Ccfl, u, c, dx):
-    #dt = 1.0
-    #def body_fun(i,dt):
-    #    start = starts[i]
-    #    end = ends[i]
-    #    M = 40
-    #    Smax = jnp.max(jnp.abs(jax.lax.dynamic_slice_in_dim(u,start,M) + jax.lax.dynamic_slice_in_dim(c,start,M)))
-    #    vessel_dt = dx[start] * Ccfl / Smax
-    #    dt = jax.lax.cond(dt > vessel_dt, lambda: vessel_dt, lambda: dt)
-    #    return dt
-    #dt = jax.lax.fori_loop(0, N, body_fun, dt)
-
-    K = len(u)
-    indices = jnp.arange(0, K, 1)
-    #U = jnp.ones(K)*jnp.max(u)
-    #C = jnp.ones(K)*jnp.max(c)
-    #u = jnp.where((indices>=starts_rep)*(indices>ends_rep), u, U)
-    #c = jnp.where((indices>=starts_rep)*(indices>ends_rep), c, C)
-    #u = u.at[:B].set(jnp.ones(B)*u[B]) 
-    #c = c.at[:B].set(jnp.ones(B)*c[B]) 
+def calculateDeltaT(Ccfl, u, c, dx):
     Smax = jnp.abs(u + c)
-    #Smaxmin = jnp.ones(K)*jnp.min(Smax)
-    #Smaxmin = jnp.where((indices>=starts_rep)*(indices<ends_rep), Smax, Smaxmin)
     vessel_dt = dx * Ccfl / Smax
-    max = jnp.ones(K)*100
-    vessel_dt = jnp.where((indices>=starts_rep)*(indices<ends_rep), vessel_dt, max)
-    #jax.debug.print("{x}", x = (indices>=starts_rep)*(indices<ends_rep))
-    #jax.debug.print("{x}", x = u)
-    #jax.debug.print("{x}", x = c)
-    #jax.debug.print("{x}", x = Smax)
     dt = jnp.min(vessel_dt)
-
-    #jax.debug.print("{x}", x = (dt, M, N, Ccfl, u, c, dx))
-
     return dt
 
 

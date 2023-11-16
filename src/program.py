@@ -71,7 +71,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, _, Ccfl, edges, input_data, rho, total_time, nodes = args
-        dt = calculateDeltaT(ini.STARTS_REP, ini.ENDS_REP, Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
+        dt = calculateDeltaT(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
         sim_dat, sim_dat_aux = solveModel(N, B, 
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
