@@ -25,6 +25,8 @@ NODES = None
 EDGES = None
 INPUT_DATA = None
 
+VESSEL_NAMES = None
+
 
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
@@ -195,15 +197,15 @@ def buildArterialNetwork(network):
     ends = np.zeros(N, dtype=np.int64)
 
     starts[0] = B
-    #ends[0] = M0 + B
-    ends[0] = 40 + B
+    ends[0] = M0 + B
+    #ends[0] = 40 + B
 
     for i in range(1, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
         starts[i] = ends[i-1] + 2*B
-        #ends[i] = starts[i] + _M
-        ends[i] = starts[i] + 40
+        ends[i] = starts[i] + _M
+        #ends[i] = starts[i] + 40
         #M = _M if _M>M else M
 
     #M = 40
@@ -229,6 +231,7 @@ def buildArterialNetwork(network):
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
     input_data = np.ones((2*N,100), dtype=np.float64)*1000
+    vessel_names = []
 
 
     nodes = np.zeros((N,3), dtype=np.int64)
@@ -242,7 +245,7 @@ def buildArterialNetwork(network):
         _input_data,
         _sim_dat, 
         _sim_dat_aux, 
-        #vessel_name,
+        vessel_name,
         #wallVa, wallVb, 
         #last_P_name, last_Q_name, 
         #last_A_name, last_c_name, 
@@ -269,6 +272,7 @@ def buildArterialNetwork(network):
         input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
 
         sim_dat_const[-1,starts[i]-B:ends[i]+B] = sim_dat_const[-1,starts[i]-B:ends[i]+B]/(M)
+        vessel_names.append(vessel_name)
     
 
     #sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
@@ -320,11 +324,14 @@ def buildArterialNetwork(network):
     global SIM_DAT_CONST_AUX
     SIM_DAT_CONST_AUX = sim_dat_const_aux
 
+    global VESSEL_NAMES
+    VESSEL_NAMES = vessel_names
+
     return sim_dat, sim_dat_aux
 
 
 def buildVessel(ID, vessel_data, blood, jump, M):
-    #vessel_name = vessel_data["label"]
+    vessel_name = vessel_data["label"]
     sn = int(vessel_data["sn"])
     tn = int(vessel_data["tn"])
     L = float(vessel_data["L"])
@@ -423,7 +430,7 @@ def buildVessel(ID, vessel_data, blood, jump, M):
            input_data,
            sim_dat,
            sim_dat_aux,
-           #vessel_name, 
+           vessel_name, 
            #wallVa, wallVb, 
            #last_P_name, last_Q_name, 
            #last_A_name, last_c_name, 

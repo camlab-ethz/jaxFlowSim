@@ -354,7 +354,7 @@ def solveModel(N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
 #@partial(jax.jit, static_argnums=(0, 1))
-#@jax.jit
+@jax.jit
 def muscl(starts_rep, ends_rep, dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
