@@ -6,28 +6,6 @@ import shutil
 from src.utils import waveSpeed, pressureSA
 from src.components import Blood
 
-CCFL = None
-TOTAL_TIME = None
-CONV_TOLL = None
-BLOOD = None
-JUMP = None
-NUM_VESSELS = None
-STARTS = None
-ENDS = None
-STARTS_REP = None
-ENDS_REP = None
-PADDING = None
-
-SIM_DAT_CONST = None
-SIM_DAT_CONST_AUX = None
-
-NODES = None
-EDGES = None
-INPUT_DATA = None
-
-VESSEL_NAMES = None
-
-
 def loadSimulationFiles(input_filename):
     data = loadYamlFile(input_filename)
 
@@ -184,12 +162,11 @@ def buildBlood(blood_data):
     rho = blood_data["rho"]
     rho_inv = 1.0 / rho
 
-    global BLOOD
-    BLOOD = Blood(mu, rho, rho_inv)
+    return Blood(mu, rho, rho_inv)
 
 
-def buildArterialNetwork(network):
-
+def buildArterialNetwork(network, J, blood):
+    
     B = 2
     N = len(network)
     M0 = meshVessel(network[0], float(network[0]["L"]))
@@ -254,7 +231,7 @@ def buildArterialNetwork(network):
         #out_A_name, out_c_name, 
         #out_u_name, 
         _sim_dat_const,
-        _sim_dat_const_aux)= buildVessel(i + 1, network[i], BLOOD, JUMP, M)
+        _sim_dat_const_aux)= buildVessel(i + 1, network[i], blood, J, M)
 
         nodes[i,:] = (int(np.floor(M * 0.25)) - 1, int(np.floor(M * 0.5)) - 1, int(np.floor(M * 0.75)) - 1)
 
@@ -299,35 +276,7 @@ def buildArterialNetwork(network):
                 edges[j,9] = jnp.where(edges[:, 1] == t)[0][0]
 
 
-    global NUM_VESSELS
-    NUM_VESSELS = N
-    global STARTS
-    STARTS = starts
-    global ENDS
-    ENDS = ends
-    global STARTS_REP
-    STARTS_REP = starts_rep
-    global ENDS_REP
-    ENDS_REP = ends_rep
-    global PADDING
-    PADDING = B
-
-    global NODES
-    NODES = nodes
-    global EDGES
-    EDGES = edges
-    global INPUT_DATA
-    INPUT_DATA = input_data
-
-    global SIM_DAT_CONST
-    SIM_DAT_CONST = sim_dat_const
-    global SIM_DAT_CONST_AUX
-    SIM_DAT_CONST_AUX = sim_dat_const_aux
-
-    global VESSEL_NAMES
-    VESSEL_NAMES = vessel_names
-
-    return sim_dat, sim_dat_aux
+    return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep
 
 
 def buildVessel(ID, vessel_data, blood, jump, M):
@@ -546,11 +495,3 @@ def parseCommandline():
     conv_ceil = True
 
     return input_filename, verbose, out_files, conv_ceil
-
-def buildConst(Ccfl, total_time, conv_toll, cardiac_T):
-    global CCFL
-    CCFL = Ccfl
-    global TOTAL_TIME
-    TOTAL_TIME = total_time * cardiac_T
-    global CONV_TOLL
-    CONV_TOLL = conv_toll

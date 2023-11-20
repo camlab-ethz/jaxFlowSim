@@ -2,7 +2,7 @@ import jax
 from functools import partial
 import jax.numpy as jnp
 import numpy as np
-from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, buildConst, makeResultsFolder
+from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempDatas#, writeResults
 from src.boundary_conditions import updateGhostCells
 from src.solver import calculateDeltaT, solveModel
@@ -16,20 +16,20 @@ import matplotlib.pyplot as plt
 
 def runSimulation_opt(input_filename, verbose=False):
     data = loadSimulationFiles(input_filename)
-    buildBlood(data["blood"])
+    blood = buildBlood(data["blood"])
 
     if verbose:
         print(f"Build {input_filename} arterial network \n")
 
-    ini.JUMP =  data["solver"]["jump"]
+    J =  data["solver"]["jump"]
 
-    sim_dat, sim_dat_aux = buildArterialNetwork(data["network"])
+    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep = buildArterialNetwork(data["network"], J, blood)
     makeResultsFolder(data, input_filename)
 
-    buildConst(float(data["solver"]["Ccfl"]), 
-               data["solver"]["cycles"], 
-               data["solver"]["convergence tolerance"],
-               ini.SIM_DAT_CONST_AUX[0,1])
+    cardiac_T = sim_dat_const_aux[0,0]
+    total_time = data["solver"]["cycles"]*cardiac_T
+    Ccfl = float(data["solver"]["Ccfl"])
+    conv_tol = data["solver"]["convergence tolerance"],
     
     if verbose:
         print("Start simulation")
@@ -38,12 +38,13 @@ def runSimulation_opt(input_filename, verbose=False):
         #print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
 
-    timepoints = np.linspace(0, ini.SIM_DAT_CONST_AUX[0,0], ini.JUMP)
+    timepoints = np.linspace(0, cardiac_T, J)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    sim_dat, t, P  = jax.block_until_ready(simulation_loop(ini.NUM_VESSELS, ini.PADDING, ini.JUMP, 
-                                          sim_dat, sim_dat_aux, ini.SIM_DAT_CONST, ini.SIM_DAT_CONST_AUX, 
-                                          timepoints, 1, ini.CCFL, ini.EDGES, ini.INPUT_DATA, 
-                                          ini.BLOOD.rho, ini.TOTAL_TIME, ini.NODES))
+    sim_dat, t, P  = jax.block_until_ready(simulation_loop(N, B, J, 
+                                          sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                          timepoints, 1, Ccfl, edges, input_data, 
+                                          blood.rho, total_time, nodes, 
+                                          starts, ends, starts_rep, ends_rep))
 
     if verbose:
         #print("\n")
@@ -59,10 +60,8 @@ def runSimulation_opt(input_filename, verbose=False):
     network_name = filename.split(".")[0]
     #vessel_name = "ulnar_R_I"
 
-    vessel_names = ini.VESSEL_NAMES
-
     for vessel_name in vessel_names:
-        index_vessel_name = ini.VESSEL_NAMES.index(vessel_name)
+        index_vessel_name = vessel_names.index(vessel_name)
         P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
         #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/adan56/adan56_results/adan56_results/aortic_arch_I_P.last")
         node = 2
@@ -71,12 +70,12 @@ def runSimulation_opt(input_filename, verbose=False):
         P0 = P0[:,index_jl]
         res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
         #print(res)
-        fig, ax = plt.subplots()
+        _, ax = plt.subplots()
         ax.set_xlabel("t")
         ax.set_ylabel("P")
-        plt.title("network: " + network_name + ", # vessels: " + str(ini.NUM_VESSELS) + ", vessel name: " + vessel_name + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
-        plt.plot(t%ini.SIM_DAT_CONST_AUX[0,0],P[:,index_jax])
-        plt.plot(t%ini.SIM_DAT_CONST_AUX[0,0],P0)
+        plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_name + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
+        plt.plot(t%cardiac_T,P[:,index_jax])
+        plt.plot(t%cardiac_T,P0)
         plt.legend(["P_JAX", "P_jl"], loc="lower right")
         #print(network_name + "_" + vessel_name + "_P.pdf")
         plt.savefig(network_name + "_" + vessel_name + "_P.pdf")
@@ -88,7 +87,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
 #@jax.jit
 @partial(jax.jit, static_argnums=(0, 1, 2))
-def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes):
+def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -112,7 +111,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, t_t, _, Ccfl, edges, input_data, rho, total_time, nodes = args
         dt = calculateDeltaT(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(N, B, 
+        sim_dat, sim_dat_aux = solveModel(N, B, starts, ends, starts_rep, ends_rep, 
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho)
@@ -121,7 +120,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
 
         (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempDatas(N, ini.STARTS, ini.ENDS, nodes, sim_dat[4,:]),counter+1), 
+                                         lambda: (saveTempDatas(N, starts, ends, nodes, sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         t_t = t_t.at[counter].set(t)

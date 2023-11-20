@@ -29,7 +29,7 @@ def calculateDeltaT(Ccfl, u, c, dx):
 
 #@jax.jit
 @partial(jax.jit, static_argnums=(0, 1))
-def solveModel(N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+def solveModel(N, B, starts, ends, starts_rep, ends_rep, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -108,7 +108,7 @@ def solveModel(N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
                                                 
     #jax.debug.print("{x}", x = sim_dat_const[2,:])
 
-    sim_dat = sim_dat.at[:,B:-B].set(muscl(ini.STARTS_REP, ini.ENDS_REP, dt, 
+    sim_dat = sim_dat.at[:,B:-B].set(muscl(starts_rep, ends_rep, dt, 
                   sim_dat[1,B:-B],
                   sim_dat[2,B:-B], 
                   sim_dat_const[0,B:-B], 
@@ -342,7 +342,7 @@ def solveModel(N, B, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_a
     (sim_dat, sim_dat_aux, _, _, _, _, _, _)  = jax.lax.fori_loop(0, N, body_fun2, 
                                                    (sim_dat, sim_dat_aux, 
                                                     sim_dat_const, sim_dat_const_aux, 
-                                                    edges, rho, ini.STARTS, ini.ENDS))
+                                                    edges, rho, starts, ends))
     #jax.debug.print("{x}", x = sim_dat)
     #jax.debug.print("{x}", x = sim_dat[0:2,:])
 
