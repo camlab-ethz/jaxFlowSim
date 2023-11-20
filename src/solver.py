@@ -20,8 +20,8 @@ from jax.experimental.shard_map import shard_map
 #@partial(jax.jit, static_argnums=(0))
 @jax.jit
 def calculateDeltaT(Ccfl, u, c, dx):
-    Smax = jnp.abs(u + c)
-    vessel_dt = dx * Ccfl / Smax
+    Smax = jax.vmap(lambda a, b: jnp.abs(a+b))(u,c)
+    vessel_dt = jax.vmap(lambda a, b: a*Ccfl/b)(dx,Smax)
     dt = jnp.min(vessel_dt)
     return dt
 
