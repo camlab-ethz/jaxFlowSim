@@ -23,7 +23,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     J =  data["solver"]["jump"]
 
-    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep = buildArterialNetwork(data["network"], J, blood)
+    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep, indices1, indices2 = buildArterialNetwork(data["network"], J, blood)
     makeResultsFolder(data, input_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
@@ -44,7 +44,8 @@ def runSimulation_opt(input_filename, verbose=False):
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
                                           blood.rho, total_time, nodes, 
-                                          starts, ends, starts_rep, ends_rep))
+                                          starts, ends, starts_rep, ends_rep,
+                                          indices1, indices2))
 
     if verbose:
         #print("\n")
@@ -87,7 +88,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
 #@jax.jit
 @partial(jax.jit, static_argnums=(0, 1, 2))
-def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep):
+def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -112,6 +113,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, t_t, _, Ccfl, edges, input_data, rho, total_time, nodes = args
         dt = calculateDeltaT(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
         sim_dat, sim_dat_aux = solveModel(N, B, starts, ends, starts_rep, ends_rep, 
+                                          indices1, indices2,
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho)

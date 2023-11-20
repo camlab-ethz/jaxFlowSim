@@ -29,7 +29,7 @@ def calculateDeltaT(Ccfl, u, c, dx):
 
 #@jax.jit
 @partial(jax.jit, static_argnums=(0, 1))
-def solveModel(N, B, starts, ends, starts_rep, ends_rep, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -117,7 +117,8 @@ def solveModel(N, B, starts, ends, starts_rep, ends_rep, t, dt, sim_dat, sim_dat
                   sim_dat_const[3,B:-B],
                   sim_dat_const[-1,B:-B],
                   sim_dat_const[4,B:-B],
-                  sim_dat_const[5,B:-B]))
+                  sim_dat_const[5,B:-B],
+                  indices1, indices2))
     
     #jax.debug.print("{x}", x = sim_dat[0:2,:])
 
@@ -358,7 +359,8 @@ def solveModel(N, B, starts, ends, starts_rep, ends_rep, t, dt, sim_dat, sim_dat
 def muscl(starts_rep, ends_rep, dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
-          dx, Pext,viscT):
+          dx, Pext,viscT,
+          indices1, indices2):
     #jax.debug.print("{x}", x = A)
     #jax.debug.print("{x}", x = (M, dt, Q, A, 
     #                            A0, beta, gamma, wallE, 
@@ -468,7 +470,6 @@ def muscl(starts_rep, ends_rep, dt,
     #                   jnp.concatenate((jnp.array([uStar2[0]]),uStar2,jnp.array([uStar2[-1]])))))
 
 
-    indices = jnp.arange(0, K+2, 1)
     uStar1 = jnp.zeros((2, K+2))
     uStar1 = uStar1.at[:,0:-2].set(uStar)
     uStar2 = jnp.zeros((2, K+2))
@@ -476,9 +477,9 @@ def muscl(starts_rep, ends_rep, dt,
     uStar3 = jnp.zeros((2, K+2))
     uStar3 = uStar1.at[:,2:].set(uStar)
     #uStar2 = jnp.where(indices%(M+2*B)==1, uStar1, uStar2) 
-    uStar2 = jnp.where(indices-starts_rep==-starts_rep[0]+1, uStar1, uStar2) 
+    uStar2 = jnp.where(indices1, uStar1, uStar2) 
     #uStar2 = jnp.where(indices%(M+2*B)==M+2, uStar3, uStar2) 
-    uStar2 = jnp.where(indices-ends_rep==-starts_rep[0]+2, uStar3, uStar2) 
+    uStar2 = jnp.where(indices2, uStar3, uStar2) 
     uStar = uStar2[:,1:-1]
     #uStar = uStar.at[0,0].set(uStar[0,1])
     #uStar = uStar.at[1,0].set(uStar[1,1])

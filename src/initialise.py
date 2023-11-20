@@ -252,6 +252,12 @@ def buildArterialNetwork(network, J, blood):
         vessel_names.append(vessel_name)
     
 
+
+    indices = jnp.arange(0, K, 1)
+    indices1 = indices-starts_rep==-starts_rep[0]+1
+    indices2 = indices-ends_rep==-starts_rep[0]+2
+    
+
     #sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)
 
@@ -276,7 +282,7 @@ def buildArterialNetwork(network, J, blood):
                 edges[j,9] = jnp.where(edges[:, 1] == t)[0][0]
 
 
-    return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep
+    return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep, indices1, indices2
 
 
 def buildVessel(ID, vessel_data, blood, jump, M):
