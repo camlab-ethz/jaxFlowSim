@@ -391,35 +391,39 @@ def muscl(starts_rep, ends_rep, dt,
     #vA = jnp.concatenate((jnp.array([U00A]),A,jnp.array([UM1A])))
     #vQ = jnp.concatenate((jnp.array([U00Q]),Q,jnp.array([UM1Q])))
 
-    slopeA_halfDx = computeLimiter(vA, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
-    slopeQ_halfDx = computeLimiter(vQ, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
+    invDx_temp = jnp.concatenate((invDx, jnp.array([invDx[-1]])))
+    limiterA = computeLimiter(vA, invDx_temp)
+    limiterQ = computeLimiter(vQ, invDx_temp)
+    halfDx_temp = jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
+    slopeA_halfDx = jax.vmap(lambda a, b: a * b)(limiterA, halfDx_temp)
+    slopeQ_halfDx = jax.vmap(lambda a, b: a * b)(limiterQ, halfDx_temp)
     #jax.debug.print("slopeQ_halfDx = {x}", x = slopeQ_halfDx)
     #jax.debug.print("slopeA_halfDx = {x}", x = slopeA_halfDx)
 
     #slopeA_halfDx = slopesA * ini.VCS[i].halfDx
     #slopeQ_halfDx = slopesQ * ini.VCS[i].halfDx
     
-    #Al = jax.vmap(lambda a, b: a+b)(vA, slopeA_halfDx)
-    #Ar = jax.vmap(lambda a, b: a-b)(vA, slopeA_halfDx)
-    #Ql = jax.vmap(lambda a, b: a+b)(vQ, slopeQ_halfDx)
-    #Qr = jax.vmap(lambda a, b: a-b)(vQ, slopeQ_halfDx)
+    Al = jax.vmap(lambda a, b: a+b)(vA, slopeA_halfDx)
+    Ar = jax.vmap(lambda a, b: a-b)(vA, slopeA_halfDx)
+    Ql = jax.vmap(lambda a, b: a+b)(vQ, slopeQ_halfDx)
+    Qr = jax.vmap(lambda a, b: a-b)(vQ, slopeQ_halfDx)
     #Al = shard_map(lambda a, b: a+b, mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(vA, slopeA_halfDx)
     #Ar = shard_map(lambda a, b: a-b, mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(vA, slopeA_halfDx)
     #Ql = shard_map(lambda a, b: a+b, mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(vQ, slopeQ_halfDx)
     #Qr = shard_map(lambda a, b: a-b, mesh, in_specs=PartitionSpec('i'), out_specs=PartitionSpec('i'))(vQ, slopeQ_halfDx)
-    Al = vA + slopeA_halfDx
-    Ar = vA - slopeA_halfDx
-    Ql = vQ + slopeQ_halfDx
-    Qr = vQ - slopeQ_halfDx
+    #Al = vA + slopeA_halfDx
+    #Ar = vA - slopeA_halfDx
+    #Ql = vQ + slopeQ_halfDx
+    #Qr = vQ - slopeQ_halfDx
     #jax.debug.print("Qr = {x}", x = Qr)
     #jax.debug.print("Ql = {x}", x = Ql)
     #jax.debug.print("Ar = {x}", x = Ar)
     #jax.debug.print("Al = {x}", x = Al)
 
-    #Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
-    #Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
-    Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
-    Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
+    Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
+    Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
+    #Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
+    #Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
     #jax.debug.print("Fr = {x}", x = Fr)
     #jax.debug.print("Fl = {x}", x = Fl)
 
@@ -431,10 +435,10 @@ def muscl(starts_rep, ends_rep, dt,
     dxDt_temp = jnp.empty(K-1)
     dxDt_temp = dxDt_temp.at[0:-1].set(dxDt)
     dxDt_temp = dxDt_temp.at[-1].set(dxDt[-1])
-    #flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - jnp.concatenate((invDx, jnp.array([invDx[-1]])))*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1]))
-    #flux = flux.at[1,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - jnp.concatenate((jnp.array([dxDt[0]]), dxDt, jnp.array([dxDt[0]]), jnp.array([dxDt[0]])))*(c-d)))(Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1]))
-    flux = flux.at[0,:].set(0.5 * (Fr[0, 1:] + Fl[0, 0:-1] - dxDt_temp * (Ar[1:] - Al[0:-1])))
-    flux = flux.at[1,:].set(0.5 * (Fr[1, 1:] + Fl[1, 0:-1] - dxDt_temp * (Qr[1:] - Ql[0:-1])))
+    flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d, e: 0.5*(a+b - e*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1], dxDt_temp))
+    flux = flux.at[1,:].set(jax.vmap(lambda a, b, c, d, e: 0.5*(a+b - e*(c-d)))(Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1], dxDt_temp))
+    #flux = flux.at[0,:].set(0.5 * (Fr[0, 1:] + Fl[0, 0:-1] - dxDt_temp * (Ar[1:] - Al[0:-1])))
+    #flux = flux.at[1,:].set(0.5 * (Fr[1, 1:] + Fl[1, 0:-1] - dxDt_temp * (Qr[1:] - Ql[0:-1])))
     #flux = jnp.stack((0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])), 
     #                  0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))), dtype=jnp.float64)
     #jax.debug.print("flux = {x}", x = flux)
@@ -444,18 +448,20 @@ def muscl(starts_rep, ends_rep, dt,
     #invDxDt_temp = invDxDt_temp.at[1:-1].set(invDxDt)
     #invDxDt_temp = invDxDt_temp.at[-1].set(invDxDt[0])
     #invDxDt_temp = invDxDt_temp.at[-1].set(invDxDt[-1])
-    #uStar = uStar.at[0,1:-1].set(jax.vmap(lambda a, b, c: a+invDxDt*(b-c))(vA[1:-1],
-    #                                                         flux[0,0:-1],
-    #                                                         flux[0,1:]))
-    #uStar = uStar.at[1,1:-1].set(jax.vmap(lambda a, b, c: a+invDxDt*(b-c))(vQ[1:-1],
-    #                                                         flux[1,0:-1],
-    #                                                         flux[1,1:]))
+    uStar = uStar.at[0,1:-1].set(jax.vmap(lambda a, b, c, d: a+d*(b-c))(vA[1:-1],
+                                                             flux[0,0:-1],
+                                                             flux[0,1:],
+                                                             invDxDt))
+    uStar = uStar.at[1,1:-1].set(jax.vmap(lambda a, b, c, d: a+d*(b-c))(vQ[1:-1],
+                                                             flux[1,0:-1],
+                                                             flux[1,1:],
+                                                             invDxDt))
     #uStar = uStar.at[0,1:M+1].set(jax.vmap(lambda a, b: a-invDxDt*b)(vA[1:-1],
     #                                                         jnp.diff(flux[0,1:])))
     #uStar = uStar.at[1,1:M+1].set(jax.vmap(lambda a, b: a-invDxDt*b)(vQ[1:-1],
     #                                                         jnp.diff(flux[1,1:])))
-    uStar = uStar.at[0,1:-1].set(vA[1:-1] + invDxDt*(flux[0,0:-1] - flux[0,1:]))
-    uStar = uStar.at[1,1:-1].set(vQ[1:-1] + invDxDt*(flux[1,0:-1] - flux[1,1:]))
+    #uStar = uStar.at[0,1:-1].set(vA[1:-1] + invDxDt*(flux[0,0:-1] - flux[0,1:]))
+    #uStar = uStar.at[1,1:-1].set(vQ[1:-1] + invDxDt*(flux[1,0:-1] - flux[1,1:]))
     #uStar1 = vA[1:M+1] - invDxDt * jnp.diff(flux[0,0:M+1])
     #uStar2 = vQ[1:M+1] - invDxDt * jnp.diff(flux[1,0:M+1])
     #uStar = jnp.stack((jnp.concatenate((jnp.array([uStar1[0]]),uStar1,jnp.array([uStar1[-1]]))), 
@@ -480,8 +486,10 @@ def muscl(starts_rep, ends_rep, dt,
     #uStar = uStar.at[1,-1].set(uStar[1,-2])
     #jax.debug.print("uStar = {x}", x = uStar)
 
-    slopesA = computeLimiterIdx(uStar, 0, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
-    slopesQ = computeLimiterIdx(uStar, 1, invDx) * jnp.concatenate((jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]])))
+    limiterA = computeLimiterIdx(uStar, 0, invDx_temp)
+    limiterQ = computeLimiterIdx(uStar, 1, invDx_temp)
+    slopesA = jax.vmap(lambda a, b: a * b)(limiterA, halfDx_temp)
+    slopesQ = jax.vmap(lambda a, b: a * b)(limiterQ, halfDx_temp)
     #jax.debug.print("slopesQ = {x}", x = slopesQ)
     #jax.debug.print("slopesA = {x}", x = slopesA)
 
@@ -498,8 +506,8 @@ def muscl(starts_rep, ends_rep, dt,
     #jax.debug.print("Ar = {x}", x = Ar)
     #jax.debug.print("Al = {x}", x = Al)
     
-    #Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
-    #Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
+    Fl = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Al, Ql))
+    Fr = jnp.array(jax.vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
     #jax.debug.print("{x}", x = Fr)
     #jax.debug.print("{x}", x = Fl)
     #jax.debug.print("{x}", x = uStar)
@@ -511,21 +519,21 @@ def muscl(starts_rep, ends_rep, dt,
     #jax.debug.print("{x}", x = Fl)
     
     #jax.debug.print("{x}", x = Fl)
-    Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
-    Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
+    #Fl = jnp.array(computeFlux(gamma_ghost, Al, Ql))
+    #Fr = jnp.array(computeFlux(gamma_ghost, Ar, Qr))
     #jax.debug.print("Fr = {x}", x = Fr)
     #jax.debug.print("Fl = {x}", x = Fl)
     #jax.debug.print ("(ˊ̱˂˃ˋ̱ )")
 
     flux = jnp.empty((2,K-1))
-    #flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt_temp*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1]))
-    #flux = flux.at[1,:].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt_temp*(c-d)))(Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1]))
+    flux = flux.at[0,:].set(jax.vmap(lambda a, b, c, d, e: 0.5*(a+b - e*(c-d)))(Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1], dxDt_temp))
+    flux = flux.at[1,:].set(jax.vmap(lambda a, b, c, d, e: 0.5*(a+b - e*(c-d)))(Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1], dxDt_temp))
     #jax.debug.print("{x}", x = flux)
     #flux = jnp.empty((2,M+2))
     #flux = flux.at[0,0:M+1].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt[0]*(c-d)))(Fr[0, 1:M+2], Fl[0, 0:M+1], Ar[1:M+2], Al[0:M+1]))
     #flux = flux.at[1,0:M+1].set(jax.vmap(lambda a, b, c, d: 0.5*(a+b - dxDt[0]*(c-d)))(Fr[1, 1:M+2], Fl[1, 0:M+1], Qr[1:M+2], Ql[0:M+1]))
-    flux = flux.at[0,:].set(0.5 * (Fr[0, 1:] + Fl[0, 0:-1] - dxDt_temp * (Ar[1:] - Al[0:-1])))
-    flux = flux.at[1,:].set(0.5 * (Fr[1, 1:] + Fl[1, 0:-1] - dxDt_temp * (Qr[1:] - Ql[0:-1])))
+    #flux = flux.at[0,:].set(0.5 * (Fr[0, 1:] + Fl[0, 0:-1] - dxDt_temp * (Ar[1:] - Al[0:-1])))
+    #flux = flux.at[1,:].set(0.5 * (Fr[1, 1:] + Fl[1, 0:-1] - dxDt_temp * (Qr[1:] - Ql[0:-1])))
     #flux = jnp.stack((0.5 * (Fr[0, 1:M+2] + Fl[0, 0:M+1] - dxDt * (Ar[1:M+2] - Al[0:M+1])), 
     #                 0.5 * (Fr[1, 1:M+2] + Fl[1, 0:M+1] - dxDt * (Qr[1:M+2] - Ql[0:M+1]))))
 
@@ -534,16 +542,18 @@ def muscl(starts_rep, ends_rep, dt,
     #jax.debug.print("{x}", x = Q)
     #jax.debug.print("{x}", x = uStar)
     #jax.debug.print("flux = {x}", x = flux)
-    #A = jax.vmap(lambda a, b, c, d: 0.5*(a+b+invDxDt[0]*(c-d)))(A[:],
-    #                                                         uStar[0,1:-1],
-    #                                                         flux[0,0:-1],
-    #                                                         flux[0,1:])
-    #Q = jax.vmap(lambda a, b, c, d: 0.5*(a+b+invDxDt[0]*(c-d)))(Q[:],
-    #                                                         uStar[1,1:-1],
-    #                                                         flux[1,0:-1],
-    #                                                         flux[1,1:])
-    A = 0.5*(A + uStar[0,1:-1] + invDxDt*(flux[0,0:-1]-flux[0,1:]))
-    Q = 0.5*(Q + uStar[1,1:-1] + invDxDt*(flux[1,0:-1]-flux[1,1:]))
+    A = jax.vmap(lambda a, b, c, d, e: 0.5*(a+b+e*(c-d)))(A[:],
+                                                             uStar[0,1:-1],
+                                                             flux[0,0:-1],
+                                                             flux[0,1:],
+                                                             invDxDt)
+    Q = jax.vmap(lambda a, b, c, d, e: 0.5*(a+b+e*(c-d)))(Q[:],
+                                                             uStar[1,1:-1],
+                                                             flux[1,0:-1],
+                                                             flux[1,1:],
+                                                             invDxDt)
+    #A = 0.5*(A + uStar[0,1:-1] + invDxDt*(flux[0,0:-1]-flux[0,1:]))
+    #Q = 0.5*(Q + uStar[1,1:-1] + invDxDt*(flux[1,0:-1]-flux[1,1:]))
     #jax.debug.print("{x}", x = A)
     #jax.debug.print("{x}", x = Q)
     #uStar = uStar.at[1,1:M+1].set(jax.vmap(lambda a, b, c: a+invDxDt*(b-c))(vQ[1:M+1],
@@ -579,8 +589,8 @@ def muscl(starts_rep, ends_rep, dt,
 
     #    v.Q = v.Q.at[mask].set(jax.scipy.linalg.solve_banded((1, 1), jnp.array([Tlu[:-1], Td, Tlu[1:]]), d))
 
-    #u = jax.vmap(lambda a, b: a/b)(Q, A)
-    u =  Q/A
+    u = jax.vmap(lambda a, b: a/b)(Q, A)
+    #u =  Q/A
     #jax.debug.print("{x}", x = A)
     #jax.debug.print("u = {x}", x = u)
     #jax.debug.print("{x}", x = (M, dt, Q, A, 
@@ -635,7 +645,7 @@ def computeLimiter(U, invDx):
     #dU = jnp.empty((2, U.size), dtype=jnp.float64)
     #dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     #dU = dU.at[1, 0:-1].set(dU[0, 1:])
-    dU = jnp.diff(U) * jnp.concatenate((invDx, jnp.array([invDx[-1]])))
+    dU = jax.vmap(lambda a, b: a*b)(jnp.diff(U), invDx)
     #test = [[0,(U[1:] - U[:-1]) * invDx], 
     #       [0, (U[1:-1] - U[:-2]) * invDx, 0]]
     #jax.debug.breakpoint()
@@ -647,7 +657,7 @@ def computeLimiter(U, invDx):
 
 def computeLimiterIdx(U, idx, invDx):
     #U = U[idx, :]
-    dU = jnp.diff(U[idx, :]) * jnp.concatenate((invDx, jnp.array([invDx[-1]])))
+    dU = jax.vmap(lambda a, b: a*b)(jnp.diff(U[idx, :]), invDx)
     #dU = jnp.empty((2, U.size), dtype=jnp.float64)
     #dU = dU.at[0, 1:].set((U[1:] - U[:-1]) * invDx)
     #dU = dU.at[1, 0:-1].set(dU[0, 1:])
