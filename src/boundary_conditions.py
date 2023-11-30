@@ -1,12 +1,11 @@
-import jax
 import jax.numpy as jnp
-from jax import lax
+from jax import lax, jit
 from src.utils import pressure
 from functools import partial
 
 def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext):
     #if inlet == 1: #"Q":
-    Q0, P0 = jax.lax.cond(inlet==1, lambda:(inputFromData(t, input_data.transpose(), cardiac_T),0.0), lambda:(0.0,inputFromData(t, input_data.transpose(), cardiac_T)))
+    Q0, P0 = lax.cond(inlet==1, lambda:(inputFromData(t, input_data.transpose(), cardiac_T),0.0), lambda:(0.0,inputFromData(t, input_data.transpose(), cardiac_T)))
     #else:
     #    P0 = inputFromData(t, input_data, cardiac_T)
     return inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext)
@@ -44,7 +43,7 @@ def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pe
     #    A = areaFromPressure(P0, A0, beta, Pext)
     #    Q0 = u0 * A
     
-    return jax.lax.cond(inlet == 1, lambda: (Q0,  Q0/u0), lambda: (u0 * areaFromPressure(P0, A0, beta, Pext), areaFromPressure(P0, A0, beta, Pext)))
+    return lax.cond(inlet == 1, lambda: (Q0,  Q0/u0), lambda: (u0 * areaFromPressure(P0, A0, beta, Pext), areaFromPressure(P0, A0, beta, Pext)))
 
     #return Q0, A
 
@@ -65,16 +64,16 @@ def areaFromPressure(P, A0, beta, Pext):
     return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
 
 def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-    #jax.debug.print("{x}", x = Cc)
+    #debug.print("{x}", x = Cc)
     def outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
         P1_out = 2.0 * P2 - P3
         u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
         return u1_out, Q1_out, A1, c1_out, P1_out, Pc
     def threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-        #jax.debug.print("{x}", x = Cc)
+        #debug.print("{x}", x = Cc)
         u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
         return u1_out, Q1, A1_out, c1, P1, Pc_out
-    return jax.lax.cond(outlet == 1,
+    return lax.cond(outlet == 1,
                   lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc),
                   lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc), dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc)
 
@@ -88,7 +87,7 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
 
     u1, c1 = inverseRiemannInvariants(W1M, W2M)
     Q1 = A1 * u1
-    #jax.debug.breakpoint()
+    #debug.breakpoint()
 
     return u1, Q1, c1
 
@@ -98,8 +97,8 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     Al = A1
     ul = u1
     Pc += dt / Cc * (Al * ul - (Pc - Pout) / R2)
-    #jax.debug.print("{x}", x = (Pc, dt, Cc, Al, ul, Pc, Pout, R2))
-    #jax.debug.print("{x}", x = (Cc))
+    #debug.print("{x}", x = (Pc, dt, Cc, Al, ul, Pc, Pout, R2))
+    #debug.print("{x}", x = (Cc))
 
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
@@ -117,7 +116,7 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
         xn = x0 - fun(x0) / dfun(x0)
 
         def cond_fun(val):
-            ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
+            ret = lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
             return ret
 
         def body_fun(val):
@@ -151,7 +150,7 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
     return U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A
 
-@partial(jax.jit, static_argnums=(0, 1))
+@partial(jit, static_argnums=(0, 1))
 def updateGhostCells(M,N,sim_dat):
     sim_dat_aux = jnp.zeros((N,8), dtype=jnp.float64)
     def body_fun(i,sim_dat_aux):
@@ -178,7 +177,7 @@ def updateGhostCells(M,N,sim_dat):
 
         return sim_dat_aux
 
-    sim_dat_aux = jax.lax.fori_loop(0,N, body_fun, sim_dat_aux)
+    sim_dat_aux = lax.fori_loop(0,N, body_fun, sim_dat_aux)
 
     return sim_dat_aux
     #return [updateGhostCell(vessel) for vessel in vessels]

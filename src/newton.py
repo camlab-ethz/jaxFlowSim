@@ -1,7 +1,6 @@
 import jax.numpy as jnp
-from jax import jit
+from jax import jit, lax
 from functools import partial
-import jax
 
 #@jit
 @partial(jit, static_argnums=(0,1,))
@@ -30,7 +29,7 @@ def newtonRaphson(fun_w, fun_f,
         test = jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
                                       ones,
                                       zeros)
-        ret = jax.lax.cond(jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
+        ret = lax.cond(jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
                                       ones,
                                       zeros).sum()==n,
                             lambda: False,
@@ -46,7 +45,7 @@ def newtonRaphson(fun_w, fun_f,
         dU = jnp.linalg.solve(J, -F)
         return U+dU, dU, F
 
-    return jax.lax.while_loop(cond_fun, body_fun, (U+dU, dU, F))
+    return lax.while_loop(cond_fun, body_fun, (U+dU, dU, F))
     #while True:
     #    dU = jnp.linalg.solve(J, -F)
     #    U_new = U + dU

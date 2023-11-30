@@ -1,14 +1,12 @@
-import jax
 from functools import partial
 import jax.numpy as jnp
+from jax import block_until_ready, jit, lax
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempDatas#, writeResults
-from src.boundary_conditions import updateGhostCells
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
 import time
-import src.initialise as ini
 import sys
 import matplotlib.pyplot as plt
 
@@ -40,7 +38,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     timepoints = np.linspace(0, cardiac_T, J)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    sim_dat, t, P  = jax.block_until_ready(simulation_loop(N, B, J, 
+    sim_dat, t, P  = block_until_ready(simulation_loop(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
                                           blood.rho, total_time, nodes, 
@@ -89,7 +87,7 @@ def runSimulation_opt(input_filename, verbose=False):
     #writeResults(vessels)
 
 #@jax.jit
-@partial(jax.jit, static_argnums=(0, 1, 2))
+@partial(jit, static_argnums=(0, 1, 2))
 def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
     t = 0.0
     passed_cycles = 0
@@ -105,7 +103,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
         def printConvErrorWrapper():
             printConvError(err)
             return False
-        ret = jax.lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err, conv_toll))*
+        ret = lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err, conv_toll))*
                            ((t_i - sim_dat_const_aux[0,0] * passed_cycles_i >= sim_dat_const_aux[0,0])), 
                             printConvErrorWrapper,
                             lambda: True)
@@ -123,7 +121,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
         #sim_dat_aux[:,2:10] = updateGhostCells(M, N, sim_dat)
 
 
-        (P_t_temp,counter_temp) = jax.lax.cond(t >= timepoints[counter], 
+        (P_t_temp,counter_temp) = lax.cond(t >= timepoints[counter], 
                                          lambda: (saveTempDatas(N, starts, ends, nodes, sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
@@ -134,18 +132,18 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
             err = computeConvError(N, P_t, P_l)
             printConvError(err)
 
-        jax.lax.cond(((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0])*
+        lax.cond(((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0])*
                        (passed_cycles + 1 > 1)), 
                        checkConv,
                         lambda: None)
-        (P_l,counter,timepoints,passed_cycles) = jax.lax.cond((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0]),
+        (P_l,counter,timepoints,passed_cycles) = lax.cond((t - sim_dat_const_aux[0,0] * passed_cycles >= sim_dat_const_aux[0,0]),
                                          lambda: (P_t,0,timepoints + sim_dat_const_aux[0,0], passed_cycles+1), 
                                          lambda: (P_l,counter,timepoints, passed_cycles))
         
 
 
         t += dt
-        (passed_cycles) = jax.lax.cond(t >= total_time,
+        (passed_cycles) = lax.cond(t >= total_time,
                                          lambda: (passed_cycles+1), 
                                          lambda: (passed_cycles))
 
@@ -156,7 +154,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
     (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      t, counter, timepoints, passed_cycles, dt, P_t, P_l, t_t,  
-     conv_toll, Ccfl, edges, input_data, rho, total_time, nodes) = jax.lax.while_loop(cond_fun, body_fun, (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, 
+     conv_toll, Ccfl, edges, input_data, rho, total_time, nodes) = lax.while_loop(cond_fun, body_fun, (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, 
                                                                                                            counter, timepoints, passed_cycles, dt, P_t, P_l, t_t, conv_toll, 
                                                                                                            Ccfl, edges, input_data, rho, total_time, nodes))
     

@@ -1,5 +1,3 @@
-import jax
-from jax import jit
 import jax.numpy as jnp
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
