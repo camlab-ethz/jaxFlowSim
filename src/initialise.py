@@ -1,6 +1,4 @@
 import numpy as np
-import sys
-import jax.numpy as jnp
 import yaml
 import os.path
 import shutil
@@ -260,7 +258,7 @@ def buildArterialNetwork(network, J, blood):
     for i, inpd in enumerate(input_data_temp):
         input_data[2*i:2*i+2, :inpd.shape[1]] = inpd
 
-    indices = jnp.arange(0, K, 1)
+    indices = np.arange(0, K, 1)
     indices1 = indices-starts_rep==-starts_rep[0]+1
     indices2 = indices-ends_rep==-starts_rep[0]+2
     
@@ -275,22 +273,22 @@ def buildArterialNetwork(network, J, blood):
         i = edges[j,0]-1
         if sim_dat_const_aux[i,2] == 0: #"none":
             t = edges[j,2]
-            edges[j,3] = jnp.where(edges[:, 1] == t,jnp.ones_like(edges[:,1]), jnp.zeros_like(edges[:,1])).sum().astype(int)
-            edges[j,6] = jnp.where(edges[:, 2] == t,jnp.ones_like(edges[:,2]), jnp.zeros_like(edges[:,2])).sum().astype(int)
+            edges[j,3] = np.where(edges[:, 1] == t,np.ones_like(edges[:,1]), np.zeros_like(edges[:,1])).sum().astype(int)
+            edges[j,6] = np.where(edges[:, 2] == t,np.ones_like(edges[:,2]), np.zeros_like(edges[:,2])).sum().astype(int)
             if edges[j,3] == 2:
-                edges[j,4] = jnp.where(edges[:, 1] == t)[0][0]
-                edges[j,5] = jnp.where(edges[:, 1] == t)[0][1]
+                edges[j,4] = np.where(edges[:, 1] == t)[0][0]
+                edges[j,5] = np.where(edges[:, 1] == t)[0][1]
 
             elif edges[j,6] == 1:
-                edges[j,7] = jnp.where(edges[:, 1] == t)[0][0]
+                edges[j,7] = np.where(edges[:, 1] == t)[0][0]
 
             elif edges[j,6] == 2:
                 #try:
-                temp1 = jnp.where(edges[:, 2] == t)[0][0]
-                temp2 = jnp.where(edges[:, 2] == t)[0][1]
-                edges[j,7] = jnp.minimum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][0]
-                edges[j,8] = jnp.maximum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][1]
-                edges[j,9] = jnp.where(edges[:, 1] == t)[0][0]
+                temp1 = np.where(edges[:, 2] == t)[0][0]
+                temp2 = np.where(edges[:, 2] == t)[0][1]
+                edges[j,7] = np.minimum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][0]
+                edges[j,8] = np.maximum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][1]
+                edges[j,9] = np.where(edges[:, 1] == t)[0][0]
                 #except IndexError:
                 #    edges[j,6] = 1
                 #    temp1 = jnp.where(edges[:, 2] == t)[0][0]
@@ -339,14 +337,14 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     R0 = radius_slope * np.arange(0,M,1) * dx + Rp
     A0 = np.pi * R0 * R0
     A = A0
-    beta = 1/jnp.sqrt(A0) * h0 * s_pi_E_over_sigma_squared
+    beta = 1/np.sqrt(A0) * h0 * s_pi_E_over_sigma_squared
     gamma = beta * one_over_rho_s_p / R0
     c = waveSpeed(A, gamma)
     wallE = 3.0 * beta * radius_slope * 1/A0 * s_pi * blood.rho_inv
     #if phi != 0.0:
     #    wallVb = Cv * 1/jnp.sqrt(A0) * 1/np.sqrt(dx)
     #    wallVa = 0.5 * wallVb
-    P = pressureSA(jnp.ones(M,jnp.float64), beta, Pext)
+    P = pressureSA(np.ones(M,np.float64), beta, Pext)
     
 
 
@@ -443,10 +441,10 @@ def getPhi(vessel):
 
 def meshVessel(vessel, L):
     if "M" not in vessel:
-        M = max([5, int(jnp.ceil(L * 1e3))])
+        M = max([5, int(np.ceil(L * 1e3))])
     else:
         M = vessel["M"]
-        M = max([5, M, int(jnp.ceil(L * 1e3))])
+        M = max([5, M, int(np.ceil(L * 1e3))])
     
     #M = 242
 
@@ -488,7 +486,7 @@ def addOutlet(vessel):
 
 def computeViscousTerm(vessel_data, blood):
     gamma_profile = vessel_data.get("gamma_profile", 9)
-    return 2 * (gamma_profile + 2) * jnp.pi * blood.mu * blood.rho_inv
+    return 2 * (gamma_profile + 2) * np.pi * blood.mu * blood.rho_inv
 
 def buildHeart(vessel_data):
     if "inlet" in vessel_data:
@@ -498,7 +496,7 @@ def buildHeart(vessel_data):
         inlet_number = vessel_data["inlet number"]
         return True, inlet_type, cardiac_period, input_data, inlet_number
     else:
-        return False, 0, 0.0, jnp.zeros((1, 2)), 0
+        return False, 0, 0.0, np.zeros((1, 2)), 0
 
 
 def loadInletData(inlet_file):
