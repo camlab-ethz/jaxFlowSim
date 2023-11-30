@@ -53,7 +53,7 @@ def runSimulation_opt(input_filename, verbose=False):
         print(f"Elapsed time = {ending_time} seconds")
 
     jnp.set_printoptions(threshold=sys.maxsize)
-    #print(sim_dat[4,0:100])
+    #print(P)
     #plt.figure()
     #plt.plot(t,P[:,0])
     #plt.show()
@@ -63,27 +63,29 @@ def runSimulation_opt(input_filename, verbose=False):
 
     for vessel_name in vessel_names:
         index_vessel_name = vessel_names.index(vessel_name)
-        P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
+        #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
         #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/adan56/adan56_results/adan56_results/aortic_arch_I_P.last")
         node = 2
-        index_jl  = 1 + node
+        #index_jl  = 1 + node
         index_jax  = 5*index_vessel_name + node
-        P0 = P0[:,index_jl]
-        res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
+        #P0 = P0[:,index_jl]
+        #res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
         #print(res)
         _, ax = plt.subplots()
         ax.set_xlabel("t")
-        ax.set_ylabel("P")
-        plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_name + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
-        plt.plot(t%cardiac_T,P[:,index_jax])
-        plt.plot(t%cardiac_T,P0)
-        plt.legend(["P_JAX", "P_jl"], loc="lower right")
+        ax.set_ylabel("P[mmHg]")
+        #plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_name + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
+        plt.title("vessel name: " + vessel_name)
+        plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
+        #plt.plot(t%cardiac_T,P0/133.322)
+        #plt.legend(["P_JAX", "P_jl"], loc="lower right")
         #print(network_name + "_" + vessel_name + "_P.pdf")
-        plt.savefig(network_name + "_" + vessel_name + "_P.pdf")
+        plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_name + "_P.pdf")
         plt.close()
 
     #plt.show()
 
+    #print(edges)
     #writeResults(vessels)
 
 #@jax.jit
