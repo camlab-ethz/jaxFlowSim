@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import jax.numpy as jnp
 import yaml
 import os.path
@@ -136,19 +137,19 @@ def makeResultsFolder(data, input_filename):
     project_name = data["project name"]
 
     if "results folder" not in data:
-        r_folder = project_name + "_results"
+        r_folder = "results/" +  project_name + "_results"
     else:
         r_folder = data["results folder"]
 
     # delete existing folder and results!
     if os.path.isdir(r_folder):
         shutil.rmtree(r_folder)
-    os.mkdir(r_folder)
+    os.makedirs(r_folder, mode = 0o777)
 
     shutil.copy2(input_filename, r_folder + "/")
     copyInletFiles(data, r_folder)
 
-    os.chdir(r_folder)
+    #os.chdir(r_folder)
 
 
 def copyInletFiles(data, r_folder):
@@ -207,7 +208,7 @@ def buildArterialNetwork(network, J, blood):
     sim_dat_const_aux = np.zeros((N, 3), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     # make max input_data size non static
-    input_data = np.ones((2*N,100), dtype=np.float64)*1000
+    input_data_temp = []
     vessel_names = []
 
 
@@ -246,12 +247,18 @@ def buildArterialNetwork(network, J, blood):
         #sim_dat_const_aux = sim_dat_const_aux.at[:,i].set(_sim_dat_const_aux)
 
         edges[i, :3] = _edges
-        input_data[2*i:2*(i+1),:_input_data.shape[0]] = _input_data.transpose()
+        #input_data[2*i:2*i+2,:_input_data.shape[0]] = _input_data.transpose()
+        input_data_temp.append(_input_data.transpose())
+        #input_data[2*i+1,:_input_data.shape[0]] = -input_data[2*i+1,:_input_data.shape[0]]/(1e4)
 
         sim_dat_const[-1,starts[i]-B:ends[i]+B] = sim_dat_const[-1,starts[i]-B:ends[i]+B]/(M)
         vessel_names.append(vessel_name)
     
-
+    input_sizes = [inpd.shape[1] for inpd in input_data_temp]
+    input_size = max(input_sizes)
+    input_data= np.ones((2*N,input_size), dtype=np.float64)*1000
+    for i, inpd in enumerate(input_data_temp):
+        input_data[2*i:2*i+2, :inpd.shape[1]] = inpd
 
     indices = jnp.arange(0, K, 1)
     indices1 = indices-starts_rep==-starts_rep[0]+1
@@ -261,7 +268,10 @@ def buildArterialNetwork(network, J, blood):
     #sim_dat_const[-1,:] = sim_dat_const[-1,:]/M
     #sim_dat_const_aux = sim_dat_const_aux.at[0,:].set(sim_dat_const_aux[0,:]/M)
 
+    #jnp.set_printoptions(threshold=sys.maxsize)
+    #print(edges)
     for j in np.arange(0,edges.shape[0],1):
+        #print(edges[j,:])
         i = edges[j,0]-1
         if sim_dat_const_aux[i,2] == 0: #"none":
             t = edges[j,2]
@@ -275,11 +285,19 @@ def buildArterialNetwork(network, J, blood):
                 edges[j,7] = jnp.where(edges[:, 1] == t)[0][0]
 
             elif edges[j,6] == 2:
+                #try:
                 temp1 = jnp.where(edges[:, 2] == t)[0][0]
                 temp2 = jnp.where(edges[:, 2] == t)[0][1]
                 edges[j,7] = jnp.minimum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][0]
                 edges[j,8] = jnp.maximum(temp1,temp2)#jnp.where(edges[:, 2] == t)[0][1]
                 edges[j,9] = jnp.where(edges[:, 1] == t)[0][0]
+                #except IndexError:
+                #    edges[j,6] = 1
+                #    temp1 = jnp.where(edges[:, 2] == t)[0][0]
+                #    temp2 = jnp.where(edges[:, 2] == t)[0][1]
+                #    edges[j,7] = temp1 if temp1 != j else temp2
+
+
 
 
     return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep, indices1, indices2
@@ -311,14 +329,10 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     one_over_rho_s_p = 1.0 / (3.0 * blood.rho * s_pi)
     radius_slope = computeRadiusSlope(Rp, Rd, L)
 
-    ah = 0.2802
-    bh = -5.053e2
-    ch = 0.1324
-    dh = -0.1114e2
 
     if h0 == 0.0:
         Rmean = 0.5 * (Rp + Rd)
-        h0 = computeThickness(Rmean, ah, bh, ch, dh)
+        h0 = computeThickness(Rmean)
     
     #Cv = 0.5 * s_pi * phi * h0 / (blood.rho * 0.75)
 
@@ -399,8 +413,12 @@ def buildVessel(ID, vessel_data, blood, jump, M):
 def computeRadiusSlope(Rp, Rd, L):
     return (Rd - Rp) / L
 
-def computeThickness(R0i, ah, bh, ch, dh):
-    return R0i * (ah * jnp.exp(bh * R0i) + ch * jnp.exp(dh * R0i))
+def computeThickness(R0i):
+    ah = 0.2802
+    bh = -5.053e2
+    ch = 0.1324
+    dh = -0.1114e2
+    return R0i * (ah * np.exp(bh * R0i) + ch * np.exp(dh * R0i))
 
 def computeRadii(vessel):
     if "R0" not in vessel:
