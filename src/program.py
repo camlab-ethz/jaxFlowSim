@@ -8,6 +8,7 @@ from src.IOutils import saveTempDatas#, writeResults
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
 import time
+import os
 import sys
 import matplotlib.pyplot as plt
 import numpyro
@@ -17,6 +18,13 @@ import numpyro.distributions as dist
 from numpyro.infer import MCMC
 
 
+numpyro.set_platform("cpu")
+os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
+numpyro.set_host_device_count(9)
+#os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
+os.chdir(os.path.dirname(__file__))
+
+jax.devices("cpu")[0]
 numpyro.set_platform("cpu")
 #numpyro.set_host_device_count(4)
 #import os
@@ -61,11 +69,11 @@ def runSimulation_opt(input_filename, verbose=False):
                                           starts, ends, starts_rep, ends_rep,
                                           indices1, indices2))
     
-    print(sim_dat_const[7,starts[5]:ends[5]])
-    R = sim_dat_const[7,ends[5]]
+    print(sim_dat_const[7,starts[0]:ends[0]])
+    R = sim_dat_const[7,ends[0]]
     def simulation_loop_wrapper(R):
-        R = np.ones(ends[5]-starts[5])
-        sim_dat_const[7,starts[5]:ends[5]] = 0.9*R
+        R = np.ones(ends[0]-starts[0])
+        sim_dat_const[7,starts[0]:ends[0]] = 0.9*R
         _, _, P = simulation_loop(N, B, J, 
                         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                         timepoints, 1, Ccfl, edges, input_data, 
@@ -82,7 +90,7 @@ def runSimulation_opt(input_filename, verbose=False):
         with numpyro.plate("size", np.size(P_obs)):
             numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R)), obs=P_obs)
     
-    mcmc = MCMC(numpyro.infer.NUTS(model),num_samples=1000,num_warmup=1000,num_chains=4)
+    mcmc = MCMC(numpyro.infer.NUTS(model),num_samples=1000,num_warmup=1000,num_chains=8)
     mcmc.run(jax.random.PRNGKey(323728029))
     mcmc.print_summary()
     
