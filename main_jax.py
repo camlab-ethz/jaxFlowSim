@@ -4,9 +4,9 @@ import os
 import numpyro
 
 
-numpyro.set_platform("cpu")
-os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
-numpyro.set_host_device_count(8)
+#numpyro.set_platform("cpu")
+#os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
+#numpyro.set_host_device_count(8)
 from jax.config import config
 import jax
 import os
@@ -14,7 +14,7 @@ import sys
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
 os.chdir(os.path.dirname(__file__))
 
-jax.devices("cpu")[0]
+#jax.devices("cpu")[0]
 config.update("jax_enable_x64", True)
 
 input_filename = ""
