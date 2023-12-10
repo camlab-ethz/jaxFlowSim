@@ -1,5 +1,6 @@
 from functools import partial
 import jax.numpy as jnp
+import jax
 from jax import block_until_ready, jit, lax
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
@@ -9,6 +10,19 @@ from src.check_convergence import printConvError, computeConvError, checkConverg
 import time
 import sys
 import matplotlib.pyplot as plt
+import numpyro
+import numpy as np
+import numpyro.distributions as dist
+
+from numpyro.infer import MCMC
+
+
+numpyro.set_platform("cpu")
+#numpyro.set_host_device_count(4)
+#import os
+#import random
+#import sys
+print(jax.local_device_count())
 
 
 
@@ -16,8 +30,8 @@ def runSimulation_opt(input_filename, verbose=False):
     data = loadSimulationFiles(input_filename)
     blood = buildBlood(data["blood"])
 
-    if verbose:
-        print(f"Build {input_filename} arterial network \n")
+    #if verbose:
+    #    print(f"Build {input_filename} arterial network \n")
 
     J =  data["solver"]["jump"]
 
@@ -32,25 +46,68 @@ def runSimulation_opt(input_filename, verbose=False):
     if verbose:
         print("Start simulation")
 
-    if verbose:
-        #print("Solving cardiac cycle no: 1")
-        starting_time = time.time_ns()
 
+    print(edges)
     timepoints = np.linspace(0, cardiac_T, J)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    sim_dat, t, P  = block_until_ready(simulation_loop(N, B, J, 
+    if verbose:
+        print("Solving cardiac cycle no: 1")
+        starting_time = time.time_ns()
+    
+    sim_dat, t, P_obs  = block_until_ready(simulation_loop(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
                                           blood.rho, total_time, nodes, 
                                           starts, ends, starts_rep, ends_rep,
                                           indices1, indices2))
+    
+    print(sim_dat_const[7,starts[5]:ends[5]])
+    R = sim_dat_const[7,ends[5]]
+    def simulation_loop_wrapper(R):
+        R = np.ones(ends[5]-starts[5])
+        sim_dat_const[7,starts[5]:ends[5]] = 0.9*R
+        _, _, P = simulation_loop(N, B, J, 
+                        sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                        timepoints, 1, Ccfl, edges, input_data, 
+                        blood.rho, total_time, nodes, 
+                        starts, ends, starts_rep, ends_rep,
+                        indices1, indices2) 
+        return P
+    
+    
+
+
+    def model():
+        R=numpyro.sample("R", dist.Normal(1.8*1e9,1))
+        with numpyro.plate("size", np.size(P_obs)):
+            numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R)), obs=P_obs)
+    
+    mcmc = MCMC(numpyro.infer.NUTS(model),num_samples=1000,num_warmup=1000,num_chains=4)
+    mcmc.run(jax.random.PRNGKey(323728029))
+    mcmc.print_summary()
+    
+    #sim_dat, t, P  = simulation_loop(N, B, J, 
+    #                                      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+    #                                      timepoints, 1, Ccfl, edges, input_data, 
+    #                                      blood.rho, total_time, nodes, 
+    #                                      starts, ends, starts_rep, ends_rep,
+    #                                      indices1, indices2).lower(42).compile()
+    #simulation_loop.lower(N, B, J, 
+    #                                      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+    #                                      timepoints, 1, Ccfl, edges, input_data, 
+    #                                      blood.rho, total_time, nodes, 
+    #                                      starts, ends, starts_rep, ends_rep,
+    #                                      indices1, indices2).compile()
+    
+    
 
     if verbose:
-        #print("\n")
+        print("\n")
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"Elapsed time = {ending_time} seconds")
+        #print(len(vessel_names), ending_time)
 
-    jnp.set_printoptions(threshold=sys.maxsize)
+    #jnp.set_printoptions(threshold=sys.maxsize)
     #print(P)
     #plt.figure()
     #plt.plot(t,P[:,0])
@@ -59,27 +116,80 @@ def runSimulation_opt(input_filename, verbose=False):
     network_name = filename.split(".")[0]
     #vessel_name = "ulnar_R_I"
 
-    for vessel_name in vessel_names:
-        index_vessel_name = vessel_names.index(vessel_name)
-        #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
-        #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/adan56/adan56_results/adan56_results/aortic_arch_I_P.last")
-        node = 2
-        #index_jl  = 1 + node
-        index_jax  = 5*index_vessel_name + node
-        #P0 = P0[:,index_jl]
-        #res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
-        #print(res)
-        _, ax = plt.subplots()
-        ax.set_xlabel("t")
-        ax.set_ylabel("P[mmHg]")
-        #plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_name + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
-        plt.title("vessel name: " + vessel_name)
-        plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
-        #plt.plot(t%cardiac_T,P0/133.322)
-        #plt.legend(["P_JAX", "P_jl"], loc="lower right")
-        #print(network_name + "_" + vessel_name + "_P.pdf")
-        plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_name + "_P.pdf")
-        plt.close()
+    vessel_names_0007 = ["ascending aorta", "right subclavian artery", "right common carotid artery", 
+                    "arch of aorta I", "brachiocephalic artery", 
+                    "arch of aorta II",
+                    "left common carotid artery", 
+                    "left subclavian artery",
+                    "descending aorta", 
+                    ]
+    vessel_names_0029 = [
+                    "aorta I",
+                    "left common iliac artery I",
+                    "left internal iliac artery",
+                    "left common iliac artery II",
+                    "right common iliac artery I",
+                    "celiac trunk II",
+                    "celiac branch",
+                    "aorta IV",
+                    "left renal artery",
+                    "aorta III",
+                    "superior mesentric artery",
+                    "celiac trunk I",
+                    "aorta II",
+                    "aorta V",
+                    "right renal artery",
+                    "right common iliac artery II",
+                    "right internal iliac artery",
+                    ]
+    vessel_names_0053 = [
+                    "right vertebral artery I", 
+                    "left vertebral artery II",
+                    "left posterior meningeal branch of vertebral artery",
+                    "basilar artery III",
+                    "left anterior inferior cerebellar artery",
+                    "basilar artery II",
+                    "right anterior inferior cerebellar artery",
+                    "basilar artery IV",
+                    "right superior cerebellar artery", 
+                    "basilar artery I",
+                    "left vertebral artery I",
+                    "right posterior cerebellar artery I",
+                    "left superior cerebellar artery",
+                    "left posterior cerebellar artery I",
+                    "right posterior central artery",
+                    "right vertebral artery II",
+                    "right posterior meningeal branch of vertebral artery",
+                    "right posterior cerebellar artery II",
+                    "right posterior comunicating artery",
+                    ]
+ 
+    #matplotlib.rcParams.update({'font.size': 20})
+
+    #for i,vessel_name in enumerate(vessel_names):
+    #    index_vessel_name = vessel_names.index(vessel_name)
+    #    P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
+    #    #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/adan56/adan56_results/adan56_results/aortic_arch_I_P.last")
+    #    node = 2
+    #    index_jl  = 1 + node
+    #    index_jax  = 5*index_vessel_name + node
+    #    P0 = P0[:,index_jl]
+    #    res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
+    #    #print(res)
+    #    _, ax = plt.subplots()
+    #    ax.set_xlabel("t[s]")
+    #    ax.set_ylabel("P[mmHg]")
+    #    plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_names_0053[i] + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
+    #    #plt.title("network: " + network_name + ", vessel name: " + vessel_names_0053[i])
+    #    #plt.title(vessel_names_0053[i])
+    #    #plt.title("vessel name: " + vessel_name)
+    #    plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
+    #    plt.plot(t%cardiac_T,P0/133.322)
+    #    plt.legend(["P_JAX", "P_jl"], loc="lower right")
+    #    plt.tight_layout()
+    #    #print(network_name + "_" + vessel_name + "_P.eps")
+    #    plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names_0053[i].replace(" ", "_") + "_P.eps")
+    #    plt.close()
 
     #plt.show()
 

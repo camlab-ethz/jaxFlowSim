@@ -4,20 +4,20 @@ from ruamel.yaml import YAML
 import ruamel.yaml
 import os
 from bs4 import BeautifulSoup
-import csv
-import scipy.constants as scc
-import shutil
-import difflib
-import matplotlib.pyplot as plt
+#import csv
+#import scipy.constants as scc
+#import shutil
+#import difflib
+#import matplotlib.pyplot as plt
 
 os.chdir(os.path.dirname(__file__))
 
-def computeThickness(R0i):
+def computeThickness(r0):
     ah = 0.2802
     bh = -5.053e2
     ch = 0.1324
     dh = -0.1114e2
-    return R0i * (ah * np.exp(bh * R0i) + ch * np.exp(dh * R0i))
+    return r0 * (ah * np.exp(bh * r0) + ch * np.exp(dh * r0))
 
 modelname = sys.argv[1]
 clinical_dat_filename = "models_vm/" + modelname + "/" + modelname + "_ClinicalData.csv"

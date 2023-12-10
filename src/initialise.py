@@ -491,7 +491,7 @@ def computeViscousTerm(vessel_data, blood):
 def buildHeart(vessel_data):
     if "inlet" in vessel_data:
         inlet_type = vessel_data["inlet"]
-        input_data = loadInletData(vessel_data["inlet file"])
+        input_data = np.loadtxt(vessel_data["inlet file"])
         cardiac_period = input_data[-1, 0]
         inlet_number = vessel_data["inlet number"]
         return True, inlet_type, cardiac_period, input_data, inlet_number
@@ -499,21 +499,8 @@ def buildHeart(vessel_data):
         return False, 0, 0.0, np.zeros((1, 2)), 0
 
 
-def loadInletData(inlet_file):
-    numpy_array = np.loadtxt(inlet_file)
-    return numpy_array
-
-
 def computeWindkesselInletImpedance(R2, blood, A0, gamma):
     R1 = blood.rho * waveSpeed(A0[-1], gamma[-1]) / A0[-1]
     R2 -= R1
 
     return R1, R2
-
-def parseCommandline():
-    input_filename = ""
-    verbose = False
-    out_files = True
-    conv_ceil = True
-
-    return input_filename, verbose, out_files, conv_ceil
