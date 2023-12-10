@@ -1,4 +1,4 @@
-from jax import jit, lax, debug
+from jax import jit, lax
 import jax.numpy as jnp
 from functools import partial
 

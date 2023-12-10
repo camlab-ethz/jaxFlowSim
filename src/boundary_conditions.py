@@ -1,7 +1,6 @@
 import jax.numpy as jnp
-from jax import lax, jit
+from jax import lax
 from src.utils import pressure
-from functools import partial
 
 def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext):
     #if inlet == 1: #"Q":
@@ -150,34 +149,3 @@ def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
 
     return U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A
 
-@partial(jit, static_argnums=(0, 1))
-def updateGhostCells(M,N,sim_dat):
-    sim_dat_aux = jnp.zeros((N,8), dtype=jnp.float64)
-    def body_fun(i,sim_dat_aux):
-        start = i*M
-        end = (i+1)*M
-        Q0 = sim_dat[1,start]
-        Q1 = sim_dat[1,start+1]
-        QM1 = sim_dat[1,end-1]
-        QM2 = sim_dat[1,end-2]
-        A0 = sim_dat[2,start]
-        A1 = sim_dat[2,start+1]
-        AM1 = sim_dat[2,end-1]
-        AM2 = sim_dat[2,end-2]
-
-        U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A = updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2)
-        sim_dat_aux = sim_dat_aux.at[i,0].set(U00Q)
-        sim_dat_aux = sim_dat_aux.at[i,1].set(U00A)
-        sim_dat_aux = sim_dat_aux.at[i,2].set(U01Q)
-        sim_dat_aux = sim_dat_aux.at[i,3].set(U01A)
-        sim_dat_aux = sim_dat_aux.at[i,4].set(UM1Q)
-        sim_dat_aux = sim_dat_aux.at[i,5].set(UM1A)
-        sim_dat_aux = sim_dat_aux.at[i,6].set(UM2Q)
-        sim_dat_aux = sim_dat_aux.at[i,7].set(UM2A)
-
-        return sim_dat_aux
-
-    sim_dat_aux = lax.fori_loop(0,N, body_fun, sim_dat_aux)
-
-    return sim_dat_aux
-    #return [updateGhostCell(vessel) for vessel in vessels]

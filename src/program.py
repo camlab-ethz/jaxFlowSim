@@ -1,7 +1,7 @@
 from functools import partial
 import jax.numpy as jnp
 import jax
-from jax import block_until_ready, jit, lax
+from jax import block_until_ready, jit, lax, grad, jacfwd
 import numpy as np
 from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempDatas#, writeResults
@@ -18,19 +18,20 @@ import numpyro.distributions as dist
 from numpyro.infer import MCMC,HMC
 
 
-#numpyro.set_platform("cpu")
-#os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
+numpyro.set_platform("cpu")
+os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 #numpyro.set_host_device_count(9)
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
 os.chdir(os.path.dirname(__file__))
 
-#jax.devices("cpu")[0]
+jax.devices("cpu")[0]
 #numpyro.set_platform("cpu")
 #numpyro.set_host_device_count(4)
 #import os
 #import random
 #import sys
 print(jax.local_device_count())
+numpyro.enable_validation()
 
 
 
@@ -62,40 +63,55 @@ def runSimulation_opt(input_filename, verbose=False):
         print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
     
-    sim_dat, t, P_obs  = block_until_ready(simulation_loop_old(N, B, J, 
+    sim_dat, t, P_obs  = block_until_ready(partial(jit, static_argnums=(0, 1, 2))(simulation_loop_old)(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
                                           blood.rho, total_time, nodes, 
                                           starts, ends, starts_rep, ends_rep,
                                           indices1, indices2))
     
-    print(sim_dat_const[7,starts[0]:ends[0]])
-    R1 = sim_dat_const[7,ends[0]]
-    R = 0.9*sim_dat_const[7,ends[0]]
+    R_index = 0
+    R1 = sim_dat_const[7,ends[R_index]]
+    R = 0.5*sim_dat_const[7,ends[R_index]]
     def simulation_loop_wrapper(R):
-        ones = jnp.ones(ends[0]-starts[0])
+        ones = jnp.ones(ends[R_index]-starts[R_index])
         sim_dat_const_new = jnp.array(sim_dat_const)
-        sim_dat_const_new = sim_dat_const_new.at[7,starts[0]:ends[0]].set(R*ones)
+        sim_dat_const_new = sim_dat_const_new.at[7,starts[R_index]:ends[R_index]].set(R*ones)
         _, _, P = simulation_loop_old(N, B, J, 
                         sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                         timepoints, 1, Ccfl, edges, input_data, 
                         blood.rho, total_time, nodes, 
                         starts, ends, starts_rep, ends_rep,
                         indices1, indices2) 
-        return P
+        return P[:,2]
+    def simulation_loop_loss_wrapper(R):
+        ones = jnp.ones(ends[R_index]-starts[R_index])
+        sim_dat_const_new = jnp.array(sim_dat_const)
+        sim_dat_const_new = sim_dat_const_new.at[7,starts[R_index]:ends[R_index]].set(R*ones)
+        _, _, P = simulation_loop_old(N, B, J, 
+                        sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
+                        timepoints, 1, Ccfl, edges, input_data, 
+                        blood.rho, total_time, nodes, 
+                        starts, ends, starts_rep, ends_rep,
+                        indices1, indices2) 
+        return jnp.linalg.norm(P[:,2]-P_obs[:,2])/jnp.linalg.norm(P_obs[:,2])
     
     
 
-    print(np.size(P_obs))
+    #print(jacfwd(simulation_loop_loss_wrapper,)(11700000.0*0.9))
+    #print(np.size(P_obs))
 
     def model():
         R_dist=numpyro.sample("R", dist.Normal(1,1))
-        with numpyro.plate("size", 1):
-            numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R*R_dist)), obs=P_obs)
+        with numpyro.plate("size", 100):
+            numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R*R_dist)), obs=P_obs[:,2])
     
-    mcmc = MCMC(numpyro.infer.NUTS(model,forward_mode_differentiation=True),num_samples=4,num_warmup=4,num_chains=1)
+    mcmc = MCMC(numpyro.infer.NUTS(model,forward_mode_differentiation=True),num_samples=1000,num_warmup=100000,num_chains=8)
     mcmc.run(jax.random.PRNGKey(323728029))
     mcmc.print_summary()
+    R = jnp.mean(mcmc.get_samples()["R"])
+
+
     print(R1)
     print(R) 
     #sim_dat, t, P  = simulation_loop(N, B, J, 
@@ -208,7 +224,6 @@ def runSimulation_opt(input_filename, verbose=False):
     #print(edges)
     #writeResults(vessels)
 
-@partial(jit, static_argnums=(0, 1, 2))
 def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
     t = 0.0
     passed_cycles = 0

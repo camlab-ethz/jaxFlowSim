@@ -1,6 +1,5 @@
 import jax.numpy as jnp
 from jax import jit, lax
-import jax
 from functools import partial
 
 #@jit

@@ -17,7 +17,6 @@ from src.utils import pressureSA, waveSpeedSA
 
 
 #@partial(jax.jit, static_argnums=(0))
-@jit
 def calculateDeltaT(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a+b))(u,c)
     vessel_dt = vmap(lambda a, b: a*Ccfl/b)(dx,Smax)
@@ -354,7 +353,6 @@ def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, 
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
 #@partial(jit, static_argnums=(0, 1))
-@jit
 def muscl(starts_rep, ends_rep, dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
