@@ -1,4 +1,4 @@
-from jax import lax
+from jax import lax, debug
 import jax.numpy as jnp
 
 
@@ -18,7 +18,7 @@ def computeConvError(N, P_t, P_l):
 
 def printConvError(err):
     err /= 133.332
-    #debug.print(" - Error norm = {x} mmHg", x=err)
+    debug.print(" - Error norm = {x} mmHg", x=err)
 
 def checkConvergence(err, conv_toll):
     return err / 133.332 <= conv_toll

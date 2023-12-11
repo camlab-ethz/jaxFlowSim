@@ -1,22 +1,13 @@
-from functools import partial
 import jax.numpy as jnp
-from jax import lax, vmap, jit
+from jax import lax, vmap
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
 from src.boundary_conditions import setInletBC, setOutletBC
 from src.utils import pressureSA, waveSpeedSA
-#from jax.sharding import Mesh, PartitionSpec
-#from jax.experimental import mesh_utils
-#from jax.experimental.shard_map import shard_map
-
-
-#devices = mesh_utils.create_device_mesh((20))
-#mesh = Mesh(devices, axis_names=('i'))
 
 
 
-#@partial(jax.jit, static_argnums=(0))
 def calculateDeltaT(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a+b))(u,c)
     vessel_dt = vmap(lambda a, b: a*Ccfl/b)(dx,Smax)
@@ -26,7 +17,7 @@ def calculateDeltaT(Ccfl, u, c, dx):
 
 
 #@jit
-def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]

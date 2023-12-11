@@ -11,6 +11,7 @@ from jax.config import config
 import jax
 import os
 import sys
+config.update("jax_debug_nans", True)
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
 os.chdir(os.path.dirname(__file__))
 

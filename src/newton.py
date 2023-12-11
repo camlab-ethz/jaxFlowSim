@@ -1,9 +1,7 @@
 import jax.numpy as jnp
-from jax import jit, lax
-from functools import partial
+from jax import lax, debug
 
 #@jit
-@partial(jit, static_argnums=(0,1,))
 def newtonRaphson(fun_w, fun_f, 
                   J, U, k,
                   A0s,
@@ -26,9 +24,9 @@ def newtonRaphson(fun_w, fun_f,
         #print(jnp.abs(val[0] - val[1]) <= 1e-5)
         #ret = jax.lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
         _, dU, F  = args
-        test = jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
-                                      ones,
-                                      zeros)
+        #test = jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
+        #                              ones,
+        #                              zeros)
         ret = lax.cond(jnp.where((jnp.abs(dU) <= nr_toll_U) | (jnp.abs(F) <= nr_toll_F), 
                                       ones,
                                       zeros).sum()==n,
@@ -43,6 +41,10 @@ def newtonRaphson(fun_w, fun_f,
                   A0s,
                   betas)
         dU = jnp.linalg.solve(J, -F)
+        lax.cond(jnp.isnan(jnp.dot(F, F)), lambda: debug.print("oh no"),lambda: debug.print(""))
+        #if jnp.isnan(jnp.dot(F, F)):
+        #    e = "("
+        #    raise ValueError(f"\nNewton-Raphson doesn't converge junction!")
         return U+dU, dU, F
 
     return lax.while_loop(cond_fun, body_fun, (U+dU, dU, F))

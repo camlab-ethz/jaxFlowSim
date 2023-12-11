@@ -1,7 +1,6 @@
 import jax.numpy as jnp
-from jax import jit, lax
+from jax import lax
 #from jax.experimental import host_callback
-from functools import partial
 
 
 #@jit

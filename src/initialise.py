@@ -195,11 +195,6 @@ def buildArterialNetwork(network, J, blood):
         starts_rep[starts[i]-B:ends[i]+B] = starts[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
         ends_rep[starts[i]-B:ends[i]+B] = ends[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
     
-    starts_rep = starts_rep 
-    ends_rep = ends_rep
-
-    
-
     sim_dat = np.zeros((5, K), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
     sim_dat_const = np.zeros((11, K), dtype=np.float64)
@@ -298,7 +293,7 @@ def buildArterialNetwork(network, J, blood):
 
 
 
-    return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep, indices1, indices2
+    return sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2
 
 
 def buildVessel(ID, vessel_data, blood, jump, M):

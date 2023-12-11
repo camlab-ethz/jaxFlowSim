@@ -19,6 +19,7 @@ from numpyro.infer import MCMC,HMC
 
 
 numpyro.set_platform("cpu")
+numpyro.enable_x64()
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 #numpyro.set_host_device_count(9)
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
@@ -31,7 +32,7 @@ os.chdir(os.path.dirname(__file__))
 #import random
 #import sys
 print(jax.local_device_count())
-#numpyro.enable_validation()
+numpyro.enable_validation()
 
 
 
@@ -44,7 +45,7 @@ def runSimulation_opt(input_filename, verbose=False):
 
     J =  data["solver"]["jump"]
 
-    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, starts_rep, ends_rep, indices1, indices2 = buildArterialNetwork(data["network"], J, blood)
+    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2 = buildArterialNetwork(data["network"], J, blood)
     makeResultsFolder(data, input_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
@@ -63,36 +64,40 @@ def runSimulation_opt(input_filename, verbose=False):
         print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
     
-    sim_dat, t, P_obs  = block_until_ready(partial(jit, static_argnums=(0, 1, 2))(simulation_loop_old)(N, B, J, 
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop_old)
+    sim_loop_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+    sim_dat, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
                                           blood.rho, total_time, nodes, 
-                                          starts, ends, starts_rep, ends_rep,
+                                          starts, ends,
                                           indices1, indices2))
     
     R_index = 0
     R1 = sim_dat_const[7,ends[R_index]]
-    R = 0.5*sim_dat_const[7,ends[R_index]]
+    R = 0.999*sim_dat_const[7,ends[R_index]]
     def simulation_loop_wrapper(R):
-        ones = jnp.ones(ends[R_index]-starts[R_index])
+        ones = jnp.ones(ends[R_index]-starts[R_index]+4)
         sim_dat_const_new = jnp.array(sim_dat_const)
-        sim_dat_const_new = sim_dat_const_new.at[7,starts[R_index]:ends[R_index]].set(R*ones)
-        _, _, P = simulation_loop_old(N, B, J, 
+        sim_dat_const_new = sim_dat_const_new.at[7,starts[R_index]-2:ends[R_index]+2].set(R*ones)
+        _, _, P = sim_loop_old_jit(N, B, J, 
                         sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                         timepoints, 1, Ccfl, edges, input_data, 
                         blood.rho, total_time, nodes, 
-                        starts, ends, starts_rep, ends_rep,
-                        indices1, indices2) 
+                        starts, ends,
+                        indices1, indices2)
         return P[:,2]
+
+    sim_loop_wrapper_jit = jit(simulation_loop_wrapper)
     def simulation_loop_loss_wrapper(R):
         ones = jnp.ones(ends[R_index]-starts[R_index])
         sim_dat_const_new = jnp.array(sim_dat_const)
         sim_dat_const_new = sim_dat_const_new.at[7,starts[R_index]:ends[R_index]].set(R*ones)
-        _, _, P = simulation_loop_old(N, B, J, 
+        _, _, P = sim_loop_old_jit(N, B, J, 
                         sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                         timepoints, 1, Ccfl, edges, input_data, 
                         blood.rho, total_time, nodes, 
-                        starts, ends, starts_rep, ends_rep,
+                        starts, ends,
                         indices1, indices2) 
         return jnp.linalg.norm(P[:,2]-P_obs[:,2])/jnp.linalg.norm(P_obs[:,2])
     
@@ -102,12 +107,12 @@ def runSimulation_opt(input_filename, verbose=False):
     #print(np.size(P_obs))
 
     def model():
-        R_dist=numpyro.sample("R", dist.Normal(1,1))
-        with numpyro.plate("size", 100):
-            numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R*R_dist)), obs=P_obs[:,2])
+        R_dist=numpyro.sample("R", dist.Normal(1,0.0001))
+        with numpyro.plate("size", jnp.size(P_obs[:,2])):
+            numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R*R_dist)), obs=P_obs[:,2])
     
-    mcmc = MCMC(numpyro.infer.NUTS(model,forward_mode_differentiation=True),num_samples=1,num_warmup=1,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(323728029))
+    mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True,),num_samples=1,num_warmup=1,num_chains=1)
+    mcmc.run(jax.random.PRNGKey(32888))
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
 
@@ -224,7 +229,7 @@ def runSimulation_opt(input_filename, verbose=False):
     #print(edges)
     #writeResults(vessels)
 
-def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
+def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, indices1, indices2):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -236,7 +241,7 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
 
     while not_conv:
         dt = calculateDeltaT(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(N, B, starts, ends, starts_rep, ends_rep, 
+        sim_dat, sim_dat_aux = solveModel(N, B, starts, ends, 
                                           indices1, indices2,
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
@@ -283,7 +288,10 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
     
     return sim_dat, t_t, P_t
 
-def simulation_loop_old(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
+
+def simulation_loop_old(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, indices1, indices2):
+    jax.debug.print("starting simulation")
+    jax.debug.print("R1 = {R}", R=sim_dat_const[7,0])
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -307,7 +315,7 @@ def simulation_loop_old(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat
     def body_fun(args):
         sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, t, counter, timepoints, passed_cycles, dt, P_t, P_l, t_t, _, Ccfl, edges, input_data, rho, total_time, nodes = args
         dt = calculateDeltaT(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(N, B, starts, ends, starts_rep, ends_rep, 
+        sim_dat, sim_dat_aux = solveModel(N, B, starts, ends,
                                           indices1, indices2,
                                           t, dt, sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
