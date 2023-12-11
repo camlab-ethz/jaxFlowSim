@@ -19,19 +19,19 @@ from numpyro.infer import MCMC,HMC
 
 
 numpyro.set_platform("cpu")
-os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
+#os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 #numpyro.set_host_device_count(9)
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 8 CPU devices
 os.chdir(os.path.dirname(__file__))
 
-jax.devices("cpu")[0]
+#jax.devices("cpu")[0]
 #numpyro.set_platform("cpu")
 #numpyro.set_host_device_count(4)
 #import os
 #import random
 #import sys
 print(jax.local_device_count())
-numpyro.enable_validation()
+#numpyro.enable_validation()
 
 
 
@@ -106,7 +106,7 @@ def runSimulation_opt(input_filename, verbose=False):
         with numpyro.plate("size", 100):
             numpyro.sample("obs", dist.Normal(simulation_loop_wrapper(R*R_dist)), obs=P_obs[:,2])
     
-    mcmc = MCMC(numpyro.infer.NUTS(model,forward_mode_differentiation=True),num_samples=1000,num_warmup=100000,num_chains=8)
+    mcmc = MCMC(numpyro.infer.NUTS(model,forward_mode_differentiation=True),num_samples=1,num_warmup=1,num_chains=1)
     mcmc.run(jax.random.PRNGKey(323728029))
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
@@ -283,7 +283,6 @@ def simulation_loop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_con
     
     return sim_dat, t_t, P_t
 
-@partial(jit, static_argnums=(0, 1, 2))
 def simulation_loop_old(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, starts_rep, ends_rep, indices1, indices2):
     t = 0.0
     passed_cycles = 0

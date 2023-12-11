@@ -1,13 +1,14 @@
 import jax.numpy as jnp
 from jax import jit, lax
+#from jax.experimental import host_callback
 from functools import partial
 
 
 #@jit
-@partial(jit, static_argnums=(0,))
 def saveTempDatas(N, starts, ends, nodes, P):
     P_t = jnp.zeros(5*N)
-    def body_fun(i,P_t):
+    def body_fun(i,args):
+        P_t, starts, ends = args
         start = starts[i]
         end = ends[i]
         P_t = P_t.at[i*5].set(P[start])
@@ -15,11 +16,12 @@ def saveTempDatas(N, starts, ends, nodes, P):
         P_t = P_t.at[i*5+2].set(P[start+nodes[i,1]])
         P_t = P_t.at[i*5+3].set(P[start+nodes[i,2]])
         P_t = P_t.at[i*5+4].set(P[end-1])
-        return P_t
+        return (P_t,starts,ends)
 
 
     #jax.debug.print("{x}", x = (M, N, nodes, P, P_t))
-    return lax.fori_loop(0, N, body_fun, P_t)
+    P_t, _, _ = lax.fori_loop(0, N, body_fun, (P_t,starts,ends))
+    return P_t
 
     
 

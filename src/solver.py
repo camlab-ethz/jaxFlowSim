@@ -26,7 +26,6 @@ def calculateDeltaT(Ccfl, u, c, dx):
 
 
 #@jit
-@partial(jit, static_argnums=(0, 1))
 def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
@@ -106,7 +105,7 @@ def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, 
                                                 
     #debug.print("{x}", x = sim_dat_const[2,:])
 
-    sim_dat = sim_dat.at[:,B:-B].set(muscl(starts_rep, ends_rep, dt, 
+    sim_dat = sim_dat.at[:,B:-B].set(muscl(dt, 
                   sim_dat[1,B:-B],
                   sim_dat[2,B:-B], 
                   sim_dat_const[0,B:-B], 
@@ -353,7 +352,7 @@ def solveModel(N, B, starts, ends, starts_rep, ends_rep, indices1, indices2, t, 
 #@partial(shard_map, mesh=mesh, in_specs=P('i', 'j'),
 #         out_specs=P('i'))
 #@partial(jit, static_argnums=(0, 1))
-def muscl(starts_rep, ends_rep, dt, 
+def muscl(dt, 
           Q, A, 
           A0, beta,  gamma, wallE,
           dx, Pext,viscT,

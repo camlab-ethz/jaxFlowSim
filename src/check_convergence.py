@@ -1,9 +1,7 @@
-from jax import jit, lax
+from jax import lax
 import jax.numpy as jnp
-from functools import partial
 
 
-@partial(jit, static_argnums=0)
 def calcNorms(N, P_t, P_l):
     norms = jnp.zeros(N)
     def body_fun(i,norms):
@@ -13,7 +11,6 @@ def calcNorms(N, P_t, P_l):
     norms = lax.fori_loop(0,N,body_fun, norms)
     return norms
 
-@partial(jit, static_argnums=0)
 def computeConvError(N, P_t, P_l):
     current_norms = calcNorms(N, P_t, P_l)
     maxnorm = jnp.max(current_norms)
