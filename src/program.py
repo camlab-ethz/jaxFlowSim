@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import jax
 from jax import block_until_ready, jit, lax, grad, jacfwd
 import numpy as np
-from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
+from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempDatas#, writeResults
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
@@ -37,7 +37,7 @@ print(jax.local_device_count())
 
 
 def runSimulation_opt(input_filename, verbose=False):
-    data = loadSimulationFiles(input_filename)
+    data = loadConfig(input_filename)
     blood = buildBlood(data["blood"])
 
     #if verbose:

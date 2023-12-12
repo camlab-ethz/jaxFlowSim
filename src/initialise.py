@@ -5,7 +5,7 @@ import shutil
 from src.utils import waveSpeed, pressureSA
 from src.components import Blood
 
-def loadSimulationFiles(input_filename):
+def loadConfig(input_filename):
     data = loadYamlFile(input_filename)
 
     checkInputFile(data)

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import jax
 from jax import block_until_ready, jit, lax, grad, jacfwd
 import numpy as np
-from src.initialise import loadSimulationFiles, buildBlood, buildArterialNetwork, makeResultsFolder
+from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempDatas#, writeResults
 from src.solver import calculateDeltaT, solveModel
 from src.check_convergence import printConvError, computeConvError, checkConvergence
@@ -37,8 +37,8 @@ print(jax.local_device_count())
 
 
 
-def runSimulation_opt(input_filename, verbose=False):
-    data = loadSimulationFiles(input_filename)
+def runSimulation_opt(config_filename, verbose=False):
+    data = loadConfig(config_filename)
     blood = buildBlood(data["blood"])
 
     #if verbose:
@@ -47,7 +47,7 @@ def runSimulation_opt(input_filename, verbose=False):
     J =  data["solver"]["jump"]
 
     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2 = buildArterialNetwork(data["network"], J, blood)
-    makeResultsFolder(data, input_filename)
+    makeResultsFolder(data, config_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
     total_time = data["solver"]["cycles"]*cardiac_T
@@ -124,14 +124,14 @@ def runSimulation_opt(input_filename, verbose=False):
         """The likelihood function for a linear model
         y ~ ax+b+error
         """
-        jax.debug.print("{x}", x=R)
+        jax.debug.print("R={x}", x=R)
         y_hat = jnp.ones_like(y)
-        jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
+        jax.lax.cond((R>R_scale/5)*(R<5*R_scale), lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
         L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
 
         #L = jnp.exp(1000*jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)+1)
-        jax.debug.print("{x}", x=jnp.linalg.norm(y))
-        jax.debug.print("{x}", x=L)
+        #jax.debug.print("{x}", x=jnp.linalg.norm(y))
+        jax.debug.print("L = {x}", x=L)
         #jax.debug.print("{x}", x=L)
         return L
     
@@ -236,7 +236,7 @@ def runSimulation_opt(input_filename, verbose=False):
     #plt.figure()
     #plt.plot(t,P[:,0])
     #plt.show()
-    filename = input_filename.split("/")[-1]
+    filename = config_filename.split("/")[-1]
     network_name = filename.split(".")[0]
     #vessel_name = "ulnar_R_I"
 

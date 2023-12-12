@@ -86,7 +86,6 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
 
     u1, c1 = inverseRiemannInvariants(W1M, W2M)
     Q1 = A1 * u1
-    #debug.breakpoint()
 
     return u1, Q1, c1
 
@@ -96,8 +95,6 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     Al = A1
     ul = u1
     Pc += dt / Cc * (Al * ul - (Pc - Pout) / R2)
-    #debug.print("{x}", x = (Pc, dt, Cc, Al, ul, Pc, Pout, R2))
-    #debug.print("{x}", x = (Cc))
 
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
@@ -136,16 +133,3 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
     u1 = us
 
     return u1, A1, Pc
-
-def updateGhostCell(Q0, Q1, QM1, QM2, A0, A1, AM1, AM2):
-    U00Q = Q0
-    U00A = A0
-    U01Q = Q1
-    U01A = A1
-    UM1Q = QM1
-    UM1A = AM1
-    UM2Q = QM2
-    UM2A = AM2
-
-    return U00Q, U00A, U01Q, U01A, UM1Q, UM1A, UM2Q, UM2A
-
