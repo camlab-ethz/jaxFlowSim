@@ -306,7 +306,7 @@ def buildVessel(ID, vessel_data, blood, jump, M):
     Rp, Rd = computeRadii(vessel_data)
     Pext = getPext(vessel_data)
     dx = L/M
-    h0 = initialiseThickness(vessel_data, M)
+    h0 = initialiseThickness(vessel_data)
     outlet, Rt, R1, R2, Cc = addOutlet(vessel_data)
     viscT = computeViscousTerm(vessel_data, blood)
     inlet, inlet_type, cardiac_T, input_data, inlet_number = buildHeart(vessel_data)
@@ -446,7 +446,7 @@ def meshVessel(vessel, L):
 
     return M
 
-def initialiseThickness(vessel, M):
+def initialiseThickness(vessel):
     if "h0" not in vessel:
         return 0.0
     else:
