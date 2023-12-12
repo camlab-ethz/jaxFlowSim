@@ -78,8 +78,9 @@ def runSimulation_opt(input_filename, verbose=False):
     var_index = 7
     R1 = sim_dat_const[var_index,ends[R_index]]
     R_scale = 0.99*R1
+    print(R1, R_scale)
     def simulation_loop_wrapper(R):
-        #R = R*R_scale
+        R = R*R_scale
         ones = jnp.ones(ends[R_index]-starts[R_index]+4)
         #jax.debug.print("{x}", x = sim_dat)
         sim_dat_const_new = jnp.array(sim_dat_const)
@@ -123,10 +124,11 @@ def runSimulation_opt(input_filename, verbose=False):
         """The likelihood function for a linear model
         y ~ ax+b+error
         """
-        #jax.debug.print("{x}", x=R)
-        R = R*R_scale
-        y_hat = sim_loop_wrapper_jit(R) 
+        jax.debug.print("{x}", x=R)
+        y_hat = jnp.ones_like(y)
+        jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
         L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
+
         #L = jnp.exp(1000*jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)+1)
         jax.debug.print("{x}", x=jnp.linalg.norm(y))
         jax.debug.print("{x}", x=L)
@@ -200,7 +202,7 @@ def runSimulation_opt(input_filename, verbose=False):
     #    with numpyro.plate("size", jnp.size(sim_dat.flatten())):
     #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_dist)), obs=sim_dat_new.flatten())
 
-    mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=1,num_warmup=100,num_chains=1)
+    mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=1000,num_warmup=100,num_chains=1)
     mcmc.run(jax.random.PRNGKey(3450))
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])

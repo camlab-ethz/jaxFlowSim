@@ -41,7 +41,7 @@ def newtonRaphson(fun_w, fun_f,
                   A0s,
                   betas)
         dU = jnp.linalg.solve(J, -F)
-        lax.cond(jnp.isnan(jnp.dot(F, F)), lambda: debug.print("oh no"),lambda: debug.print(""))
+        #lax.cond(jnp.isnan(jnp.dot(F, F)), lambda: debug.print("oh no"),lambda: debug.print(""))
         #if jnp.isnan(jnp.dot(F, F)):
         #    e = "("
         #    raise ValueError(f"\nNewton-Raphson doesn't converge junction!")
