@@ -126,7 +126,7 @@ def runSimulation_opt(config_filename, verbose=False):
         """
         jax.debug.print("R = {x}", x=R)
         y_hat = jnp.ones_like(y)
-        jax.lax.cond((R*R_scale>R_scale/5)*(R*R_scale<5*R_scale), lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
+        y_hat = jax.lax.cond((R>0.5)*(R<1.5), lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
         L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
 
         #L = jnp.exp(1000*jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)+1)
