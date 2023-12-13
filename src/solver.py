@@ -8,7 +8,7 @@ from src.utils import pressureSA, waveSpeedSA
 
 
 
-def calculateDeltaT(Ccfl, u, c, dx):
+def computeDt(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a+b))(u,c)
     vessel_dt = vmap(lambda a, b: a*Ccfl/b)(dx,Smax)
     dt = jnp.min(vessel_dt)
