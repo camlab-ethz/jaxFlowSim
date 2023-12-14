@@ -78,9 +78,9 @@ def runSimulation_opt(config_filename, verbose=False):
     R1 = sim_dat_const[var_index,ends[R_index]]
     R_scale = 0.9*R1
     print(R1, R_scale)
-    def simulation_loop_wrapper(R):
+    def simulation_loop_wrapper(R, R_scale):
         #R = R*R_scale
-        R = 0.5*R_scale*R+R_scale
+        R = 0.5*R*R_scale + R_scale
         ones = jnp.ones(ends[R_index]-starts[R_index]+4)
         #jax.debug.print("{x}", x = sim_dat)
         sim_dat_const_new = jnp.array(sim_dat_const)
@@ -93,13 +93,14 @@ def runSimulation_opt(config_filename, verbose=False):
                         indices1, indices2)
         return sim_dat_temp[2,:].flatten()
     sim_loop_wrapper_jit = jit(simulation_loop_wrapper)
-    def logp(y, R):#, sigma):
+    def logp(y, R, R_scale):#, sigma):
         """The likelihood function for a linear model
         y ~ ax+b+error
         """
         jax.debug.print("R = {x}", x=R)
-        y_hat = R*y
-        y_hat = jax.lax.cond(0.5*R_scale*R+R_scale>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
+        y_hat = (R+1)*y
+        y_hat = jax.lax.cond(R>-1, lambda: sim_loop_wrapper_jit(R, R_scale), lambda: y_hat)
+        #y_hat = sim_loop_wrapper_jit(R)
         #L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
 
         L = jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)
@@ -107,14 +108,19 @@ def runSimulation_opt(config_filename, verbose=False):
         jax.debug.print("L = {x}", x=L)
         #jax.debug.print("{x}", x=L)
         return L
-    def model():
+    def model(R_scale, obs):
         R_dist = numpyro.sample("R", dist.Normal())
         print("R_dist",R_dist)
         #sigma = numpyro.sample("sigma", dist.Normal())
-        log_density = logp(sim_dat_new[2,:].flatten(), R_dist)#, sigma)
+        log_density = logp(obs, R_dist, R_scale)#, sigma)
         numpyro.factor("custom_logp", -log_density)
+    ### NUTS model with bultin loss
+    #def model(R_scale, obs):
+    #    R_dist=numpyro.sample("R", dist.Normal())
+    #    with numpyro.plate("size", jnp.size(obs)):
+    #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(0.5*R_scale*R_dist + R_scale)), obs=obs)
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(345000))
+    mcmc.run(jax.random.PRNGKey(345000),R_scale,sim_dat_new[2,:].flatten())
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
 
