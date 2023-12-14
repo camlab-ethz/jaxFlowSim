@@ -41,11 +41,10 @@ def runSimulation(input_filename, verbose=False):
     Ccfl = float(data["solver"]["Ccfl"])
     
     if verbose:
-        print("Start simulation")
+        print("start simulation")
 
     timepoints = np.linspace(0, cardiac_T, J)
     if verbose:
-        print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
     
     sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop_old)
@@ -57,9 +56,8 @@ def runSimulation(input_filename, verbose=False):
                                           indices_1, indices_2))
     
     if verbose:
-        print("\n")
         ending_time = (time.time_ns() - starting_time) / 1.0e9
-        print(f"Elapsed time = {ending_time} seconds")
+        print(f"elapsed time = {ending_time} seconds")
 
     #jnp.set_printoptions(threshold=sys.maxsize)
     filename = input_filename.split("/")[-1]
