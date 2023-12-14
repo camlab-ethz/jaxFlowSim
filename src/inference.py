@@ -46,17 +46,19 @@ def runSimulation_opt(config_filename, verbose=False):
 
     J =  data["solver"]["jump"]
 
-    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2 = buildArterialNetwork(data["network"], blood)
+    (sim_dat, sim_dat_aux, sim_dat_const, 
+    sim_dat_const_aux, N, B, 
+    edges, input_data, nodes, 
+    vessel_names, starts, ends, 
+    indices1, indices2) = buildArterialNetwork(data["network"], blood)
     makeResultsFolder(data, config_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
     total_time = data["solver"]["cycles"]*cardiac_T
     Ccfl = float(data["solver"]["Ccfl"])
-    conv_tol = data["solver"]["convergence tolerance"],
     
     if verbose:
         print("Start simulation")
-
 
     timepoints = np.linspace(0, cardiac_T, J)
     #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
@@ -64,8 +66,7 @@ def runSimulation_opt(config_filename, verbose=False):
         print("Solving cardiac cycle no: 1")
         starting_time = time.time_ns()
     
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop_old)
-    #sim_loop_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simLoop)
     sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, 1, Ccfl, edges, input_data, 
@@ -78,9 +79,9 @@ def runSimulation_opt(config_filename, verbose=False):
     R1 = sim_dat_const[var_index,ends[R_index]]
     R_scale = 1.1*R1
     print(R1, R_scale)
-    def simulation_loop_wrapper(R, R_scale):
+    def simLoopWrapper(R):#, R_scale):
         #R = R*R_scale
-        R = 0.5*R*R_scale + R_scale
+        #R = 0.5*R*R_scale + R_scale
         ones = jnp.ones(ends[R_index]-starts[R_index]+4)
         #jax.debug.print("{x}", x = sim_dat)
         sim_dat_const_new = jnp.array(sim_dat_const)
@@ -92,7 +93,7 @@ def runSimulation_opt(config_filename, verbose=False):
                         starts, ends,
                         indices1, indices2)
         return sim_dat_temp[2,:].flatten()
-    sim_loop_wrapper_jit = jit(simulation_loop_wrapper)
+    sim_loop_wrapper_jit = jit(simLoopWrapper)
     def logp(y, R, R_scale):#, sigma):
         """The likelihood function for a linear model
         y ~ ax+b+error
@@ -109,19 +110,19 @@ def runSimulation_opt(config_filename, verbose=False):
         jax.debug.print("L = {x}", x=L)
         #jax.debug.print("{x}", x=L)
         return L
-    def model(R_scale, obs):
-        R_dist = numpyro.sample("R", dist.Normal())
-        print("R_dist",R_dist)
-        #sigma = numpyro.sample("sigma", dist.Normal())
-        log_density = logp(obs, R_dist, R_scale)#, sigma)
-        numpyro.factor("custom_logp", -log_density)
-    ### NUTS model with bultin loss
     #def model(R_scale, obs):
-    #    R_dist=numpyro.sample("R", dist.Normal())
-    #    with numpyro.plate("size", jnp.size(obs)):
-    #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(0.5*R_scale*R_dist + R_scale)), obs=obs)
+    #    R_dist = numpyro.sample("R", dist.Normal())
+    #    print("R_dist",R_dist)
+    #    #sigma = numpyro.sample("sigma", dist.Normal())
+    #    log_density = logp(obs, R_dist, R_scale)#, sigma)
+    #    return numpyro.factor("custom_logp", log_density)
+    ### NUTS model with bultin loss
+    def model(R_scale, obs):
+        R_dist=numpyro.sample("R", dist.LogNormal(loc=0,scale=0.25))
+        with numpyro.plate("size", jnp.size(obs)):
+            numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*R_dist),scale=0.01), obs=obs)
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(5000),R_scale,sim_dat_new[2,:].flatten())
+    mcmc.run(jax.random.PRNGKey(5090),R_scale,sim_dat_new[2,:].flatten())
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
 
@@ -134,7 +135,7 @@ def runSimulation_opt(config_filename, verbose=False):
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"Elapsed time = {ending_time} seconds")
 
-def simulation_loop_old(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, indices1, indices2):
+def simLoop(N, B, jump, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, timepoints, conv_toll, Ccfl, edges, input_data, rho, total_time, nodes, starts, ends, indices1, indices2):
     jax.debug.print("R1 = {R}", R=sim_dat_const[7,starts[1]])
     #jax.debug.print("{x}", x=sim_dat)
     t = 0.0
