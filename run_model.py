@@ -1,4 +1,4 @@
-from src.model import runSimulation_opt
+from src.model import runSimulation
 import os
 
 import numpyro
@@ -42,5 +42,5 @@ else:
 #config.update('jax_disable_jit', True)
 #with jax.checking_leaks():
 #jax.distributed.initialize(num_processes=32)
-runSimulation_opt(config_filename, verbose=True)
+runSimulation(config_filename, verbose=True)
 #with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):

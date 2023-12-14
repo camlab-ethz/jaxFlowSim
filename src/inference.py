@@ -46,7 +46,7 @@ def runSimulation_opt(config_filename, verbose=False):
 
     J =  data["solver"]["jump"]
 
-    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2 = buildArterialNetwork(data["network"], J, blood)
+    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, N, B, edges, input_data, nodes, vessel_names, starts, ends, indices1, indices2 = buildArterialNetwork(data["network"], blood)
     makeResultsFolder(data, config_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
@@ -76,7 +76,7 @@ def runSimulation_opt(config_filename, verbose=False):
     R_index = 1
     var_index = 7
     R1 = sim_dat_const[var_index,ends[R_index]]
-    R_scale = 0.9*R1
+    R_scale = 1.1*R1
     print(R1, R_scale)
     def simulation_loop_wrapper(R, R_scale):
         #R = R*R_scale
@@ -99,7 +99,8 @@ def runSimulation_opt(config_filename, verbose=False):
         """
         jax.debug.print("R = {x}", x=R)
         y_hat = (R+1)*y
-        y_hat = jax.lax.cond(R>-1, lambda: sim_loop_wrapper_jit(R, R_scale), lambda: y_hat)
+        y_hat = jax.lax.cond((R>-1)*(R<1), lambda: sim_loop_wrapper_jit(R, R_scale), lambda: y_hat)
+        y_hat = jax.lax.cond((R<1),  lambda: y_hat, lambda: (-R+1)*y)
         #y_hat = sim_loop_wrapper_jit(R)
         #L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
 
@@ -120,7 +121,7 @@ def runSimulation_opt(config_filename, verbose=False):
     #    with numpyro.plate("size", jnp.size(obs)):
     #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(0.5*R_scale*R_dist + R_scale)), obs=obs)
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(345000),R_scale,sim_dat_new[2,:].flatten())
+    mcmc.run(jax.random.PRNGKey(5000),R_scale,sim_dat_new[2,:].flatten())
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
 

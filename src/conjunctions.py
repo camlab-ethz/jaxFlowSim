@@ -2,9 +2,10 @@ import jax.numpy as jnp
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
-def solveConjunction(u1, u2, A1, A2, 
-                     A01, A02, beta1, beta2, 
-                     gamma1, gamma2, Pext1, Pext2,
+def solveConjunction(u1, u2, A1, 
+                     A2, A01, A02, 
+                     beta1, beta2, gamma1, 
+                     gamma2, Pext1, Pext2,
                      rho):
     U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))), dtype=jnp.float64)
 

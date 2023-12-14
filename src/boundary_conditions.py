@@ -2,12 +2,18 @@ import jax.numpy as jnp
 from jax import lax
 from src.utils import pressure
 
-def setInletBC(inlet, u0, u1, A, c0, c1, t, dt, input_data, cardiac_T, invDx, A0, beta, Pext):
-    #if inlet == 1: #"Q":
-    Q0, P0 = lax.cond(inlet==1, lambda:(inputFromData(t, input_data.transpose(), cardiac_T),0.0), lambda:(0.0,inputFromData(t, input_data.transpose(), cardiac_T)))
-    #else:
-    #    P0 = inputFromData(t, input_data, cardiac_T)
-    return inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pext)
+def setInletBC(inlet, u0, u1, 
+               A, c0, c1, 
+               t, dt, input_data, 
+               cardiac_T, invDx, A0, 
+               beta, P_ext):
+    Q0, P0 = lax.cond(inlet==1, lambda:(inputFromData(t, input_data.transpose(), cardiac_T),0.0), 
+                                lambda:(0.0,inputFromData(t, input_data.transpose(), cardiac_T)))
+    return inletCompatibility(inlet, u0, u1, 
+                              Q0, A, c0, 
+                              c1, P0, dt, 
+                              invDx, A0, beta, 
+                              P_ext)
 
 
 def inputFromData(t, input_data, cardiac_T):
@@ -20,7 +26,6 @@ def inputFromData(t, input_data, cardiac_T):
     t -= t_hat * cardiac_T
 
     idx = jnp.where((t >= idt) & (t <= idt1), jnp.arange(0,idt.size,1),jnp.zeros(idt.size)).sum().astype(int) #[0][0]
-
 
     qu = idq[idx] + (t - idt[idx]) * (idq[idx+1] - idq[idx]) / (idt[idx+1] - idt[idx])
 
@@ -35,16 +40,7 @@ def inletCompatibility(inlet, u0, u1, Q0, A, c0, c1, P0, dt, invDx, A0, beta, Pe
 
     u0, c0 = inverseRiemannInvariants(W11, W21)
 
-    #if inlet == 1:
-    #    A = Q0 / u0
-    #    P0 = pressure(A, A0, beta, Pext)
-    #else:
-    #    A = areaFromPressure(P0, A0, beta, Pext)
-    #    Q0 = u0 * A
-    
     return lax.cond(inlet == 1, lambda: (Q0,  Q0/u0), lambda: (u0 * areaFromPressure(P0, A0, beta, Pext), areaFromPressure(P0, A0, beta, Pext)))
-
-    #return Q0, A
 
 def riemannInvariants(u, c):
     W1 = u - 4.0 * c
@@ -59,25 +55,90 @@ def inverseRiemannInvariants(W1, W2):
 
     return u, c
 
-def areaFromPressure(P, A0, beta, Pext):
-    return A0 * ((P - Pext) / beta + 1.0) * ((P - Pext) / beta + 1.0)
+def areaFromPressure(P, A0, beta, P_ext):
+    return A0 * ((P - P_ext) / beta + 1.0) * ((P - P_ext) / beta + 1.0)
 
-def setOutletBC(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-    #debug.print("{x}", x = Cc)
-    def outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
+def setOutletBC(dt, u1, u2, 
+                Q1, A1, c1, 
+                c2, P1, P2, 
+                P3, Pc, W1M0, 
+                W2M0, A0, beta, 
+                gamma, dx, P_ext, 
+                outlet, Rt, R1, 
+                R2, Cc):
+    def outletCompatibility_wrapper(dt, u1, u2, 
+                                    Q1, A1, c1, 
+                                    c2, P1, P2, 
+                                    P3, Pc, W1M0, 
+                                    W2M0, A0, beta, 
+                                    gamma, dx, Pext, 
+                                    outlet, Rt, R1, 
+                                    R2, Cc):
         P1_out = 2.0 * P2 - P3
-        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt)
+        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, 
+                                                     c1, c2, W1M0, 
+                                                     W2M0, dt, dx, 
+                                                     Rt)
         return u1_out, Q1_out, A1, c1_out, P1_out, Pc
-    def threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc):
-        #debug.print("{x}", x = Cc)
-        u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext)
+
+    def threeElementWindkessel_wrapper(dt, u1, u2, 
+                                       Q1, A1, c1, 
+                                       c2, P1, P2, 
+                                       P3, Pc, W1M0, 
+                                       W2M0, A0, beta, 
+                                       gamma, dx, Pext, 
+                                       outlet, Rt, R1, 
+                                       R2, Cc):
+        u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, 
+                                                        Pc, Cc, R1, 
+                                                        R2, beta, gamma, 
+                                                        A0, Pext)
         return u1_out, Q1, A1_out, c1, P1, Pc_out
     return lax.cond(outlet == 1,
-                  lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: outletCompatibility_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc),
-                  lambda dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc: threeElementWindkessel_wrapper(dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc), dt, u1, u2, Q1, A1, c1, c2, P1, P2, P3, Pc, W1M0, W2M0, A0, beta, gamma, dx, Pext, outlet, Rt, R1, R2, Cc)
+                  lambda dt, u1, u2, 
+                            Q1, A1, c1, 
+                            c2, P1, P2, 
+                            P3, Pc, W1M0, 
+                            W2M0, A0, beta, 
+                            gamma, dx, Pext, 
+                            outlet, Rt, R1, 
+                            R2, Cc: outletCompatibility_wrapper(dt, u1, u2, 
+                                                                Q1, A1, c1, 
+                                                                c2, P1, P2, 
+                                                                P3, Pc, W1M0, 
+                                                                W2M0, A0, beta, 
+                                                                gamma, dx, Pext, 
+                                                                outlet, Rt, R1, 
+                                                                R2, Cc),
+                  lambda dt, u1, u2, 
+                            Q1, A1, c1, 
+                            c2, P1, P2, 
+                            P3, Pc, W1M0, 
+                            W2M0, A0, beta, 
+                            gamma, dx, Pext, 
+                            outlet, Rt, R1, 
+                            R2, Cc: threeElementWindkessel_wrapper(dt, u1, u2, 
+                                                                   Q1, A1, c1, 
+                                                                   c2, P1, P2, 
+                                                                   P3, Pc, W1M0, 
+                                                                   W2M0, A0, beta, 
+                                                                   gamma, dx, Pext, 
+                                                                   outlet, Rt, R1, 
+                                                                   R2, Cc), 
+                  dt, u1, u2, 
+                  Q1, A1, c1, 
+                  c2, P1, P2, 
+                  P3, Pc, W1M0, 
+                  W2M0, A0, beta, 
+                  gamma, dx, P_ext, 
+                  outlet, Rt, R1, 
+                  R2, Cc)
 
 
-def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
+def outletCompatibility(u1, u2, A1, 
+                        c1, c2, W1M0, 
+                        W2M0, dt, dx, 
+                        Rt):
     _, W2M1 = riemannInvariants(u2, c2)
     W1M, W2M = riemannInvariants(u1, c1)
 
@@ -89,7 +150,10 @@ def outletCompatibility(u1, u2, A1, c1, c2, W1M0, W2M0, dt, dx, Rt):
 
     return u1, Q1, c1
 
-def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
+def threeElementWindkessel(dt, u1, A1, 
+                           Pc, Cc, R1, 
+                           R2, beta, gamma, 
+                           A0, Pext):
     Pout = 0.0
 
     Al = A1
@@ -120,12 +184,7 @@ def threeElementWindkessel(dt, u1, A1, Pc, Cc, R1, R2, beta, gamma, A0, Pext):
         temp = lax.while_loop(cond_fun, body_fun, jnp.array((x0,xn)))
         return temp[1]
 
-    try:
-        As = newtonSolver(As)
-    except Exception as e:
-        #vlab = ini.VCS[i].label
-        #print(f"\nNewton solver doesn't converge at {vlab} outlet!")
-        raise e
+    As = newtonSolver(As)
 
     us = (pressure(As, A0, beta, Pext) - Pout) / (As * R1)
 
