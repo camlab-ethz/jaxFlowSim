@@ -125,7 +125,7 @@ def runSimulation_opt(config_filename, verbose=False):
         """
         jax.debug.print("R = {x}", x=R)
         y_hat = jnp.zeros_like(y)
-        y_hat = jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(0.5*R_scale*R+R_scale), lambda: y_hat)
+        y_hat = jax.lax.cond(0.5*R_scale*R+R_scale>0, lambda: sim_loop_wrapper_jit(0.5*R_scale*R+R_scale), lambda: y_hat)
         L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
 
         #L = jnp.exp(1000*jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)+1)
@@ -167,7 +167,7 @@ def runSimulation_opt(config_filename, verbose=False):
     #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_dist)), obs=sim_dat_new.flatten())
 
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(345000),)
+    mcmc.run(jax.random.PRNGKey(345000))
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
 
@@ -184,7 +184,7 @@ def runSimulation_opt(config_filename, verbose=False):
     #    print(R_scale)
 
     #### adam optimizer example
-    #start_learning_rate = 750000
+    #start_learning_rate = 1e-2
     ## Exponential decay of the learning rate.
     #scheduler = optax.exponential_decay(
     #init_value=start_learning_rate, 
