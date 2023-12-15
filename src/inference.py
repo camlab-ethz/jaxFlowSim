@@ -77,10 +77,10 @@ def runSimulation_opt(config_filename, verbose=False):
     R_index = 1
     var_index = 7
     R1 = sim_dat_const[var_index,ends[R_index]]
-    R_scale = 1.1*R1
+    R_scale = 1.01*R1
     print(R1, R_scale)
     def simLoopWrapper(R):#, R_scale):
-        #R = R*R_scale
+        R = R*R_scale
         #R = 0.5*R*R_scale + R_scale
         ones = jnp.ones(ends[R_index]-starts[R_index]+4)
         #jax.debug.print("{x}", x = sim_dat)
@@ -110,21 +110,54 @@ def runSimulation_opt(config_filename, verbose=False):
         jax.debug.print("L = {x}", x=L)
         #jax.debug.print("{x}", x=L)
         return L
-    #def model(R_scale, obs):
-    #    R_dist = numpyro.sample("R", dist.Normal())
-    #    print("R_dist",R_dist)
-    #    #sigma = numpyro.sample("sigma", dist.Normal())
-    #    log_density = logp(obs, R_dist, R_scale)#, sigma)
-    #    return numpyro.factor("custom_logp", log_density)
+    def model(R_scale, obs):
+        R_dist = numpyro.sample("R", dist.Normal())
+        print("R_dist",R_dist)
+        #sigma = numpyro.sample("sigma", dist.Normal())
+        log_density = logp(obs, R_dist, R_scale)#, sigma)
+        numpyro.factor("custom_logp", log_density)
     ### NUTS model with bultin loss
     def model(R_scale, obs):
         R_dist=numpyro.sample("R", dist.LogNormal(loc=0,scale=0.25))
         with numpyro.plate("size", jnp.size(obs)):
             numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*R_dist+0.1)/jnp.linalg.norm(obs),scale=0.001), obs=obs/jnp.linalg.norm(obs))
-    mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(5090),R_scale,sim_dat_new[2,:].flatten())
-    mcmc.print_summary()
-    R = jnp.mean(mcmc.get_samples()["R"])
+    #mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
+    #mcmc.run(jax.random.PRNGKey(5090),R_scale,sim_dat_new[2,:].flatten())
+    #mcmc.print_summary()
+    #R = jnp.mean(mcmc.get_samples()["R"])
+    ### adam optimizer example
+    start_learning_rate = 1e-2
+    # Exponential decay of the learning rate.
+    scheduler = optax.exponential_decay(
+    init_value=start_learning_rate, 
+    transition_steps=1000,
+    decay_rate=0.99)
+
+    # Combining gradient transforms using `optax.chain`.
+    gradient_transform = optax.chain(
+        optax.clip_by_global_norm(1.0),  # Clip by the gradient by the global norm.
+        optax.scale_by_adam(),  # Use the updates from adam.
+        optax.scale_by_schedule(scheduler),  # Use the learning rate from the scheduler.
+        # Scale updates by -1 since optax.apply_updates is additive and we want to descend on the loss.
+        optax.scale(-1.0)
+    )
+    num_weights = 1
+    #optimizer = optax.adam(learning_rate)
+    params = jnp.array([1, 0.0])  # Recall target_params=0.5.
+    opt_state = gradient_transform.init(params)
+    #params = {'w': R_scale*jnp.ones((num_weights,))}
+    #opt_state = optimizer.init(params)
+    compute_loss = lambda params, y: jnp.mean(optax.l2_loss(sim_loop_wrapper_jit(params[0]), y))/jnp.mean(y)
+    print("loss", compute_loss(jnp.array([R1, 0.0]), sim_dat_new[2,:].flatten()))
+    
+    for i in range(100):
+        grads = jax.jacfwd(-compute_loss)(params, sim_dat_new[2,:].flatten())
+        print(grads)
+    
+        updates, opt_state = gradient_transform.update(grads, opt_state)
+        print(opt_state)
+        params = optax.apply_updates(params, updates)
+        print(params)
 
 
     print(R1)
