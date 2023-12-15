@@ -120,7 +120,7 @@ def runSimulation_opt(config_filename, verbose=False):
     def model(R_scale, obs):
         R_dist=numpyro.sample("R", dist.LogNormal(loc=0,scale=0.25))
         with numpyro.plate("size", jnp.size(obs)):
-            numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*R_dist),scale=0.01), obs=obs)
+            numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*R_dist)/jnp.linalg.norm(obs),scale=0.001), obs=obs/jnp.linalg.norm(obs))
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
     mcmc.run(jax.random.PRNGKey(5090),R_scale,sim_dat_new[2,:].flatten())
     mcmc.print_summary()
