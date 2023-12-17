@@ -124,7 +124,7 @@ def runSimulation_opt(config_filename, verbose=False):
         log_density = logp(sim_dat_new[0,:].flatten(), R_dist, sigma)
         return numpyro.factor("custom_logp", log_density)
     mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=200,num_warmup=12,num_chains=1)
-    mcmc.run(jax.random.PRNGKey(59111230))
+    mcmc.run(jax.random.PRNGKey(3450))
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["R"])
     print(R1)
