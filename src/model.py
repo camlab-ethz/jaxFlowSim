@@ -111,7 +111,7 @@ def runSimulation(input_filename, verbose=False):
                     "right posterior comunicating artery",
                     ]
  
-    plt.rcParams.update({'font.size': 20})
+    #plt.rcParams.update({'font.size': 20})
 
     for i,vessel_name in enumerate(vessel_names):
         index_vessel_name = vessel_names.index(vessel_name)
@@ -132,7 +132,7 @@ def runSimulation(input_filename, verbose=False):
         plt.plot(t%cardiac_T,P0/133.322)
         plt.legend(["P_JAX", "P_jl"], loc="lower right")
         plt.tight_layout()
-        plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.pdf")
+        plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.eps")
         plt.close()
 
 

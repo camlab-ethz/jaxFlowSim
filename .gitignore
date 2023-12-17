@@ -165,3 +165,4 @@ debug.txt
 parsing/models*
 parsing/openBF-hub
 test.py
+*_bckp*

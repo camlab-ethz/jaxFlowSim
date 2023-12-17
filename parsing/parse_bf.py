@@ -19,9 +19,20 @@ model_dir = "openBF-hub/models/" + modelname  + model_sub_dir
 csv_file = model_dir + "/" + modelfilename + '.csv'
 test_path = "../test/" + modelfilename 
 yaml_file = test_path + "/" + modelfilename + '.yml'
-if not os.path.exists(test_path): 
-    os.mkdir(test_path)
-shutil.copyfile(model_dir + "/" + modelfilename + "_inlet.dat", test_path+ "/" + modelfilename + "_inlet.dat")
+if os.path.exists(csv_file):
+    if not os.path.exists(test_path): 
+        os.mkdir(test_path)
+    shutil.copyfile(model_dir + "/" + modelfilename + "_inlet.dat", test_path+ "/" + modelfilename + "_inlet.dat")
+else:
+    model_sub_dir = "/" + sys.argv[2]
+    model_dir = "openBF-hub/models/" + modelname  + model_sub_dir
+    csv_file = model_dir + "/" + modelfilename + '.csv'
+    test_path = "../test/" + modelfilename 
+    yaml_file = test_path + "/" + modelfilename + '.yml'
+    if not os.path.exists(test_path): 
+        os.mkdir(test_path)
+    shutil.copyfile(model_dir + "/" + modelfilename + "_inlet.dat", test_path+ "/" + modelfilename + "_inlet.dat")
+
 
 
 # Read the constants from file
