@@ -1,6 +1,6 @@
 \documentclass{beamer}
-\usepackage{graphicx}
 \usepackage{listings}
+\usepackage[outdir=./images/]{epstopdf}
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
@@ -68,6 +68,7 @@
 \section{Code}
 
 \begin{frame} [fragile]
+	\frametitle{Code Structure}
 	\begin{lstlisting}[basicstyle=\fontsize{8}{8}\selectfont\ttfamily, language=Python, caption=The code structure of an entire simulation is given here in pseudocode. Each line is detailed throughout this section., label=lst:pc, escapechar=|] 
 		def runSimulation(config_filename, J) 
 			config = loadConfig(config_filename) |\label{ln:init_start}|
@@ -91,6 +92,10 @@
 						break
 				converged = checkConv(P_t, P_t_temp) |\label{ln:conv}|
 	\end{lstlisting}
+\end{frame}
+\begin{frame}
+	\frametitle{Padding}
+	\includegraphics[height=0.265\textheight,width=\textwidth]{images/padding.eps}
 \end{frame}
 	%    \frametitle{General Pipeline}
 	%    \begin{enumerate}
