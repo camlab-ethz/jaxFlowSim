@@ -69,8 +69,45 @@
 
 \begin{frame}
 	\frametitle{1D-Navier Stokes Equations}
-	pde with boundary/initial conditions
+	\begin{equation}
+		\begin{aligned}
+			\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{F} \left(
+			\mathbf{U} \right)}{\partial z} &= \mathbf{S} \left( \mathbf{U} \right), \ t>0, \
+			z \in \left[ 0,l \right], \\
+			\mathbf{U} \left( z;0 \right) &= \mathbf{U}_0 \left( z \right), \ z \in \left[ 0,l \right], \\
+			\mathbf{U} \left( 0;t \right) &= \mathbf{U}_L \left( t \right), \ t>0,\\
+			\mathbf{U} \left( l;t \right) &= \mathbf{U}_R \left( t \right), \ t>0,
+		\end{aligned} \label{eq:1deqs3}
+	\end{equation}
+	\begin{equation}
+		\mathbf{U} :=
+		\begin{bmatrix}
+			A \\
+			Q
+		\end{bmatrix}, \ 
+		\mathbf{F} \left( \mathbf{U} \right) :=
+		\begin{bmatrix}
+			Q \\
+			\frac{Q^2}{A} + \frac{\beta A^{\frac{3}{2}}}{3\rho\sqrt{A_0}}
+		\end{bmatrix}, \ 
+		\mathbf{S} \left( \mathbf{U} \right) :=
+		\begin{bmatrix}
+			0 \\
+			-22\frac{\mu}{\rho}\frac{Q}{A}
+		\end{bmatrix},
+	\end{equation}
+
 \end{frame}
+
+\begin{frame}
+	\frametitle{Tube Law}
+	\begin{align}
+		P(z;t) &:= P_{ext}(z;t) + \beta \left( \sqrt{\frac{A(z;t)}{A_0(z)}}-1 \right),      \label{eq:p_tot}\\
+		\beta(z) &:=  \frac{\sqrt{\pi} E h_0(z)}{(1-\nu^2) \sqrt{A_0(z)}}.
+	\end{align}
+
+\end{frame}
+
 \begin{frame}
 	\frametitle{Inlets}
 	example computing inlets from data
@@ -137,7 +174,7 @@
 \end{frame}
 \begin{frame}
 	\frametitle{Model: Abdominal Arteries (0029\_H\_ABAO\_H)}
-		\includegraphics[width=\columnwidth]{images/0029.eps}
+	\includegraphics[width=\columnwidth]{images/0029.eps}
 \end{frame}
 \begin{frame}
 	\frametitle{Model: Cerebellar Arteries (0053\_H\_CERE\_H)}
