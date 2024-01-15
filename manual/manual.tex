@@ -94,7 +94,7 @@
 		\begin{bmatrix}
 			0 \\
 			-22\frac{\mu}{\rho}\frac{Q}{A}
-		\end{bmatrix},
+		\end{bmatrix}.
 	\end{equation}
 
 	\vfill
@@ -137,16 +137,43 @@
 \end{frame}
 
 \begin{frame}
-	\frametitle{Inlets}
-	example computing inlets from data
+	\frametitle{Initial Conditions}
+	\begin{align}
+		u(z;0) &\equiv 0, &z \in [0,l],\\
+		A(z;0) &= A_0(z), &z \in [0,l], \\
+		Q(z;0) &= u(z;0)A(z;0) \equiv 0, &z \in [0,l].
+	\end{align}
+	\vspace{5mm}
 \end{frame}
 \begin{frame}
-	\frametitle{Junctions}
-	exmaple of linear system for junction
+	\frametitle{Inlets, Juntions, Outlets}
+	\begin{block}{Inlets}
+		set $P$ from data $\rightarrow$ set $u$, $Q$, $A$, $c$ through linear extrapolation of charateristics
+
+		set $Q$ from data $\rightarrow$ set $u$, $A$, $c$, $P$ through linear extrapolation of charateristics
+	\end{block}
+	\begin{block}{Junctions}
+	solve linear system of equations consisting of:
+	\begin{itemize}
+		\item conservation of mass, 
+		\item conservation of pressure, 
+		\item extrapolation of charateristics	
+	\end{itemize}
+\end{block}
+\begin{block}{Outlets}
+	0D-/ lumped parameter model: three element Windkessel (RCR) model 
+\end{block}
 \end{frame}
 \begin{frame}
-	\frametitle{Outlets}
-	description of Windkessel model
+	\frametitle{Numerical Methods}
+	\begin{block}{1D-Model}
+		FV method: MUSCL scheme with Lax-Friedrichs Flux
+	\end{block}
+	\begin{block}{Junctions \& Outlets}
+		Newton method
+	\end{block}
+
+
 \end{frame}
 
 \section{Implementation}
