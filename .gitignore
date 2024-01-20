@@ -160,9 +160,26 @@ cython_debug/
 #.idea/
 
 # custom
+# code
 debug.txt
 *_results
 parsing/models*
 parsing/openBF-hub
 test.py
 *_bckp*
+
+# debug
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.synctex
+*.synctex.gz
+*.toc
+*.vrb
+
+
+
