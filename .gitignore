@@ -168,18 +168,24 @@ parsing/openBF-hub
 test.py
 *_bckp*
 
-# debug
-*.aux
-*.fdb_latexmk
-*.fls
-*.log
-*.nav
-*.out
-*.snm
-*.synctex
-*.synctex.gz
-*.toc
-*.vrb
+# presentation
+presentation/*.aux
+presentation/*.fdb_latexmk
+presentation/*.fls
+presentation/*.log
+presentation/*.nav
+presentation/*.out
+presentation/*.snm
+presentation/*.synctex
+presentation/*.synctex\(busy\)
+presentation/*.synctex.gz
+presentation/*.toc
+presentation/*.vrb
+presentation/images/*.pdf
+presentation/images/*.png
+presentation/images/*.jpg
+presentation/images/*.xcf
+
 
 
 
