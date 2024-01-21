@@ -185,4 +185,5 @@ presentation/images/*.pdf
 presentation/images/*.png
 presentation/images/*.jpg
 presentation/images/*.xcf
+presentation/images/*.svg
 presentation/*.dvi
