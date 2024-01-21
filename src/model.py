@@ -17,7 +17,7 @@ numpyro.set_platform("cpu")
 
 
 
-def configSimulation(input_filename, verbose=False):
+def configSimulation(input_filename, verbose=False, make_results_folder=True):
     data = loadConfig(input_filename)
     blood = buildBlood(data["blood"])
 
@@ -28,7 +28,8 @@ def configSimulation(input_filename, verbose=False):
      input_data, nodes, vessel_names, 
     starts, ends, indices_1, 
     indices_2) = buildArterialNetwork(data["network"], blood)
-    makeResultsFolder(data, input_filename)
+    if make_results_folder:
+        makeResultsFolder(data, input_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
     total_time = data["solver"]["cycles"]*cardiac_T

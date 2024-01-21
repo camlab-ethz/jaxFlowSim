@@ -137,7 +137,7 @@ def makeResultsFolder(data, input_filename):
     else:
         r_folder = data["results folder"]
 
-    # delete existing folder and results!
+    # delete existing folder and results
     if os.path.isdir(r_folder):
         shutil.rmtree(r_folder)
 

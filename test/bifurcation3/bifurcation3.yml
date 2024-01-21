@@ -1,4 +1,4 @@
-project name: bifurcation2
+project name: bifurcation3
 
 blood:
   rho: 1060.0 # density [kg/m^3]
@@ -38,9 +38,9 @@ network:
     E: 700.0e3 # Young's modulus (Pa)
 
     outlet: 3
-    R1: 6.8123e8
+    R1: 12.8123e7
     R2: 3.1013e9
-    Cc: 3.6664e-10
+    Cc: 3.6664e-11
 
   - label: d2
 
@@ -54,6 +54,6 @@ network:
     E: 700.0e3 # Young's modulus (Pa)
 
     outlet: 3
-    R1: 12.8123e8
+    R1: 12.8123e7
     R2: 3.1013e9
-    Cc: 3.6664e-10
+    Cc: 3.6664e-11
