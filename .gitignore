@@ -162,6 +162,7 @@ cython_debug/
 # custom
 # code
 debug.txt
+results/*
 *_results
 parsing/models*
 parsing/openBF-hub
