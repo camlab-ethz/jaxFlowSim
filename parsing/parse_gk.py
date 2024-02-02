@@ -24,7 +24,6 @@ if not os.path.exists(path):
 rho = 0.0
 mu = 0.0
 Ccfl = 0.0
-cycles = 100
 num_snapshots = 100
 convergence_tolerance = 1.0
 Pext = 0.0
@@ -301,7 +300,6 @@ data['blood'] = blood
 # Add solver section
 solver = ruamel.yaml.comments.CommentedMap()
 solver['Ccfl'] = Ccfl
-solver['cycles'] = cycles
 solver['num_snapshots'] = num_snapshots
 solver['convergence tolerance'] = convergence_tolerance
 data['solver'] = solver

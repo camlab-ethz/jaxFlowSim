@@ -40,7 +40,7 @@ def checkSections(data):
             raise ValueError(f"missing section {key} in YAML input file")
 
     checkSection(data, "blood", ["mu", "rho"])
-    checkSection(data, "solver", ["Ccfl", "cycles", "convergence tolerance"])
+    checkSection(data, "solver", ["Ccfl", "convergence tolerance"])
 
     if "num_snapshots" not in data["solver"]:
         data["solver"]["num_snapshots"] = 100

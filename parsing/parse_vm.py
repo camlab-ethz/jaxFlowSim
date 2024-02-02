@@ -43,18 +43,6 @@ dat_edges_seq_tuples = [tuple(row) for row in dat_edges_seq]
 dat_edges_seq_unique = np.unique(dat_edges_seq_tuples,axis=0)
 dat_edges_seq_unique = [tuple(row) for row in dat_edges_seq_unique]
 
-
-
-
-# Read the constants from file
-constants = {}
-with open("adan56" + '_constants.jl', 'r') as file:
-    for line in file:
-        parts = line.strip().split('=')
-        key = parts[0].strip().replace('const ', '')
-        value = parts[1].strip()
-        constants[key] = value
-
 # Create an OrderedDict for the YAML structure
 data = ruamel.yaml.comments.CommentedMap()
 
@@ -63,14 +51,13 @@ data['project name'] = modelname
 
 # Add blood section
 blood = ruamel.yaml.comments.CommentedMap()
-blood['rho'] = float(constants['rho'])
-blood['mu'] = float(constants['mu'])
+blood['rho'] = 1060.0
+blood['mu'] = 0.004
 data['blood'] = blood
 
 # Add solver section
 solver = ruamel.yaml.comments.CommentedMap()
-solver['Ccfl'] = float(constants['Ccfl'])
-solver['cycles'] = int(constants['cycles'])
+solver['Ccfl'] = 0.9
 solver['num_snapshots'] = 100
 solver['convergence tolerance'] = 1.0
 data['solver'] = solver

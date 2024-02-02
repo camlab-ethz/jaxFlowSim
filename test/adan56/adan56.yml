@@ -4,7 +4,6 @@ blood:
   mu: 0.004
 solver:
   Ccfl: 0.9
-  cycles: 100
   num_snapshots: 100
   convergence tolerance: 1.0
 network:
