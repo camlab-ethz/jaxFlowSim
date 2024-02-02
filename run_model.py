@@ -34,7 +34,7 @@ else:
 verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_toll, Ccfl, edges, input_data, 
+ timepoints, conv_tol, Ccfl, edges, input_data, 
             rho, nodes, 
             starts, ends,
             indices_1, indices_2,
@@ -45,7 +45,7 @@ if verbose:
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
 sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_toll, Ccfl, edges, input_data, 
+                                      timepoints, conv_tol, Ccfl, edges, input_data, 
                                       rho, nodes, 
                                       starts, ends,
                                       indices_1, indices_2)) #, junction_functions))

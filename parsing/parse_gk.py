@@ -289,7 +289,7 @@ E = r0/h0 * (k1*np.exp(k2*r0) + k3)/1000 #Applied Mathematical Models in Human P
 data = ruamel.yaml.comments.CommentedMap()
 
 # Add project name
-data['project name'] = modelname
+data['proj_name'] = modelname
 
 # Add blood section
 blood = ruamel.yaml.comments.CommentedMap()
@@ -301,7 +301,7 @@ data['blood'] = blood
 solver = ruamel.yaml.comments.CommentedMap()
 solver['Ccfl'] = Ccfl
 solver['num_snapshots'] = num_snapshots
-solver['convergence tolerance'] = convergence_tolerance
+solver['conv_tol'] = convergence_tolerance
 data['solver'] = solver
 
 data_net = []

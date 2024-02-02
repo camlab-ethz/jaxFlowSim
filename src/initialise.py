@@ -34,13 +34,13 @@ def checkInputFile(data):
 
 
 def checkSections(data):
-    keys = ["project name", "network", "blood", "solver"]
+    keys = ["proj_name", "network", "blood", "solver"]
     for key in keys:
         if key not in data:
             raise ValueError(f"missing section {key} in YAML input file")
 
     checkSection(data, "blood", ["mu", "rho"])
-    checkSection(data, "solver", ["Ccfl", "convergence tolerance"])
+    checkSection(data, "solver", ["Ccfl", "conv_tol"])
 
     if "num_snapshots" not in data["solver"]:
         data["solver"]["num_snapshots"] = 100
@@ -139,7 +139,7 @@ def checkVessel(i, vessel):
 
 
 def makeResultsFolder(data, input_filename):
-    project_name = data["project name"]
+    project_name = data["proj_name"]
 
     if "results folder" not in data:
         r_folder = "results/" +  project_name + "_results"

@@ -48,7 +48,7 @@ with open(model_dir + "/" + modelfilename +'_constants.jl', 'r') as file:
 data = ruamel.yaml.comments.CommentedMap()
 
 # Add project name
-data['project name'] = modelfilename
+data['proj_name'] = modelfilename
 
 # Add blood section
 blood = ruamel.yaml.comments.CommentedMap()
@@ -60,7 +60,7 @@ data['blood'] = blood
 solver = ruamel.yaml.comments.CommentedMap()
 solver['Ccfl'] = float(constants['Ccfl'])
 solver['num_snapshots'] = 100
-solver['convergence tolerance'] = 1.0
+solver['conv_tol'] = 1.0
 data['solver'] = solver
 
 # Create a YAML instance and configure the formatting

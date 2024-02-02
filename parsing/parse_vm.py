@@ -47,7 +47,7 @@ dat_edges_seq_unique = [tuple(row) for row in dat_edges_seq_unique]
 data = ruamel.yaml.comments.CommentedMap()
 
 # Add project name
-data['project name'] = modelname
+data['proj_name'] = modelname
 
 # Add blood section
 blood = ruamel.yaml.comments.CommentedMap()
@@ -59,7 +59,7 @@ data['blood'] = blood
 solver = ruamel.yaml.comments.CommentedMap()
 solver['Ccfl'] = 0.9
 solver['num_snapshots'] = 100
-solver['convergence tolerance'] = 1.0
+solver['conv_tol'] = 1.0
 data['solver'] = solver
 
 data_net = []

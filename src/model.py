@@ -4,7 +4,7 @@ import numpy as np
 from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempData
 from src.solver import computeDt, solveModel
-from src.check_convergence import printConvError, computeConvError, checkConv
+from src.check_conv import printConvError, computeConvError, checkConv
 import numpy as np
 import numpyro
 
@@ -104,7 +104,7 @@ def simulationLoopUnsafe(N, B,
 
 def simulationLoop(N, B, num_snapshots, 
                         sim_dat, sim_dat_aux, sim_dat_const, 
-                        sim_dat_const_aux, timepoints, conv_toll, 
+                        sim_dat_const_aux, timepoints, conv_tol, 
                         Ccfl, edges, input_data, 
                         rho, nodes, 
                         starts, ends, indices1, 
@@ -122,13 +122,13 @@ def simulationLoop(N, B, num_snapshots,
          sim_dat_const_aux, t_i, _, 
          _, passed_cycles_i, _, 
          P_t_i, P_l_i, _, 
-         conv_toll, _, _, 
+         conv_tol, _, _, 
          _, _, _) = args
         err = computeConvError(N, P_t_i, P_l_i)
         def printConvErrorWrapper():
             printConvError(err)
             return False
-        ret = lax.cond((passed_cycles_i + 1 > 1)*(checkConv(err, conv_toll))*
+        ret = lax.cond((passed_cycles_i + 1 > 1)*(checkConv(err, conv_tol))*
                            ((t_i - sim_dat_const_aux[0,0] * passed_cycles_i >= sim_dat_const_aux[0,0])), 
                             printConvErrorWrapper,
                             lambda: True)
@@ -175,7 +175,7 @@ def simulationLoop(N, B, num_snapshots,
                 sim_dat_const_aux, t, counter, 
                 timepoints, passed_cycles, dt, 
                 P_t, P_l, t_t, 
-                conv_toll, Ccfl, edges, 
+                conv_tol, Ccfl, edges, 
                 input_data, rho, 
                 nodes)
 
@@ -183,13 +183,13 @@ def simulationLoop(N, B, num_snapshots,
      sim_dat_const_aux, t, counter, 
      timepoints, passed_cycles, dt, 
      P_t, P_l, t_t,  
-     conv_toll, Ccfl, edges, 
+     conv_tol, Ccfl, edges, 
      input_data, rho, 
      nodes) = lax.while_loop(condFun, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                                 sim_dat_const_aux, t, counter, 
                                                 timepoints, passed_cycles, dt, 
                                                 P_t, P_l, t_t, 
-                                                conv_toll, Ccfl, edges, 
+                                                conv_tol, Ccfl, edges, 
                                                 input_data, rho, 
                                                 nodes))
     
