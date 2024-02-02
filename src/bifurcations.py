@@ -1,6 +1,58 @@
 import jax.numpy as jnp
+from functools import partial
+from jax import lax, jit
 from src.utils import pressure, waveSpeed
 from src.newton import newtonRaphson
+
+@partial(jit, static_argnums=(5))
+def solveBifurcationWrapper(dt, sim_dat, sim_dat_aux, 
+                       sim_dat_const, sim_dat_const_aux, 
+                       B, i, index1, edges, starts, ends, rho):
+    d1_i = edges[i,4]
+    d2_i = edges[i,5]
+    d1_i_start = starts[d1_i] 
+    d2_i_start = starts[d2_i] 
+    u1 = sim_dat[0,index1-1]
+    u2 = sim_dat[0,d1_i_start]
+    u3 = sim_dat[0,d2_i_start]
+    A1 = sim_dat[2,index1-1]
+    A2 = sim_dat[2,d1_i_start]
+    A3 = sim_dat[2,d2_i_start]
+    (u1, u2, u3, 
+     Q1, Q2, Q3, 
+     A1, A2, A3, 
+     c1, c2, c3, 
+     P1, P2, P3) = solveBifurcation(u1, u2, u3, 
+                                    A1, A2, A3,
+                                    sim_dat_const[0,index1-1],
+                                    sim_dat_const[0,d1_i_start],
+                                    sim_dat_const[0,d2_i_start],
+                                    sim_dat_const[1,index1-1],
+                                    sim_dat_const[1,d1_i_start],
+                                    sim_dat_const[1,d2_i_start],
+                                    sim_dat_const[2,index1-1],
+                                    sim_dat_const[2,d1_i_start],
+                                    sim_dat_const[2,d2_i_start],
+                                    sim_dat_const[4, index1-1],
+                                    sim_dat_const[4, d1_i_start],
+                                    sim_dat_const[4, d2_i_start],
+                                    )
+    temp1 = jnp.array((u1, Q1, A1, c1, P1))
+    temp2 = jnp.array((u2, Q2, A2, c2, P2))
+    temp3 = jnp.array((u3, Q3, A3, c3, P3))
+    sim_dat = lax.dynamic_update_slice( 
+        sim_dat, 
+        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+        (0,index1-1))
+    sim_dat = lax.dynamic_update_slice( 
+        sim_dat, 
+        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+        (0,d1_i_start-B))
+    sim_dat = lax.dynamic_update_slice( 
+        sim_dat, 
+        temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+        (0,d2_i_start-B))
+    return sim_dat, sim_dat_aux
 
 def solveBifurcation(u1, u2, u3, 
                      A1, A2, A3, 
