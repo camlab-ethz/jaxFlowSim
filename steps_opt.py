@@ -106,7 +106,7 @@ vessel_names_0053 = [
 if verbose:
     starting_time = time.time_ns()
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
-sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
+sim_dat_out, t_out, P_out  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                       timepoints, conv_toll, Ccfl, edges, input_data, 
                                       rho, total_time, nodes, 
@@ -122,9 +122,9 @@ t0 = P0_temp[:,0]%cardiac_T
 counter = 0
 t_new = np.zeros(len(timepoints))
 P_new = np.zeros((len(timepoints), 5*N))
-for i in range(len(t)-1):
-    if t0[counter] >= t[i] and t0[counter] <= t[i+1]:
-        P_new[counter,:] = (P[i,:] + P[i+1,:])/2
+for i in range(len(t_out)-1):
+    if t0[counter] >= t_out[i] and t0[counter] <= t_out[i+1]:
+        P_new[counter,:] = (P_out[i,:] + P_out[i+1,:])/2
         counter += 1
 
 t_new = t_new[:-1]
@@ -141,6 +141,8 @@ for i,vessel_name in enumerate(vessel_names):
     t0 = P0_temp[:-1,0]%cardiac_T
     P1 = P_new[:,index_jax]
     residual_base += np.sqrt(((P1-P0).dot(P1-P0)/P0.dot(P0)))
+
+residual_base = residual_base/N
 
 times = []
 steps = range(50000,210000,10000)
@@ -192,18 +194,20 @@ for m in steps:
         residual += np.sqrt(((P1-P0).dot(P1-P0)/P0.dot(P0)))
     
     residuals.append(residual/N)
+
 _, ax = plt.subplots()
 ax.set_xlabel("# steps")
 ax1 = ax.twinx()
 ln1 = ax.plot(steps,times, "g-", label="static t[s]")
 ln2 = ax.plot(steps,np.ones(len(steps))*ending_time_base, "r-", label="dynamic t[s]")
-ln3 = ax1.plot(steps,residuals, "b-", label ="static residual")
+ln3 = ax1.plot(steps,residuals, "b-", label="static residual")
 ln4 = ax.plot(steps,np.ones(len(steps))*residual_base, "y-", label="dynamic residual")
 ax.set_xlabel("# steps")
 ax.set_ylabel("t[s]")
 ax1.set_ylabel("residual")
 lns = ln1+ln2+ln3+ln4
 labels = [l.get_label() for l in lns]
+plt.title("network: " + network_name + ", # vessels: " + str(N))
 plt.legend(lns, labels, loc ="center right")
 plt.tight_layout()
 plt.savefig(r_folder + "/steps_opt_" + network_name +".pdf")

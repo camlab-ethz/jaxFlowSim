@@ -5,7 +5,7 @@ blood:
 solver:
   Ccfl: 0.9
   cycles: 100
-  jump: 100
+  num_snapshots: 100
   convergence tolerance: 1.0
 network:
   - label: aortic_arch_I

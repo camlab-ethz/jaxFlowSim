@@ -1,10 +1,10 @@
 import jax.numpy as jnp
 from jax import lax
 
-def saveTempDatas(N, starts, ends, 
+def saveTempData(N, starts, ends, 
                   nodes, P):
     P_t = jnp.zeros(5*N)
-    def body_fun(i,args):
+    def bodyFun(i,args):
         P_t, starts, ends = args
         start = starts[i]
         end = ends[i]
@@ -15,5 +15,5 @@ def saveTempDatas(N, starts, ends,
         P_t = P_t.at[i*5+4].set(P[end-1])
         return (P_t,starts,ends)
 
-    P_t, _, _ = lax.fori_loop(0, N, body_fun, (P_t,starts,ends))
+    P_t, _, _ = lax.fori_loop(0, N, bodyFun, (P_t,starts,ends))
     return P_t

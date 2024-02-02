@@ -20,5 +20,5 @@ def printConvError(err):
     err /= 133.332
     debug.print("error norm = {x} mmHg", x=err)
 
-def checkConvergence(err, conv_toll):
+def checkConv(err, conv_toll):
     return err / 133.332 <= conv_toll

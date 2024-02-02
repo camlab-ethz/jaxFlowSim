@@ -1,10 +1,10 @@
 import jax.numpy as jnp
-from jax import lax, debug
+from jax import lax#, debug
 import numpy as np
 from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
-from src.IOutils import saveTempDatas#, writeResults
+from src.IOutils import saveTempData
 from src.solver import computeDt, solveModel
-from src.check_convergence import printConvError, computeConvError, checkConvergence
+from src.check_convergence import printConvError, computeConvError, checkConv
 import numpy as np
 import numpyro
 
@@ -21,19 +21,18 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
     data = loadConfig(input_filename)
     blood = buildBlood(data["blood"])
 
-    J =  data["solver"]["jump"]
+    J =  data["solver"]["num_snapshots"]
 
     (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      N, B, edges, 
      input_data, nodes, vessel_names, 
     starts, ends, indices_1, 
-    indices_2) = buildArterialNetwork(data["network"], blood)
+    indices_2) = buildArterialNetwork(data["network"], blood)#, junction_functions) = buildArterialNetwork(data["network"], blood)
     if make_results_folder:
         makeResultsFolder(data, input_filename)
 
     cardiac_T = sim_dat_const_aux[0,0]
     total_time = data["solver"]["cycles"]*cardiac_T
-    print(total_time)
     Ccfl = float(data["solver"]["Ccfl"])
     
     if verbose:
@@ -47,7 +46,7 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
             blood.rho, total_time, nodes, 
             starts, ends,
             indices_1, indices_2, 
-            vessel_names, cardiac_T)
+            vessel_names, cardiac_T) #, junction_functions)
 
 
 def simulationLoopUnsafe(N, B,
@@ -78,7 +77,7 @@ def simulationLoopUnsafe(N, B,
                                           edges, input_data, rho)
         t = (t + dt)%sim_dat_const_aux[0,0]
         t_t = t_t.at[i].set(t)
-        P_t = P_t.at[i,:].set(saveTempDatas(N, starts, ends, nodes, sim_dat[4,:]))
+        P_t = P_t.at[i,:].set(saveTempData(N, starts, ends, nodes, sim_dat[4,:]))
 
 
         return (sim_dat, sim_dat_aux, sim_dat_const, 
@@ -110,7 +109,7 @@ def simulationLoop(N, B, jump,
                         Ccfl, edges, input_data, 
                         rho, total_time, nodes, 
                         starts, ends, indices1, 
-                        indices2):
+                        indices2): #, junction_functions):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -131,7 +130,7 @@ def simulationLoop(N, B, jump,
         def printConvErrorWrapper():
             printConvError(err)
             return False
-        ret = lax.cond((passed_cycles_i + 1 > 1)*(checkConvergence(err, conv_toll))*
+        ret = lax.cond((passed_cycles_i + 1 > 1)*(checkConv(err, conv_toll))*
                            ((t_i - sim_dat_const_aux[0,0] * passed_cycles_i >= sim_dat_const_aux[0,0])), 
                             printConvErrorWrapper,
                             lambda: True)
@@ -150,10 +149,10 @@ def simulationLoop(N, B, jump,
                                           ends, indices1, indices2,
                                           t, dt, sim_dat, 
                                           sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                          edges, input_data, rho)
+                                          edges, input_data, rho) #, junction_functions)
 
         (P_t_temp,counter_temp) = lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempDatas(N, starts, ends, 
+                                         lambda: (saveTempData(N, starts, ends, 
                                                                 nodes, sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)

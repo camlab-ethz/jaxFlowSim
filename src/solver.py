@@ -1,10 +1,12 @@
 import jax.numpy as jnp
-from jax import lax, vmap
+from functools import partial
+from jax import lax, vmap, debug, jit
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
 from src.boundary_conditions import setInletBC, setOutletBC
 from src.utils import pressureSA, waveSpeedSA
+#from src.initialise import JUNCTION_FUNCTIONS
 
 def computeDt(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a+b))(u,c)
@@ -12,7 +14,8 @@ def computeDt(Ccfl, u, c, dx):
     dt = jnp.min(vessel_dt)
     return dt
 
-def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+@partial(jit, static_argnums=(1))
+def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho): #, junction_functions):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -44,10 +47,16 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                   indices1, indices2))
 
     def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat
+        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat #, junction_functions) = dat
         i = edges[j,0]-1
         end = ends[i]
-        
+
+        #debug.print("{x}", x = junction_functions)
+        #args = (dt, sim_dat, sim_dat_aux, 
+        #               sim_dat_const, sim_dat_const_aux, 
+        #               B, i, end, edges, starts, ends, rho)
+        #sim_dat, sim_dat_aux = lax.switch(i, junction_functions, *args)
+
         def setOutletBCWrapper(sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,end-2]
@@ -240,13 +249,13 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
 
         return (sim_dat, sim_dat_aux, 
                 sim_dat_const, sim_dat_const_aux, 
-                edges, rho, starts, ends)
+                edges, rho, starts, ends) #, junction_functions)
 
     (sim_dat, sim_dat_aux, _, 
      _, _, _, 
      _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                             sim_dat_const_aux, edges, rho, 
-                                            starts, ends))
+                                            starts, ends)) #, junction_functions))
 
     return sim_dat, sim_dat_aux
 

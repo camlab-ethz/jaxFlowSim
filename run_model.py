@@ -6,6 +6,7 @@ import os
 from functools import partial
 from jax import block_until_ready, jit
 import matplotlib.pyplot as plt
+import numpy as np
 
 os.chdir(os.path.dirname(__file__))
 jax.config.update("jax_enable_x64", True)
@@ -37,7 +38,7 @@ verbose = True
             rho, total_time, nodes, 
             starts, ends,
             indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)#, junction_functions) = configSimulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
@@ -47,7 +48,7 @@ sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J,
                                       timepoints, conv_toll, Ccfl, edges, input_data, 
                                       rho, total_time, nodes, 
                                       starts, ends,
-                                      indices_1, indices_2))
+                                      indices_1, indices_2)) #, junction_functions))
 
 if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9
@@ -107,24 +108,26 @@ vessel_names_0053 = [
 
 #plt.rcParams.update({'font.size': 20})
 
+
 for i,vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
-    #P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
+    P0 = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_name + "_P.last")
     node = 2
     index_jl  = 1 + node
     index_jax  = 5*index_vessel_name + node
-    #P0 = P0[:,index_jl]
-    #res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
+    P0 = P0[:,index_jl]
+    res = np.sqrt(((P[:,index_jax]-P0).dot(P[:,index_jax]-P0)/P0.dot(P0)))
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
-    #plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_names[i] + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
+    plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_names[i] + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
     #plt.title("network: " + network_name + ", vessel name: " + vessel_names_0053[i])
     #plt.title(vessel_names_0053[i])
     #plt.title("vessel name: " + vessel_name)
     plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
-    #plt.plot(t%cardiac_T,P0/133.322)
+    plt.plot(t%cardiac_T,P0/133.322)
     #plt.legend(["P_JAX", "P_jl"], loc="lower right")
+    #plt.axis("off")
     plt.tight_layout()
-    plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.pdf")
+    plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.pdf")#, bbox_inches='tight')
     plt.close()

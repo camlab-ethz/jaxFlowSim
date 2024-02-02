@@ -2,12 +2,21 @@ import numpy as np
 import yaml
 import os.path
 import shutil
+#from jax.tree_util import Partial
+#from functools import partial
+#from jax import jit
 from src.utils import waveSpeed, pressureSA
 from src.components import Blood
+#from src.anastomosis import solveAnastomosisWrapper
+#from src.bifurcations import solveBifurcationWrapper
+#from src.conjunctions import solveConjunctionWrapper
+#from src.boundary_conditions import setOutletBCWrapper
+
+#JUNCTION_FUNCTIONS = []
 
 def loadConfig(input_filename):
     data = loadYamlFile(input_filename)
-    checkInputFile(data)
+    checkInputFile(data) 
     return data
 
 
@@ -33,8 +42,8 @@ def checkSections(data):
     checkSection(data, "blood", ["mu", "rho"])
     checkSection(data, "solver", ["Ccfl", "cycles", "convergence tolerance"])
 
-    if "jump" not in data["solver"]:
-        data["solver"]["jump"] = 100
+    if "num_snapshots" not in data["solver"]:
+        data["solver"]["num_snapshots"] = 100
 
 
 def checkSection(data, section, keys):
@@ -192,6 +201,7 @@ def buildArterialNetwork(network, blood):
     edges = np.zeros((N, 10), dtype=np.int64)
     input_data_temp = []
     vessel_names = []
+    #junction_functions = []
 
     nodes = np.zeros((N,3), dtype=np.int64)
 
@@ -240,9 +250,11 @@ def buildArterialNetwork(network, blood):
             if edges[j,3] == 2:
                 edges[j,4] = np.where(edges[:, 1] == t)[0][0]
                 edges[j,5] = np.where(edges[:, 1] == t)[0][1]
+                #junction_functions.append(Partial(jit, static_argnums=5)(solveBifurcationWrapper))
 
             elif edges[j,6] == 1:
                 edges[j,7] = np.where(edges[:, 1] == t)[0][0]
+                #junction_functions.append(Partial(jit, static_argnums=5)(solveConjunctionWrapper))
 
             elif edges[j,6] == 2:
                 temp_1 = np.where(edges[:, 2] == t)[0][0]
@@ -250,7 +262,13 @@ def buildArterialNetwork(network, blood):
                 edges[j,7] = np.minimum(temp_1,temp_2)
                 edges[j,8] = np.maximum(temp_1,temp_2)
                 edges[j,9] = np.where(edges[:, 1] == t)[0][0]
-
+                #junction_functions.append(Partial(jit, static_argnums=5)(solveAnastomosisWrapper))
+        #else:
+        #    junction_functions.append(Partial(jit, static_argnums=5)(setOutletBCWrapper))
+    
+        
+    #global JUNCTION_FUNCTIONS
+    #JUNCTION_FUNCTIONS = junction_functions
     return (sim_dat, sim_dat_aux, sim_dat_const,
             sim_dat_const_aux, N, B,
             edges, input_data, nodes, 

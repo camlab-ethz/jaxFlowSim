@@ -1,5 +1,6 @@
 import jax.numpy as jnp
-from jax import lax
+from jax import lax, jit
+from functools import partial
 from src.utils import pressure
 
 def setInletBC(inlet, u0, u1, 
@@ -57,6 +58,43 @@ def inverseRiemannInvariants(W1, W2):
 
 def areaFromPressure(P, A0, beta, P_ext):
     return A0 * ((P - P_ext) / beta + 1.0) * ((P - P_ext) / beta + 1.0)
+
+@partial(jit, static_argnums=(5))
+def setOutletBCWrapper(dt, sim_dat, sim_dat_aux, 
+                       sim_dat_const, sim_dat_const_aux, 
+                       B, i, index1, edges, starts, ends, rho):
+    u1 = sim_dat[0,index1-1]
+    u2 = sim_dat[0,index1-2]
+    Q1 = sim_dat[1,index1-1]
+    A1 = sim_dat[2,index1-1]
+    c1 = sim_dat[3,index1-1]
+    c2 = sim_dat[3,index1-2]
+    P1 = sim_dat[4,index1-1]
+    P2 = sim_dat[4,index1-2]
+    P3 = sim_dat[4,index1-3]
+    Pc = sim_dat_aux[i,2]
+    W1M0 = sim_dat_aux[i,0]
+    W2M0 = sim_dat_aux[i,1]
+    u, Q, A, c, P1, Pc = setOutletBC(dt,
+                                     u1, u2, Q1, A1, c1, c2, 
+                                     P1, P2, P3, Pc, W1M0, W2M0,
+                                     sim_dat_const[0,index1-1],
+                                     sim_dat_const[1,index1-1],
+                                     sim_dat_const[2,index1-1],
+                                     sim_dat_const[-1, index1-1],
+                                     sim_dat_const[4, index1-1],
+                                     sim_dat_const_aux[i, 2], 
+                                     sim_dat_const[6, index1-1],
+                                     sim_dat_const[7, index1-1],
+                                     sim_dat_const[8, index1-1],
+                                     sim_dat_const[9, index1-1])
+    temp = jnp.array((u,Q,A,c,P1))
+    sim_dat = lax.dynamic_update_slice( 
+        sim_dat, 
+        temp[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+        (0,index1-1))
+    sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
+    return sim_dat, sim_dat_aux
 
 def setOutletBC(dt, u1, u2, 
                 Q1, A1, c1, 

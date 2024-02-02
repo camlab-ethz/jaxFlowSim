@@ -48,7 +48,7 @@ sim_dat, P_t, t_t = block_until_ready(sim_loop_old_jit(N, B,
                                       Ccfl, edges, input_data, 
                                       rho, nodes, 
                                       starts, ends,
-                                      indices_1, indices_2, upper=200000))
+                                      indices_1, indices_2, upper=120000))
 
 if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9
@@ -111,18 +111,18 @@ vessel_names_0053 = [
 #print(sim_dat)
 
 indices = [i+1 for i in range(len(t_t)-1) if t_t[i]>t_t[i+1]]
-P_cycle = P_t[indices[-2]:indices[-1],:]
-t_cycle = t_t[indices[-2]:indices[-1]]
+#P_cycle = P_t[indices[-2]:indices[-1],:]
+#t_cycle = t_t[indices[-2]:indices[-1]]
 P0_temp = np.loadtxt("/home/diego/studies/uni/thesis_maths/openBF/test/" + network_name + "/" + network_name + "_results/" + vessel_names[0] + "_P.last")
 t0 = P0_temp[:,0]%cardiac_T
 
 counter = 0
 t_new = np.zeros(len(timepoints))
 P_new = np.zeros((len(timepoints), 5*N))
-for i in range(len(t_cycle)-1):
-    if t0[counter] >= t_cycle[i] and t0[counter] <= t_cycle[i+1]:
-        P_new[counter,:] = (P_cycle[i,:] + P_cycle[i+1,:])/2
-        counter += 1
+#for i in range(len(t_cycle)-1):
+#    if t0[counter] >= t_cycle[i] and t0[counter] <= t_cycle[i+1]:
+#        P_new[counter,:] = (P_cycle[i,:] + P_cycle[i+1,:])/2
+#        counter += 1
 
 
 
@@ -152,18 +152,20 @@ for i,vessel_name in enumerate(vessel_names):
     t0 = P0_temp[:-1,0]%cardiac_T
     P1 = P_new[:,index_jax]
     res = np.sqrt(((P1-P0).dot(P1-P0)/P0.dot(P0)))
+    print(res)
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
-    plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_names[i] + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
+    #plt.title("network: " + network_name + ", # vessels: " + str(N) + ", vessel name: " + vessel_names[i] + ", \n relative error = |P_JAX-P_jl|/|P_jl| = " + str(res) + "%")
     #plt.title("network: " + network_name + ", vessel name: " + vessel_names_0053[i])
     #plt.title(vessel_names_0053[i])
     #plt.title("vessel name: " + vessel_name)
-    plt.plot(t0, P1/133.322)
+    #plt.plot(t0, P1/133.322)
+    plt.plot(t_t[:], P_t[:, index_jax]/133.322)
     #print(P)
     #plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
-    plt.plot(t0,P0/133.322)
-    plt.legend(["P_JAX", "P_jl"], loc="lower right")
+    #plt.plot(t0,P0/133.322)
+    #plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
-    plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.pdf")
+    plt.savefig("results/" + network_name + "_results/" + network_name + "_" + vessel_names[i].replace(" ", "_") + "_P.eps")
     plt.close()

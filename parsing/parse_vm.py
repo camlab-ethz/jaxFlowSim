@@ -71,7 +71,7 @@ data['blood'] = blood
 solver = ruamel.yaml.comments.CommentedMap()
 solver['Ccfl'] = float(constants['Ccfl'])
 solver['cycles'] = int(constants['cycles'])
-solver['jump'] = 100
+solver['num_snapshots'] = 100
 solver['convergence tolerance'] = 1.0
 data['solver'] = solver
 
