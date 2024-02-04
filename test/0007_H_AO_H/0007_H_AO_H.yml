@@ -1,11 +1,11 @@
-project name: 0007_H_AO_H
+proj_name: 0007_H_AO_H
 blood:
   rho: 1060.0
   mu: 0.004
 solver:
   Ccfl: 0.9
   num_snapshots: 100
-  convergence tolerance: 1.0
+  conv_tol: 1.0
 network:
   - label: carotid4
     sn: 5

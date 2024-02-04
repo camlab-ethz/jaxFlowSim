@@ -1,11 +1,11 @@
-project name: adan56
+proj_name: adan56
 blood:
   rho: 1060.0
   mu: 0.004
 solver:
   Ccfl: 0.9
   num_snapshots: 100
-  convergence tolerance: 1.0
+  conv_tol: 1.0
 network:
   - label: aortic_arch_I
     sn: 1

@@ -1,4 +1,4 @@
-project name: bifurcation
+proj_name: bifurcation
 
 blood:
   rho: 1060.0 # density [kg/m^3]
@@ -6,9 +6,8 @@ blood:
 
 solver:
   Ccfl: 0.9   # Courant number
-  cycles: 100 # maximum number of cycles
-  jump: 100   # timesteps per cycle to be saved
-  convergence tolerance: 1.0 # percentage value
+  num_snapshots: 100   # timesteps per cycle to be saved
+  conv_tol: 1.0 # percentage value
 
 network:
   - label: P
