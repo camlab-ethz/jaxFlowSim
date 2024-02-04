@@ -9,8 +9,6 @@ openBF_timing_file=timing_openBF.txt
 jaxFlowSim_timing_file=timing_jaxFlowSim.txt
 num_vessels_file=num_vessels.txt
 
-cp $openBF_timing_script $openBF_dir
-cd $openBF_dir
 
 samples=10
 
@@ -22,6 +20,8 @@ network_names=("single-artery
                0053_H_CERE_H
                adan56")
 
+cp $openBF_timing_script $openBF_dir
+cd $openBF_dir
 julia run_timing.jl $samples $network_names | grep "Elapsed time =" | awk '{print $4}' > "$plotting_dir/$openBF_timing_file"
 
 rm $openBF_timing_script
