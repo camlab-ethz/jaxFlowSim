@@ -28,7 +28,7 @@ yaml_file = path +"/" + modelname + ".yml"
 if not os.path.exists(path): 
     os.mkdir(path)
 
-inflow_const = -1e6
+inflow_const = 1e4
 inflow = np.loadtxt("models_vm/" + modelname + "/Simulations/" + casename + "/inflow.flow")
 inflow[:,1] = inflow[:,1]/inflow_const
 np.savetxt(path + "/inflow.flow", inflow)
@@ -223,7 +223,7 @@ for i in range(0,N):
     elif counts[tn[i]] == 1: 
         #m = outlet_names.index(outlet_pot_names[i])
         #if len(RCR[m]) == 3:
-        R_const = 1/1.5
+        R_const = 2
         R_i = A_tot/(r0*r0*np.pi)*R_tot
         R1 = 0.09*R_i*R_const
         R2 = 0.91*R_i*R_const
