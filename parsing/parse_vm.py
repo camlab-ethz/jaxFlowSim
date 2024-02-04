@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 
 os.chdir(os.path.dirname(__file__))
 
+# compute vessel wall thickness
 def computeThickness(r0):
     ah = 0.2802
     bh = -5.053e2
@@ -164,11 +165,14 @@ for i in range(0,N):
         else:
             name = outlet_pot_names[i] + str(i)
         r0 = dat[i,2]/100
+
+        # compute Young's modulus as in 
+        # Applied Mathematical Models in Human Physiology p109
         h0 = computeThickness(r0)
         k1 = 2.e6
         k2 = -2253.00
         k3 = 86500.00
-        E = r0/h0 * (k1*np.exp(k2*r0) + k3) #Applied Mathematical Models in Human Physiology p109
+        E = r0/h0 * (k1*np.exp(k2*r0) + k3) 
 
         entry = {
                  'label': name,
@@ -207,7 +211,7 @@ for i in range(0,N):
     k1 = 2.e6
     k2 = -2253.00
     k3 = 86500.00
-    E = r0/h0 * (k1*np.exp(k2*r0) + k3)#Applied Mathematical Models in Human Physiology p109
+    E = r0/h0 * (k1*np.exp(k2*r0) + k3) #Applied Mathematical Models in Human Physiology p109
     #R1 = (4*np.pi*scc.epsilon_0)*1009
     #R2 = (4*np.pi*scc.epsilon_0)*19171
     #Cc = 1/(4*np.pi*scc.epsilon_0)*5.580000000000001e-5
