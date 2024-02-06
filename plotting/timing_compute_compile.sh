@@ -11,6 +11,6 @@ for filename in $filenames
 do
     for i in {1..10}
     do
-        python ../main_jax.py $filename >> compute_timing.txt
+        python ../main_jax.py $filename >> timing_compute.txt
     done
 done
