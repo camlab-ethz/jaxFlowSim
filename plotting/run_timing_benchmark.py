@@ -27,6 +27,16 @@ for network_name in network_names:
                                                            + network_name +
                                                            "/" + network_name
                                                            + ".yml", verbose)
+
+    # warmup step
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1,15))(simulationLoopUnsafe)
+    sim_dat, P_t, t_t = block_until_ready(sim_loop_old_jit(N, B,
+                                          sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                          Ccfl, edges, input_data, 
+                                          rho, nodes, 
+                                          starts, ends,
+                                          indices_1, indices_2, upper=120000))
+
     for i in range(samples):
         
         if verbose:

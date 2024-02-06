@@ -14,6 +14,8 @@ path = pwd()
 
 for network_name in network_names
 	cd(network_name)
+	# warmup step
+	openBF.runSimulation(network_name*".yml", verbose=false)
 	for i in 1:samples
 		openBF.runSimulation(network_name*".yml", verbose=true)
 	end

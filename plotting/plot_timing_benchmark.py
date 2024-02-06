@@ -11,9 +11,6 @@ openBF_timing = np.loadtxt(openBF_timing_file)
 jaxFlowSim_timing = np.loadtxt(jaxFlowSim_timing_file)
 num_vessels = np.loadtxt(num_vessels_file)
 
-print(openBF_timing)
-print(jaxFlowSim_timing)
-print(num_vessels)
 num_networks = num_vessels.size
 
 
@@ -33,7 +30,7 @@ plt.scatter(num_vessels, jaxFlowSim_timing_average)
 #ax.set_ylim(ymin=0)
 ax.set_xlabel("#segments")
 ax.set_ylabel("t[s]")
-plt.title("average of compute time in JAX vs julia over 10 runs")
+plt.title("average compute time over 10 runs")
 plt.legend(["openBF", "jaxFlowSim"], loc="upper left")
 #plt.show()
 plt.savefig("timing_benchmark.eps")
