@@ -1,8 +1,9 @@
 import jax.numpy as jnp
-from jax import lax, jit
+from jax import lax, jit, debug
 from functools import partial
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
+import optimistix as optx
 
 @partial(jit, static_argnums=(5))
 def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
@@ -56,7 +57,17 @@ def solveConjunction(u1, u2, A1,
     U = newtonRaphson(calculateWStarConjunction, calculateFConjunction, 
                       J, U0, k,
                       (A01, A02),
-                      (beta1, beta2))[0]
+                      (beta1, beta2))
+    
+    #debug.print("{x}", x = counter)
+    
+    #def F_wrapper(U, args):
+    #    k, A01, A02, beta1, beta2 = args
+    #    return calculateFConjunction(U, k, calculateWStarConjunction(U, k), (A01, A02), (beta1, beta2))
+
+    #solver = optx.LevenbergMarquardt(rtol=1e-2, atol=1e-2)#, lower=-jnp.ones(4)*2, upper=jnp.ones(4)*2)
+    
+    #U = optx.root_find(F_wrapper, solver, U0, (k, A01, A02, beta1, beta2), max_steps=1000000000).value
 
     return updateConjunction(U,
                              A01, A02,

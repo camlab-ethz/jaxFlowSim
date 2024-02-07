@@ -88,7 +88,7 @@ def solveAnastomosis(u1, u2, u3,
     U = newtonRaphson(calculateWstarAnastomosis, calculateFAnastomosis, 
                       J, U0, k,
                       (A01, A02, A03),
-                      (beta1, beta2, beta3))[0]
+                      (beta1, beta2, beta3))
         
     #jax.debug.breakpoint()
 

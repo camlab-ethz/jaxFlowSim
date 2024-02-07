@@ -78,7 +78,7 @@ def solveBifurcation(u1, u2, u3,
                       calculateFBifurcation, 
                       J, U0, k,
                       (A01, A02, A03),
-                      (beta1, beta2, beta3))[0]
+                      (beta1, beta2, beta3))
 
     return updateBifurcation(U,
                              A01, A02, A03,
