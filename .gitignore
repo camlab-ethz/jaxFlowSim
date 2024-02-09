@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 # custom
+
 # code
 debug.txt
 results/*
@@ -168,23 +169,6 @@ parsing/models*
 parsing/openBF-hub
 test.py
 *_bckp*
+plotting/*.txt
+plotting/*.eps
 
-# presentation
-presentation/*.aux
-presentation/*.fdb_latexmk
-presentation/*.fls
-presentation/*.log
-presentation/*.nav
-presentation/*.out
-presentation/*.snm
-presentation/*.synctex
-presentation/*.synctex\(busy\)
-presentation/*.synctex.gz
-presentation/*.toc
-presentation/*.vrb
-presentation/images/*.pdf
-presentation/images/*.png
-presentation/images/*.jpg
-presentation/images/*.xcf
-presentation/images/*.svg
-presentation/*.dvi
