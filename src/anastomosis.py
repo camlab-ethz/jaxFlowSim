@@ -4,44 +4,44 @@ from functools import partial
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
-@partial(jit, static_argnums=(5))
 def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, sim_dat_const_aux, 
-                       B, i, index1, edges, starts, ends, rho):
+                       edges, starts, ends, rho, B, i, index2, index3):
+    index1 = ends[i]
     p1_i = edges[i,7]
     p2_i = edges[i,8]
     d = edges[i,9]
     p1_i_end = ends[p1_i]
     d_start = starts[d]
-    u1 = sim_dat[0,index1-1]
+    u1 = sim_dat[0,index1]
     u2 = sim_dat[0,p1_i_end-1]
     u3 = sim_dat[0,d_start]
-    Q1 = sim_dat[1,index1-1]
+    Q1 = sim_dat[1,index1]
     Q2 = sim_dat[1,p1_i_end-1]
     Q3 = sim_dat[1,d_start]
-    A1 = sim_dat[2,index1-1]
+    A1 = sim_dat[2,index1]
     A2 = sim_dat[2,p1_i_end-1]
     A3 = sim_dat[2,d_start]
-    c1 = sim_dat[3,index1-1]
+    c1 = sim_dat[3,index1]
     c2 = sim_dat[3,p1_i_end-1]
     c3 = sim_dat[3,d_start]
-    P1 = sim_dat[4,index1-1]
+    P1 = sim_dat[4,index1]
     P2 = sim_dat[4,p1_i_end-1]
     P3 = sim_dat[4,d_start]
     u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
         jnp.maximum(p1_i, p2_i) == i, 
         lambda: solveAnastomosis(u1, u2, u3, 
                                  A1, A2, A3,
-                                 sim_dat_const[0,index1-1],
+                                 sim_dat_const[0,index1],
                                  sim_dat_const[0,p1_i_end-1],
                                  sim_dat_const[0,d_start],
-                                 sim_dat_const[1,index1-1],
+                                 sim_dat_const[1,index1],
                                  sim_dat_const[1,p1_i_end-1],
                                  sim_dat_const[1,d_start],
-                                 sim_dat_const[2,index1-1],
+                                 sim_dat_const[2,index1],
                                  sim_dat_const[2,p1_i_end-1],
                                  sim_dat_const[2,d_start],
-                                 sim_dat_const[4,index1-1],
+                                 sim_dat_const[4,index1],
                                  sim_dat_const[4,p1_i_end-1],
                                  sim_dat_const[4,d_start],
                                 ), 
@@ -51,16 +51,16 @@ def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux,
     temp3 = jnp.array((u3, Q3, A3, c3, P3))
     sim_dat = lax.dynamic_update_slice( 
         sim_dat, 
-        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-        (0,index1-1))
+        temp1[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
+        (0,index1))
     sim_dat = lax.dynamic_update_slice( 
         sim_dat, 
-        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+        temp2[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
         (0,p1_i_end-1))
     sim_dat = lax.dynamic_update_slice( 
         sim_dat, 
-        temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-        (0,d_start-B))
+        temp3[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
+        (0,d_start-2))
     return sim_dat, sim_dat_aux
 
 def solveAnastomosis(u1, u2, u3, 
@@ -74,19 +74,19 @@ def solveAnastomosis(u1, u2, u3,
                     u3,
                     jnp.sqrt(jnp.sqrt(A1)),
                     jnp.sqrt(jnp.sqrt(A2)),
-                    jnp.sqrt(jnp.sqrt(A3))), dtype=jnp.float64)
+                    jnp.sqrt(jnp.sqrt(A3))))
     
 
     k1 = jnp.sqrt(1.5*gamma1)
     k2 = jnp.sqrt(1.5*gamma2)
     k3 = jnp.sqrt(1.5*gamma3)
-    k = jnp.array([k1, k2, k3], dtype=jnp.float64)
+    k = jnp.array([k1, k2, k3])
 
     J = calculateJacobianAnastomosis(U0, k,
                                      A01, A02, A03,
                                      beta1, beta2, beta3)
-    U = newtonRaphson(calculateWstarAnastomosis, calculateFAnastomosis, 
-                      J, U0, k,
+    U = newtonRaphson(calculateFAnastomosis, 
+                      J, U0,
                       (A01, A02, A03),
                       (beta1, beta2, beta3))
         
@@ -101,9 +101,9 @@ def solveAnastomosis(u1, u2, u3,
 def calculateJacobianAnastomosis(U, k,
                                  A01, A02, A03,
                                  beta1, beta2, beta3):
-    U43 = U[3]**3
-    U53 = U[4]**3
-    U63 = U[5]**3
+    U43 = U[3]*U[3]*U[3]
+    U53 = U[4]*U[4]*U[4]
+    U63 = U[5]*U[5]*U[5]
 
     J14 =  4.0 * k[0]
     J25 =  4.0 * k[1]
@@ -127,16 +127,16 @@ def calculateJacobianAnastomosis(U, k,
                       [0.0, 0.0, 1.0, 0.0, 0.0, J36],
                       [J41, J42, J43, J44, J45, J46],
                       [0.0, 0.0, 0.0, J54, 0.0, J56],
-                      [0.0, 0.0, 0.0, 0.0, J65, J66]], dtype=jnp.float64)
+                      [0.0, 0.0, 0.0, 0.0, J65, J66]])
 
-def calculateWstarAnastomosis(U, k):
-    W1 = U[0] + 4 * k[0] * U[3]
-    W2 = U[1] + 4 * k[1] * U[4]
-    W3 = U[2] - 4 * k[2] * U[5]
+#def calculateWstarAnastomosis(U, k):
+#    W1 = U[0] + 4 * k[0] * U[3]
+#    W2 = U[1] + 4 * k[1] * U[4]
+#    W3 = U[2] - 4 * k[2] * U[5]
+#
+#    return jnp.array([W1, W2, W3])
 
-    return jnp.array([W1, W2, W3], dtype=jnp.float64)
-
-def calculateFAnastomosis(U, k, W,
+def calculateFAnastomosis(U,# k, W,
                           A0s,
                           betas):
     A01, A02, A03 = A0s
@@ -146,15 +146,15 @@ def calculateFAnastomosis(U, k, W,
     U52 = U[4]**2
     U62 = U[5]**2
 
-    f1 = U[0] + 4 * k[0] * U[3] - W[0]
-    f2 = U[1] + 4 * k[1] * U[4] - W[1]
-    f3 = U[2] - 4 * k[2] * U[5] - W[2]
+    f1 = 0 #U[0] + 4 * k[0] * U[3] - W[0]
+    f2 = 0 #U[1] + 4 * k[1] * U[4] - W[1]
+    f3 = 0 #U[2] - 4 * k[2] * U[5] - W[2]
     f4 = U[0] * U42**2 + U[1] * U52**2 - U[2] * U62**2
 
     f5 = beta1 * (U42 * jnp.sqrt(1/A01) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
     f6 = beta2 * (U52 * jnp.sqrt(1/A02) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
 
-    return jnp.array([f1, f2, f3, f4, f5, f6], dtype=jnp.float64)
+    return jnp.array([f1, f2, f3, f4, f5, f6])
 
 def updateAnastomosis(U,
                       A01, A02, A03,
