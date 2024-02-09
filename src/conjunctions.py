@@ -36,7 +36,7 @@ def solveConjunction(u1, u2, A1,
                      beta1, beta2, gamma1, 
                      gamma2, Pext1, Pext2,
                      rho):
-    U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))), dtype=jnp.float64)
+    U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))))
 
     k1 = jnp.sqrt(1.5*gamma1)
     k2 = jnp.sqrt(1.5*gamma2)
@@ -46,8 +46,9 @@ def solveConjunction(u1, u2, A1,
     J = calculateJacobianConjunction(U0, k, 
                                      A01, A02, 
                                      beta1, beta2)
-    U = newtonRaphson(calculateWStarConjunction, calculateFConjunction, 
-                      J, U0, k,
+    U = newtonRaphson(#calculateWStarConjunction, 
+                      calculateFConjunction, 
+                      J, U0,# k,
                       (A01, A02),
                       (beta1, beta2))[0]
 
@@ -72,25 +73,26 @@ def calculateJacobianConjunction(U, k,
     J33 =  4.0 * U[0] * U33
     J34 = -4.0 * U[1] * U43
 
-    J41 =  k[2] * U[0]
-    J42 = -k[2] * U[1]
+    #J41 =  k[2] * U[0]
+    #J42 = -k[2] * U[1]
     J43 =  2.0 * beta1  * U[2] * jnp.sqrt(1/A01)
     J44 = -2.0 * beta2 * U[3] * jnp.sqrt(1/A02)
 
     return jnp.array([[1.0, 0.0, J13, 0.0],
                       [0.0, 1.0, 0.0, J24],
                       [J31, J32, J33, J34],
-                      [J41, J42, J43, J44]], dtype=jnp.float64)
+                      [0.0, 0.0, J43, J44]])
+                      #[J41, J42, J43, J44]], dtype=jnp.float64)
 
 
-def calculateWStarConjunction(U, k):
-    W1 = U[0] + 4.0 * k[0] * U[2]
-    W2 = U[1] - 4.0 * k[1] * U[3]
+#def calculateWStarConjunction(U, k):
+#    W1 = U[0] + 4.0 * k[0] * U[2]
+#    W2 = U[1] - 4.0 * k[1] * U[3]
+#
+#    return jnp.array([W1, W2], dtype=jnp.float64)
 
-    return jnp.array([W1, W2], dtype=jnp.float64)
 
-
-def calculateFConjunction(U, k, W,
+def calculateFConjunction(U,# k, W,
                           A0s,
                           betas):
     
@@ -100,11 +102,12 @@ def calculateFConjunction(U, k, W,
     U32 = U[2]*U[2]
     U42 = U[3]*U[3]
 
-    f1 = U[0] + 4.0 * k[0] * U[2] - W[0]
-    f2 = U[1] - 4.0 * k[1] * U[3] - W[1]
+    f1 =  0 #U[0] + 4.0 * k[0] * U[2] - W[0]
+    f2 =  0 #U[1] - 4.0 * k[1] * U[3] - W[1]
     f3 = U[0] * U32*U32 - U[1] * U42*U42
 
-    f4 = 0.5 * k[2] * U[0]**2 + beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) - (0.5 * k[2] * U[1]**2 + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0))
+    #f4 = 0.5 * k[2] * U[0]**2 + beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) - (0.5 * k[2] * U[1]**2 + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0))
+    f4 =  beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) -  + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0)
 
     return jnp.array([f1, f2, f3, f4], dtype=jnp.float64)
 
