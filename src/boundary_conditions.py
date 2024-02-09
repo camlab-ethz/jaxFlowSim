@@ -1,6 +1,7 @@
 import jax.numpy as jnp
-from jax import lax
+from jax import lax, debug
 from src.utils import pressure
+import optimistix as optx
 
 def setInletBC(inlet, u0, u1, 
                A, c0, c1, 
@@ -144,18 +145,23 @@ def threeElementWindkessel(dt, u1, A1,
 
     def dfun(As):
         return R1 * (ul + sgamma * (ssAl - 1.25 * jnp.sqrt(jnp.sqrt(As)))) - bA0 * 0.5 / jnp.sqrt(As)
-
     def newtonSolver(x0):
         xn = x0 - fun(x0) / dfun(x0)
 
-        def cond_fun(val):
-            ret = lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
-            return ret
+        #def cond_fun(val):
+        #    val, counter = val
+        #    ret = lax.cond( jnp.abs(val[0]-val[1]) < 1e-5, lambda: False, lambda: True)
+        #    return ret
 
-        def body_fun(val):
-            return jnp.array((val[1],val[1] - fun(val[1]) / dfun(val[1]))) 
-        temp = lax.while_loop(cond_fun, body_fun, jnp.array((x0,xn)))
-        return temp[1]
+        #def body_fun(val):
+        #    val, counter = val
+        #    counter += 1
+        #    debug.print("{x}", x=counter)
+        #    return jnp.array((val[1],val[1] - fun(val[1]) / dfun(val[1]))), counter
+        #counter = 0
+        #temp,_ = lax.while_loop(cond_fun, body_fun, (jnp.array((x0,xn)), counter))
+        #return temp[1]
+        return xn
 
     As = newtonSolver(As)
 
