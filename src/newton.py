@@ -12,7 +12,7 @@ def newtonRaphson(fun_w, fun_f, J,
     F = fun_f(U, k, W,
               A0s,
               betas)
-            
+
     dU = jnp.linalg.solve(J, -F)
     n = F.size
     ones = jnp.ones(n,dtype=jnp.int32)
