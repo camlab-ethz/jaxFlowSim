@@ -2,15 +2,15 @@ import numpy as np
 import yaml
 import os.path
 import shutil
-#from jax.tree_util import Partial
+from jax.tree_util import Partial
 #from functools import partial
 #from jax import jit
 from src.utils import waveSpeed, pressureSA
 from src.components import Blood
-#from src.anastomosis import solveAnastomosisWrapper
-#from src.bifurcations import solveBifurcationWrapper
-#from src.conjunctions import solveConjunctionWrapper
-#from src.boundary_conditions import setOutletBCWrapper
+from src.anastomosis import solveAnastomosisWrapper
+from src.bifurcations import solveBifurcationWrapper
+from src.conjunctions import solveConjunctionWrapper
+from src.boundary_conditions import setOutletBCWrapper
 
 #JUNCTION_FUNCTIONS = []
 
@@ -201,7 +201,7 @@ def buildArterialNetwork(network, blood):
     edges = np.zeros((N, 10), dtype=np.int64)
     input_data_temp = []
     vessel_names = []
-    #junction_functions = []
+    junction_functions = []
 
     nodes = np.zeros((N,3), dtype=np.int64)
 
@@ -240,21 +240,30 @@ def buildArterialNetwork(network, blood):
     indices = np.arange(0, K, 1)
     indices_1 = indices-starts_rep==-starts_rep[0]+1
     indices_2 = indices-ends_rep==-starts_rep[0]+2
+
+    mask = np.zeros(K, dtype=np.int64)
+    mask1 = np.zeros(N, dtype=np.int64)
     
     for j in np.arange(0,edges.shape[0],1):
-        i = edges[j,0]-1
-        if sim_dat_const_aux[i,2] == 0: #"none":
+        if sim_dat_const_aux[j,2] == 0: #"none":
             t = edges[j,2]
             edges[j,3] = np.where(edges[:, 1] == t,np.ones_like(edges[:,1]), np.zeros_like(edges[:,1])).sum().astype(int)
             edges[j,6] = np.where(edges[:, 2] == t,np.ones_like(edges[:,2]), np.zeros_like(edges[:,2])).sum().astype(int)
             if edges[j,3] == 2:
                 edges[j,4] = np.where(edges[:, 1] == t)[0][0]
                 edges[j,5] = np.where(edges[:, 1] == t)[0][1]
-                #junction_functions.append(Partial(jit, static_argnums=5)(solveBifurcationWrapper))
+                junction_functions.append(Partial(solveBifurcationWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                mask[ends[j]-1:ends[j]+B] = j+1
+                mask[starts[edges[j,4]]-B:starts[edges[j,4]]+1] = j + 1
+                mask[starts[edges[j,5]]-B:starts[edges[j,5]]+1] = j + 1
 
             elif edges[j,6] == 1:
                 edges[j,7] = np.where(edges[:, 1] == t)[0][0]
-                #junction_functions.append(Partial(jit, static_argnums=5)(solveConjunctionWrapper))
+                junction_functions.append(Partial(solveConjunctionWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                mask[ends[j]-1:ends[j]+B] = j+1
+                mask[starts[edges[j,7]]-B:starts[edges[j,7]]+1] = j + 1
 
             elif edges[j,6] == 2:
                 temp_1 = np.where(edges[:, 2] == t)[0][0]
@@ -262,9 +271,23 @@ def buildArterialNetwork(network, blood):
                 edges[j,7] = np.minimum(temp_1,temp_2)
                 edges[j,8] = np.maximum(temp_1,temp_2)
                 edges[j,9] = np.where(edges[:, 1] == t)[0][0]
-                #junction_functions.append(Partial(jit, static_argnums=5)(solveAnastomosisWrapper))
-        #else:
-        #    junction_functions.append(Partial(jit, static_argnums=5)(setOutletBCWrapper))
+                junction_functions.append(Partial(solveAnastomosisWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                if j == edges[j,8]:
+                    mask[starts[edges[j,9]]-B:starts[edges[j,9]]+1] = j + 1
+                    mask[ends[edges[j,7]]-1:ends[edges[j,7]]+B] = j + 1
+                    mask[ends[edges[j,8]]-1:ends[edges[j,8]]+B] = j + 1
+        else:
+            junction_functions.append(Partial(setOutletBCWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+            mask[ends[j]-1:ends[j]+B] = j+1#j+1
+            mask1[j] = j+1#j+1
+        
+    mask = np.ones(5, dtype=np.int64)[:,np.newaxis]*mask[np.newaxis,:]
+    mask1 = mask1[:,np.newaxis]*np.ones(3, dtype=np.int64)[np.newaxis,:]
+    print(mask)
+    print(mask1)
+    print(junction_functions)
     
         
     #global JUNCTION_FUNCTIONS
@@ -273,7 +296,7 @@ def buildArterialNetwork(network, blood):
             sim_dat_const_aux, N, B,
             edges, input_data, nodes, 
             vessel_names, starts, ends, 
-            indices_1, indices_2)
+            indices_1, indices_2, junction_functions, mask, mask1)
 
 
 def buildVessel(ID, vessel_data, blood, M):
@@ -326,7 +349,7 @@ def buildVessel(ID, vessel_data, blood, M):
                               wall_E, P_ext*np.ones(M), viscT*np.ones(M),
                               Rt*np.ones(M), R1*np.ones(M), R2*np.ones(M),
                               Cc*np.ones(M), L*np.ones(M)))
-    sim_dat_const_aux = np.array([cardiac_T, inlet, outlet])
+    sim_dat_const_aux = np.array([cardiac_T, int(inlet), int(outlet)])
     edges = np.array([ID, s_n, t_n])
     return(edges, input_data, sim_dat,
            sim_dat_aux, vessel_name, sim_dat_const,

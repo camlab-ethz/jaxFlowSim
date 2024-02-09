@@ -14,8 +14,8 @@ def computeDt(Ccfl, u, c, dx):
     dt = jnp.min(vessel_dt)
     return dt
 
-@partial(jit, static_argnums=(1))
-def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho): #, junction_functions):
+@partial(jit, static_argnums=(0,1))
+def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho, junction_functions, mask, mask1):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -46,216 +46,279 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                   sim_dat_const[5,B:-B],
                   indices1, indices2))
 
-    def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat #, junction_functions) = dat
-        i = edges[j,0]-1
-        end = ends[i]
+    args = (dt, sim_dat, sim_dat_aux)
+    junction_functions_wrapper = vmap(lambda j, x: lax.switch(j,junction_functions,*x), in_axes=(0,None))
+    results = junction_functions_wrapper(jnp.arange(N), args)
+    #debug.print("{x}", x = jnp.arange(N))
+    sim_dat_results = jnp.vstack((sim_dat[None], results[0]))
+    sim_dat_aux_results = jnp.vstack((sim_dat_aux[None], results[1]))
+    #sim_dat_results = jnp.append(sim_dat_results, [sim_dat[:,:]], axis = 0)
+    #sim_dat_aux_results = results[1]
+    #[sim_dat_aux_results].append(sim_dat_aux)
+    #sim_dat_aux_results = [sim_dat_aux].append(results[1])
+    sim_dat = jnp.choose(mask, sim_dat_results, mode="clip")
+    sim_dat_aux = jnp.choose(mask1, sim_dat_aux_results, mode="clip")
+    #debug.print("{x}", x=sim_dat_results.shape)
+    #debug.print("{x}", x=sim_dat_aux_results.shape)
+    #debug.print("{x}", x=mask.shape)
+    #debug.print("{x}", x=mask1.shape)
+    #debug.print("{x}", x=sim_dat1)
+    #debug.print("{x}", x=sim_dat_aux1)
+    #debug.print("{x}", x=mask)
+    #debug.print("{x}", x=ends)
+    #def bodyFun(j, dat):
+    #    (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends, junction_functions) = dat
+    #    end = ends[j]
 
-        #debug.print("{x}", x = junction_functions)
-        #args = (dt, sim_dat, sim_dat_aux, 
-        #               sim_dat_const, sim_dat_const_aux, 
-        #               B, i, end, edges, starts, ends, rho)
-        #sim_dat, sim_dat_aux = lax.switch(i, junction_functions, *args)
+    #    #debug.print("{x}", x = junction_functions)
+    #    args = (dt, sim_dat, sim_dat_aux)
+    #                   #sim_dat_const, sim_dat_const_aux, 
+    #                   #edges, starts, rho)
 
-        def setOutletBCWrapper(sim_dat, sim_dat_aux):
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,end-2]
-            Q1 = sim_dat[1,end-1]
-            A1 = sim_dat[2,end-1]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,end-2]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,end-2]
-            P3 = sim_dat[4,end-3]
-            Pc = sim_dat_aux[i,2]
-            W1M0 = sim_dat_aux[i,0]
-            W2M0 = sim_dat_aux[i,1]
-            u, Q, A, c, P1, Pc = setOutletBC(dt,
-                                             u1, u2, Q1, A1, c1, c2, 
-                                             P1, P2, P3, Pc, W1M0, W2M0,
-                                             sim_dat_const[0,end-1],
-                                             sim_dat_const[1,end-1],
-                                             sim_dat_const[2,end-1],
-                                             sim_dat_const[-1, end-1],
-                                             sim_dat_const[4, end-1],
-                                             sim_dat_const_aux[i, 2], 
-                                             sim_dat_const[6, end-1],
-                                             sim_dat_const[7, end-1],
-                                             sim_dat_const[8, end-1],
-                                             sim_dat_const[9, end-1])
-            temp = jnp.array((u,Q,A,c,P1))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,end-1))
-            sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
-            return sim_dat, sim_dat_aux
+    #    #sim_dat, sim_dat_aux = junction_functions[j](*args)
+    #    sim_dat, sim_dat_aux = lax.switch(j, junction_functions, *args)
+    #    #debug.breakpoint()
+    #    #debug.print("{x}", x=jnp.linalg.norm((sim_dat-sim_dat1).flatten()))
 
-        (sim_dat, 
-         sim_dat_aux) = lax.cond(sim_dat_const_aux[i,2] != 0,
-                                    lambda x, y: setOutletBCWrapper(x,y), 
-                                    lambda x, y: (x,y), sim_dat, sim_dat_aux)
+    #    #def setOutletBCWrapper(sim_dat, sim_dat_aux):
+    #    #    u1 = sim_dat[0,end-1]
+    #    #    u2 = sim_dat[0,end-2]
+    #    #    Q1 = sim_dat[1,end-1]
+    #    #    A1 = sim_dat[2,end-1]
+    #    #    c1 = sim_dat[3,end-1]
+    #    #    c2 = sim_dat[3,end-2]
+    #    #    P1 = sim_dat[4,end-1]
+    #    #    P2 = sim_dat[4,end-2]
+    #    #    P3 = sim_dat[4,end-3]
+    #    #    Pc = sim_dat_aux[j,2]
+    #    #    W1M0 = sim_dat_aux[j,0]
+    #    #    W2M0 = sim_dat_aux[j,1]
+    #    #    u, Q, A, c, P1, Pc = setOutletBC(dt,
+    #    #                                     u1, u2, Q1, A1, c1, c2, 
+    #    #                                     P1, P2, P3, Pc, W1M0, W2M0,
+    #    #                                     sim_dat_const[0,end-1],
+    #    #                                     sim_dat_const[1,end-1],
+    #    #                                     sim_dat_const[2,end-1],
+    #    #                                     sim_dat_const[-1, end-1],
+    #    #                                     sim_dat_const[4, end-1],
+    #    #                                     sim_dat_const_aux[j, 2], 
+    #    #                                     sim_dat_const[6, end-1],
+    #    #                                     sim_dat_const[7, end-1],
+    #    #                                     sim_dat_const[8, end-1],
+    #    #                                     sim_dat_const[9, end-1])
+    #    #    temp = jnp.array((u,Q,A,c,P1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,end-1))
+    #    #    sim_dat_aux = sim_dat_aux.at[j,2].set(Pc)
+    #    #    return sim_dat, sim_dat_aux
+ 
+    #    #(sim_dat, 
+    #    # sim_dat_aux) = lax.cond(sim_dat_const_aux[j,2] != 0,
+    #    #                            lambda x, y: setOutletBCWrapper(x,y), 
+    #    #                            lambda x, y: (x,y), sim_dat, sim_dat_aux)
+ 
+    #    #def solveBifurcationWrapper(sim_dat):
+    #    #    d1_i = edges[j,4]
+    #    #    d2_i = edges[j,5]
+    #    #    d1_i_start = starts[d1_i] 
+    #    #    d2_i_start = starts[d2_i] 
+    #    #    u1 = sim_dat[0,end-1]
+    #    #    u2 = sim_dat[0,d1_i_start]
+    #    #    u3 = sim_dat[0,d2_i_start]
+    #    #    A1 = sim_dat[2,end-1]
+    #    #    A2 = sim_dat[2,d1_i_start]
+    #    #    A3 = sim_dat[2,d2_i_start]
+    #    #    (u1, u2, u3, 
+    #    #     Q1, Q2, Q3, 
+    #    #     A1, A2, A3, 
+    #    #     c1, c2, c3, 
+    #    #     P1, P2, P3
+    #    #     ) = solveBifurcation(u1, u2, u3, 
+    #    #                                    A1, A2, A3,
+    #    #                                    sim_dat_const[0,end-1],
+    #    #                                    sim_dat_const[0,d1_i_start],
+    #    #                                    sim_dat_const[0,d2_i_start],
+    #    #                                    sim_dat_const[1,end-1],
+    #    #                                    sim_dat_const[1,d1_i_start],
+    #    #                                    sim_dat_const[1,d2_i_start],
+    #    #                                    sim_dat_const[2,end-1],
+    #    #                                    sim_dat_const[2,d1_i_start],
+    #    #                                    sim_dat_const[2,d2_i_start],
+    #    #                                    sim_dat_const[4, end-1],
+    #    #                                    sim_dat_const[4, d1_i_start],
+    #    #                                    sim_dat_const[4, d2_i_start],
+    #    #                                    )
+    #    #    temp1 = jnp.array((u1, Q1, A1, c1, P1))
+    #    #    temp2 = jnp.array((u2, Q2, A2, c2, P2))
+    #    #    temp3 = jnp.array((u3, Q3, A3, c3, P3))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,end-1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,d1_i_start-B))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,d2_i_start-B))
+    #    #    return sim_dat
+ 
+    #    #sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * (edges[j,3] == 2),
+    #    #                            lambda x: solveBifurcationWrapper(x), 
+    #    #                            lambda x: x, sim_dat)
+ 
+    #    #def solveConjunctionWrapper(sim_dat, rho):
+    #    #    d_i = edges[j,7]
+    #    #    d_i_start = starts[d_i]
+    #    #    u1 = sim_dat[0,end-1]
+    #    #    u2 = sim_dat[0,d_i_start]
+    #    #    A1 = sim_dat[2,end-1]
+    #    #    A2 = sim_dat[2,d_i_start]
+    #    #    (u1, u2, Q1, Q2, 
+    #    #     A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
+    #    #                                                A1, A2,
+    #    #                                                sim_dat_const[0,end-1],
+    #    #                                                sim_dat_const[0,d_i_start],
+    #    #                                                sim_dat_const[1,end-1],
+    #    #                                                sim_dat_const[1,d_i_start],
+    #    #                                                sim_dat_const[2,end-1],
+    #    #                                                sim_dat_const[2,d_i_start],
+    #    #                                                sim_dat_const[4, end-1],
+    #    #                                                sim_dat_const[4, d_i_start],
+    #    #                                                rho)
+    #    #    temp1 = jnp.array((u1, Q1, A1, c1, P1))
+    #    #    temp2 = jnp.array((u2, Q2, A2, c2, P2))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,end-1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,d_i_start-B))
+    #    #    return sim_dat
+ 
+    #    #def solveConjunctionWrapper(sim_dat, rho):
+    #    #    d_i = edges[j,7]
+    #    #    d_i_start = starts[d_i]
+    #    #    u1 = sim_dat[0,end-1]
+    #    #    u2 = sim_dat[0,d_i_start]
+    #    #    A1 = sim_dat[2,end-1]
+    #    #    A2 = sim_dat[2,d_i_start]
+    #    #    (#u1, u2, 
+    #    #        Q1, Q2, 
+    #    #        A1, A2, 
+    #    #        #c1, c2, 
+    #    #        #P1, P2
+    #    #        ) = solveConjunction(u1, u2, 
+    #    #                                                A1, A2,
+    #    #                                                sim_dat_const[0,end-1],
+    #    #                                                sim_dat_const[0,d_i_start],
+    #    #                                                sim_dat_const[1,end-1],
+    #    #                                                sim_dat_const[1,d_i_start],
+    #    #                                                sim_dat_const[2,end-1],
+    #    #                                                sim_dat_const[2,d_i_start],
+    #    #                                                sim_dat_const[4, end-1],
+    #    #                                                sim_dat_const[4, d_i_start],
+    #    #                                                rho)
+    #    #    #temp1 = jnp.array((u1, Q1, A1, c1, P1))
+    #    #    #temp2 = jnp.array((u2, Q2, A2, c2, P2))
+    #    #    temp1 = jnp.array((Q1, A1))
+    #    #    temp2 = jnp.array((Q2, A2))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (1,end-1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (1,d_i_start-B))
+    #    #    return sim_dat
+ 
+    #    #sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * 
+    #    #                       (edges[j,3] != 2) *
+    #    #                       (edges[j,6] == 1),
+    #    #                        lambda x, y: solveConjunctionWrapper(x, y), 
+    #    #                        lambda x, y: x, sim_dat, rho)
+ 
+    #    #def solveAnastomosisWrapper(sim_dat):
+    #    #    p1_i = edges[j,7]
+    #    #    p2_i = edges[j,8]
+    #    #    d = edges[j,9]
+    #    #    p1_i_end = ends[p1_i]
+    #    #    d_start = starts[d]
+    #    #    u1 = sim_dat[0,end-1]
+    #    #    u2 = sim_dat[0,p1_i_end-1]
+    #    #    u3 = sim_dat[0,d_start]
+    #    #    Q1 = sim_dat[1,end-1]
+    #    #    Q2 = sim_dat[1,p1_i_end-1]
+    #    #    Q3 = sim_dat[1,d_start]
+    #    #    A1 = sim_dat[2,end-1]
+    #    #    A2 = sim_dat[2,p1_i_end-1]
+    #    #    A3 = sim_dat[2,d_start]
+    #    #    c1 = sim_dat[3,end-1]
+    #    #    c2 = sim_dat[3,p1_i_end-1]
+    #    #    c3 = sim_dat[3,d_start]
+    #    #    P1 = sim_dat[4,end-1]
+    #    #    P2 = sim_dat[4,p1_i_end-1]
+    #    #    P3 = sim_dat[4,d_start]
+    #    #    u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
+    #    #        jnp.maximum(p1_i, p2_i) == j, 
+    #    #        lambda: solveAnastomosis(u1, u2, u3, 
+    #    #                                 A1, A2, A3,
+    #    #                                 sim_dat_const[0,end-1],
+    #    #                                 sim_dat_const[0,p1_i_end-1],
+    #    #                                 sim_dat_const[0,d_start],
+    #    #                                 sim_dat_const[1,end-1],
+    #    #                                 sim_dat_const[1,p1_i_end-1],
+    #    #                                 sim_dat_const[1,d_start],
+    #    #                                 sim_dat_const[2,end-1],
+    #    #                                 sim_dat_const[2,p1_i_end-1],
+    #    #                                 sim_dat_const[2,d_start],
+    #    #                                 sim_dat_const[4,end-1],
+    #    #                                 sim_dat_const[4,p1_i_end-1],
+    #    #                                 sim_dat_const[4,d_start],
+    #    #                                ), 
+    #    #        lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
+    #    #    temp1 = jnp.array((u1, Q1, A1, c1, P1))
+    #    #    temp2 = jnp.array((u2, Q2, A2, c2, P2))
+    #    #    temp3 = jnp.array((u3, Q3, A3, c3, P3))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,end-1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,p1_i_end-1))
+    #    #    sim_dat = lax.dynamic_update_slice( 
+    #    #        sim_dat, 
+    #    #        temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #    #        (0,d_start-B))
+    #    #    return sim_dat
+    #    
+    #    #sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * 
+    #    #                       (edges[j,3] != 2) *
+    #    #                       (edges[j,6] == 2),
+    #    #                        lambda x: solveAnastomosisWrapper(x), 
+    #    #                        lambda x: x, sim_dat)
+ 
+ 
+    #    return (sim_dat, sim_dat_aux, 
+    #           sim_dat_const, sim_dat_const_aux, 
+    #           edges, rho, starts, ends, junction_functions)
 
-        def solveBifurcationWrapper(sim_dat):
-            d1_i = edges[j,4]
-            d2_i = edges[j,5]
-            d1_i_start = starts[d1_i] 
-            d2_i_start = starts[d2_i] 
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,d1_i_start]
-            u3 = sim_dat[0,d2_i_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,d1_i_start]
-            A3 = sim_dat[2,d2_i_start]
-            (u1, u2, u3, 
-             Q1, Q2, Q3, 
-             A1, A2, A3, 
-             c1, c2, c3, 
-             P1, P2, P3) = solveBifurcation(u1, u2, u3, 
-                                            A1, A2, A3,
-                                            sim_dat_const[0,end-1],
-                                            sim_dat_const[0,d1_i_start],
-                                            sim_dat_const[0,d2_i_start],
-                                            sim_dat_const[1,end-1],
-                                            sim_dat_const[1,d1_i_start],
-                                            sim_dat_const[1,d2_i_start],
-                                            sim_dat_const[2,end-1],
-                                            sim_dat_const[2,d1_i_start],
-                                            sim_dat_const[2,d2_i_start],
-                                            sim_dat_const[4, end-1],
-                                            sim_dat_const[4, d1_i_start],
-                                            sim_dat_const[4, d2_i_start],
-                                            )
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
-            temp3 = jnp.array((u3, Q3, A3, c3, P3))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,end-1))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,d1_i_start-B))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,d2_i_start-B))
-            return sim_dat
-
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * (edges[j,3] == 2),
-                                    lambda x: solveBifurcationWrapper(x), 
-                                    lambda x: x, sim_dat)
-
-        def solveConjunctionWrapper(sim_dat, rho):
-            d_i = edges[j,7]
-            d_i_start = starts[d_i]
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,d_i_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,d_i_start]
-            (u1, u2, Q1, Q2, 
-             A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
-                                                        A1, A2,
-                                                        sim_dat_const[0,end-1],
-                                                        sim_dat_const[0,d_i_start],
-                                                        sim_dat_const[1,end-1],
-                                                        sim_dat_const[1,d_i_start],
-                                                        sim_dat_const[2,end-1],
-                                                        sim_dat_const[2,d_i_start],
-                                                        sim_dat_const[4, end-1],
-                                                        sim_dat_const[4, d_i_start],
-                                                        rho)
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,end-1))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,d_i_start-B))
-            return sim_dat
-
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * 
-                               (edges[j,3] != 2) *
-                               (edges[j,6] == 1),
-                                lambda x, y: solveConjunctionWrapper(x, y), 
-                                lambda x, y: x, sim_dat, rho)
-
-        def solveAnastomosisWrapper(sim_dat):
-            p1_i = edges[j,7]
-            p2_i = edges[j,8]
-            d = edges[j,9]
-            p1_i_end = ends[p1_i]
-            d_start = starts[d]
-            u1 = sim_dat[0,end-1]
-            u2 = sim_dat[0,p1_i_end-1]
-            u3 = sim_dat[0,d_start]
-            Q1 = sim_dat[1,end-1]
-            Q2 = sim_dat[1,p1_i_end-1]
-            Q3 = sim_dat[1,d_start]
-            A1 = sim_dat[2,end-1]
-            A2 = sim_dat[2,p1_i_end-1]
-            A3 = sim_dat[2,d_start]
-            c1 = sim_dat[3,end-1]
-            c2 = sim_dat[3,p1_i_end-1]
-            c3 = sim_dat[3,d_start]
-            P1 = sim_dat[4,end-1]
-            P2 = sim_dat[4,p1_i_end-1]
-            P3 = sim_dat[4,d_start]
-            u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
-                jnp.maximum(p1_i, p2_i) == i, 
-                lambda: solveAnastomosis(u1, u2, u3, 
-                                         A1, A2, A3,
-                                         sim_dat_const[0,end-1],
-                                         sim_dat_const[0,p1_i_end-1],
-                                         sim_dat_const[0,d_start],
-                                         sim_dat_const[1,end-1],
-                                         sim_dat_const[1,p1_i_end-1],
-                                         sim_dat_const[1,d_start],
-                                         sim_dat_const[2,end-1],
-                                         sim_dat_const[2,p1_i_end-1],
-                                         sim_dat_const[2,d_start],
-                                         sim_dat_const[4,end-1],
-                                         sim_dat_const[4,p1_i_end-1],
-                                         sim_dat_const[4,d_start],
-                                        ), 
-                lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
-            temp3 = jnp.array((u3, Q3, A3, c3, P3))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,end-1))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,p1_i_end-1))
-            sim_dat = lax.dynamic_update_slice( 
-                sim_dat, 
-                temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
-                (0,d_start-B))
-            return sim_dat
-        
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * 
-                               (edges[j,3] != 2) *
-                               (edges[j,6] == 2),
-                                lambda x: solveAnastomosisWrapper(x), 
-                                lambda x: x, sim_dat)
-
-
-        return (sim_dat, sim_dat_aux, 
-                sim_dat_const, sim_dat_const_aux, 
-                edges, rho, starts, ends) #, junction_functions)
-
-    (sim_dat, sim_dat_aux, _, 
-     _, _, _, 
-     _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
-                                            sim_dat_const_aux, edges, rho, 
-                                            starts, ends)) #, junction_functions))
+    #(sim_dat, sim_dat_aux, _, 
+    # _, _, _, 
+    # _, _, junction_functions)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
+    #                                        sim_dat_const_aux, edges, rho, 
+    #                                        starts, ends, junction_functions))
+    #debug.print("{x}", x=sim_dat)
+    #debug.print("{x}", x=sim_dat_aux)
 
     return sim_dat, sim_dat_aux
 

@@ -38,7 +38,8 @@ verbose = True
             rho, nodes, 
             starts, ends,
             indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)#, junction_functions) = configSimulation(config_filename, verbose)
+            vessel_names, cardiac_T, junction_functions, mask, mask1) = configSimulation(config_filename, verbose)#, junction_functions) = configSimulation(config_filename, verbose)
+            
 
 if verbose:
     starting_time = time.time_ns()
@@ -48,7 +49,7 @@ sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J,
                                       timepoints, conv_tol, Ccfl, edges, input_data, 
                                       rho, nodes, 
                                       starts, ends,
-                                      indices_1, indices_2)) #, junction_functions))
+                                      indices_1, indices_2, junction_functions, mask, mask1))
 
 if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9

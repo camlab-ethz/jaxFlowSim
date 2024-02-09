@@ -27,7 +27,7 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
      N, B, edges, 
      input_data, nodes, vessel_names, 
     starts, ends, indices_1, 
-    indices_2) = buildArterialNetwork(data["network"], blood)#, junction_functions) = buildArterialNetwork(data["network"], blood)
+    indices_2, junction_functions, mask, mask1) = buildArterialNetwork(data["network"], blood)
     if make_results_folder:
         makeResultsFolder(data, input_filename)
 
@@ -45,16 +45,16 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
             blood.rho, nodes, 
             starts, ends,
             indices_1, indices_2, 
-            vessel_names, cardiac_T) #, junction_functions)
+            vessel_names, cardiac_T, junction_functions, mask, mask1)
 
 
-def simulationLoopUnsafe(N, B,
+def simulationLoopUnsafe(N, B, 
                         sim_dat, sim_dat_aux, sim_dat_const, 
                         sim_dat_const_aux,
                         Ccfl, edges, input_data, 
                         rho, nodes, 
-                        starts, ends, indices1, 
-                        indices2, upper = 100000):
+                        starts, ends, indices1, indices2, junction_functions, mask, mask1,
+                        upper = 100000):
     t = 0.0
     dt = 1
     P_t = jnp.zeros((upper,5*N))
@@ -73,7 +73,7 @@ def simulationLoopUnsafe(N, B,
                                           ends, indices1, indices2,
                                           t, dt, sim_dat, 
                                           sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                          edges, input_data, rho)
+                                          edges, input_data, rho, junction_functions, mask, mask1)
         t = (t + dt)%sim_dat_const_aux[0,0]
         t_t = t_t.at[i].set(t)
         P_t = P_t.at[i,:].set(saveTempData(N, starts, ends, nodes, sim_dat[4,:]))
@@ -108,7 +108,7 @@ def simulationLoop(N, B, num_snapshots,
                         Ccfl, edges, input_data, 
                         rho, nodes, 
                         starts, ends, indices1, 
-                        indices2): #, junction_functions):
+                        indices2, junction_functions, mask, mask1):
     t = 0.0
     passed_cycles = 0
     counter = 0
@@ -147,7 +147,7 @@ def simulationLoop(N, B, num_snapshots,
                                           ends, indices1, indices2,
                                           t, dt, sim_dat, 
                                           sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                          edges, input_data, rho) #, junction_functions)
+                                          edges, input_data, rho, junction_functions, mask, mask1)
 
         (P_t_temp,counter_temp) = lax.cond(t >= timepoints[counter], 
                                          lambda: (saveTempData(N, starts, ends, 
