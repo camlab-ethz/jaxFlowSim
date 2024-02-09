@@ -1,6 +1,5 @@
 import jax.numpy as jnp
-from jax import lax, jit, debug
-from functools import partial
+from jax import lax
 from src.utils import pressure
 
 def setInletBC(inlet, u0, u1, 
@@ -128,7 +127,6 @@ def threeElementWindkessel(dt, u1, A1,
                            Pc, Cc, R1, 
                            R2, beta, gamma, 
                            A0, Pext):
-    #debug.print("{x}", x=1111111)
     Pout = 0.0
 
     Al = A1
@@ -165,4 +163,5 @@ def threeElementWindkessel(dt, u1, A1,
 
     A1 = As
     u1 = us
+
     return u1, A1, Pc
