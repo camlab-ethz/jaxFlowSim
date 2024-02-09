@@ -6,7 +6,6 @@ from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
 from src.boundary_conditions import setInletBC, setOutletBC
 from src.utils import pressureSA, waveSpeedSA
-#from src.initialise import JUNCTION_FUNCTIONS
 
 def computeDt(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a+b))(u,c)
@@ -15,7 +14,7 @@ def computeDt(Ccfl, u, c, dx):
     return dt
 
 @partial(jit, static_argnums=(1))
-def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho): #, junction_functions):
+def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -47,15 +46,8 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                   indices1, indices2))
 
     def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat #, junction_functions) = dat
-        i = edges[j,0]-1
-        end = ends[i]
-
-        #debug.print("{x}", x = junction_functions)
-        #args = (dt, sim_dat, sim_dat_aux, 
-        #               sim_dat_const, sim_dat_const_aux, 
-        #               B, i, end, edges, starts, ends, rho)
-        #sim_dat, sim_dat_aux = lax.switch(i, junction_functions, *args)
+        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat
+        end = ends[j]
 
         def setOutletBCWrapper(sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
@@ -67,9 +59,9 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
             P1 = sim_dat[4,end-1]
             P2 = sim_dat[4,end-2]
             P3 = sim_dat[4,end-3]
-            Pc = sim_dat_aux[i,2]
-            W1M0 = sim_dat_aux[i,0]
-            W2M0 = sim_dat_aux[i,1]
+            Pc = sim_dat_aux[j,2]
+            W1M0 = sim_dat_aux[j,0]
+            W2M0 = sim_dat_aux[j,1]
             u, Q, A, c, P1, Pc = setOutletBC(dt,
                                              u1, u2, Q1, A1, c1, c2, 
                                              P1, P2, P3, Pc, W1M0, W2M0,
@@ -78,7 +70,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                                              sim_dat_const[2,end-1],
                                              sim_dat_const[-1, end-1],
                                              sim_dat_const[4, end-1],
-                                             sim_dat_const_aux[i, 2], 
+                                             sim_dat_const_aux[j, 2], 
                                              sim_dat_const[6, end-1],
                                              sim_dat_const[7, end-1],
                                              sim_dat_const[8, end-1],
@@ -88,11 +80,11 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                 sim_dat, 
                 temp[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
                 (0,end-1))
-            sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
+            sim_dat_aux = sim_dat_aux.at[j,2].set(Pc)
             return sim_dat, sim_dat_aux
 
         (sim_dat, 
-         sim_dat_aux) = lax.cond(sim_dat_const_aux[i,2] != 0,
+         sim_dat_aux) = lax.cond(sim_dat_const_aux[j,2] != 0,
                                     lambda x, y: setOutletBCWrapper(x,y), 
                                     lambda x, y: (x,y), sim_dat, sim_dat_aux)
 
@@ -143,7 +135,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                 (0,d2_i_start-B))
             return sim_dat
 
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * (edges[j,3] == 2),
+        sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * (edges[j,3] == 2),
                                     lambda x: solveBifurcationWrapper(x), 
                                     lambda x: x, sim_dat)
 
@@ -178,7 +170,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                 (0,d_i_start-B))
             return sim_dat
 
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * 
+        sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * 
                                (edges[j,3] != 2) *
                                (edges[j,6] == 1),
                                 lambda x, y: solveConjunctionWrapper(x, y), 
@@ -206,7 +198,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
             P2 = sim_dat[4,p1_i_end-1]
             P3 = sim_dat[4,d_start]
             u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
-                jnp.maximum(p1_i, p2_i) == i, 
+                jnp.maximum(p1_i, p2_i) == j, 
                 lambda: solveAnastomosis(u1, u2, u3, 
                                          A1, A2, A3,
                                          sim_dat_const[0,end-1],
@@ -240,7 +232,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                 (0,d_start-B))
             return sim_dat
         
-        sim_dat = lax.cond((sim_dat_const_aux[i,2] == 0) * 
+        sim_dat = lax.cond((sim_dat_const_aux[j,2] == 0) * 
                                (edges[j,3] != 2) *
                                (edges[j,6] == 2),
                                 lambda x: solveAnastomosisWrapper(x), 
@@ -249,13 +241,13 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
 
         return (sim_dat, sim_dat_aux, 
                 sim_dat_const, sim_dat_const_aux, 
-                edges, rho, starts, ends) #, junction_functions)
+                edges, rho, starts, ends)
 
     (sim_dat, sim_dat_aux, _, 
      _, _, _, 
      _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                             sim_dat_const_aux, edges, rho, 
-                                            starts, ends)) #, junction_functions))
+                                            starts, ends))
 
     return sim_dat, sim_dat_aux
 
