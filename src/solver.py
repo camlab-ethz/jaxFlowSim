@@ -13,7 +13,7 @@ def computeDt(Ccfl, u, c, dx):
     dt = jnp.min(vessel_dt)
     return dt
 
-@partial(jit, static_argnums=(1))
+@partial(jit, static_argnums=(0, 1))
 def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 

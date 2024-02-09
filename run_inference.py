@@ -1,4 +1,4 @@
-from src.model import configSimulation, simulationLoop
+from src.model import configSimulation, simulationLoopUnsafe
 import os
 from jax.config import config
 import sys
@@ -42,7 +42,7 @@ verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
  timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, total_time, nodes, 
+            rho, nodes, 
             starts, ends,
             indices1, indices2,
             vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
@@ -50,13 +50,13 @@ verbose = True
 if verbose:
     starting_time = time.time_ns()
 
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
-sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B, J, 
+sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_toll, Ccfl, edges, input_data, 
-                                      rho, total_time, nodes, 
+                                      Ccfl, edges, input_data, 
+                                      rho, nodes, 
                                       starts, ends,
-                                      indices1, indices2))
+                                      indices1, indices2, 120000))
 R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,ends[R_index]]
@@ -69,12 +69,12 @@ def simLoopWrapper(R):#, R_scale):
     #jax.debug.print("{x}", x = sim_dat)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*ones)
-    sim_dat_temp, _, P = simulationLoop(N, B, J, 
+    sim_dat_temp, _, P = simulationLoopUnsafe(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
-                    timepoints, conv_toll, Ccfl, edges, input_data, 
-                    rho, total_time, nodes, 
+                    Ccfl, edges, input_data, 
+                    rho, nodes, 
                     starts, ends,
-                    indices1, indices2)
+                    indices1, indices2, 120000)
     return sim_dat_temp[2,:].flatten()/jnp.linalg.norm(sim_dat_temp[2,:].flatten())
 sim_loop_wrapper_jit = jit(simLoopWrapper)
 def logp(y, R, sigma):
@@ -106,7 +106,7 @@ def model():
     sigma = numpyro.sample("sigma", dist.HalfNormal())
     log_density = logp(sim_dat_new[0,:].flatten(), R_dist, sigma)
     return numpyro.factor("custom_logp", log_density)
-mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=200,num_warmup=12,num_chains=1)
+mcmc = MCMC(numpyro.infer.NUTS(model),num_samples=200,num_warmup=12,num_chains=1)
 mcmc.run(jax.random.PRNGKey(3450))
 mcmc.print_summary()
 R = jnp.mean(mcmc.get_samples()["R"])
