@@ -4,64 +4,6 @@ from functools import partial
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
-def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, ends, rho, B, i, index2, index3):
-    index1 = ends[i]
-    p1_i = edges[i,7]
-    p2_i = edges[i,8]
-    d = edges[i,9]
-    p1_i_end = ends[p1_i]
-    d_start = starts[d]
-    u1 = sim_dat[0,index1]
-    u2 = sim_dat[0,p1_i_end-1]
-    u3 = sim_dat[0,d_start]
-    Q1 = sim_dat[1,index1]
-    Q2 = sim_dat[1,p1_i_end-1]
-    Q3 = sim_dat[1,d_start]
-    A1 = sim_dat[2,index1]
-    A2 = sim_dat[2,p1_i_end-1]
-    A3 = sim_dat[2,d_start]
-    c1 = sim_dat[3,index1]
-    c2 = sim_dat[3,p1_i_end-1]
-    c3 = sim_dat[3,d_start]
-    P1 = sim_dat[4,index1]
-    P2 = sim_dat[4,p1_i_end-1]
-    P3 = sim_dat[4,d_start]
-    u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
-        jnp.maximum(p1_i, p2_i) == i, 
-        lambda: solveAnastomosis(u1, u2, u3, 
-                                 A1, A2, A3,
-                                 sim_dat_const[0,index1],
-                                 sim_dat_const[0,p1_i_end-1],
-                                 sim_dat_const[0,d_start],
-                                 sim_dat_const[1,index1],
-                                 sim_dat_const[1,p1_i_end-1],
-                                 sim_dat_const[1,d_start],
-                                 sim_dat_const[2,index1],
-                                 sim_dat_const[2,p1_i_end-1],
-                                 sim_dat_const[2,d_start],
-                                 sim_dat_const[4,index1],
-                                 sim_dat_const[4,p1_i_end-1],
-                                 sim_dat_const[4,d_start],
-                                ), 
-        lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
-    temp1 = jnp.array((u1, Q1, A1, c1, P1))
-    temp2 = jnp.array((u2, Q2, A2, c2, P2))
-    temp3 = jnp.array((u3, Q3, A3, c3, P3))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp1[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp2[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,p1_i_end-1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp3[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,d_start-2))
-    return sim_dat, sim_dat_aux
 
 def solveAnastomosis(u1, u2, u3, 
                      A1, A2, A3,
@@ -89,8 +31,6 @@ def solveAnastomosis(u1, u2, u3,
                       J, U0,
                       (A01, A02, A03),
                       (beta1, beta2, beta3))
-        
-    #jax.debug.breakpoint()
 
     return updateAnastomosis(U,
                              A01, A02, A03,

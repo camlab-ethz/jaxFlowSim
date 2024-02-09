@@ -5,40 +5,6 @@ from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 import optimistix as optx
 
-def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, rho, B, ends, i, index2, index3):
-    index1 = ends[i]
-    #debug.print("{x}", x = (rho, i, index1, index2, index3))
-    d_i = edges[i,7]
-    d_i_start = starts[d_i]
-    u1 = sim_dat[0,index1]
-    u2 = sim_dat[0,d_i_start]
-    A1 = sim_dat[2,index1]
-    A2 = sim_dat[2,d_i_start]
-    (u1, u2, Q1, Q2, 
-     A1, A2, c1, c2, P1, P2) = solveConjunction(u1, u2, 
-                                                A1, A2,
-                                                sim_dat_const[0,index1],
-                                                sim_dat_const[0,d_i_start],
-                                                sim_dat_const[1,index1],
-                                                sim_dat_const[1,d_i_start],
-                                                sim_dat_const[2,index1],
-                                                sim_dat_const[2,d_i_start],
-                                                sim_dat_const[4, index1],
-                                                sim_dat_const[4, d_i_start],
-                                                rho)
-    temp1 = jnp.array((u1, Q1, A1, c1, P1))
-    temp2 = jnp.array((u2, Q2, A2, c2, P2))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp1[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp2[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,d_i_start-2))
-    return sim_dat, sim_dat_aux
 
 def solveConjunction(u1, u2, A1, 
                      A2, A01, A02, 
