@@ -5,8 +5,8 @@ def newtonRaphson(fun_f, J,
                   U, A0s,
                   betas):
 
-    nr_toll_U = 1e-5
-    nr_toll_F = 1e-5
+    #nr_toll_U = 1e-5
+    #nr_toll_F = 1e-5
 
     #W = fun_w(U, k)
     F = fun_f(U,# k, W,
