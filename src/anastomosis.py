@@ -57,16 +57,20 @@ def solveAnastomosis(u1, u2, u3,
                     jnp.sqrt(jnp.sqrt(A1)),
                     jnp.sqrt(jnp.sqrt(A2)),
                     jnp.sqrt(jnp.sqrt(A3))))
+                    jnp.sqrt(jnp.sqrt(A3))))
     
 
     k1 = jnp.sqrt(1.5*gamma1)
     k2 = jnp.sqrt(1.5*gamma2)
     k3 = jnp.sqrt(1.5*gamma3)
     k = jnp.array([k1, k2, k3])
+    k = jnp.array([k1, k2, k3])
 
     J = calculateJacobianAnastomosis(U0, k,
                                      A01, A02, A03,
                                      beta1, beta2, beta3)
+    U = newtonRaphson(calculateFAnastomosis, 
+                      J, U0,
     U = newtonRaphson(calculateFAnastomosis, 
                       J, U0,
                       (A01, A02, A03),
@@ -83,6 +87,9 @@ def solveAnastomosis(u1, u2, u3,
 def calculateJacobianAnastomosis(U, k,
                                  A01, A02, A03,
                                  beta1, beta2, beta3):
+    U43 = U[3]*U[3]*U[3]
+    U53 = U[4]*U[4]*U[4]
+    U63 = U[5]*U[5]*U[5]
     U43 = U[3]*U[3]*U[3]
     U53 = U[4]*U[4]*U[4]
     U63 = U[5]*U[5]*U[5]
@@ -110,6 +117,7 @@ def calculateJacobianAnastomosis(U, k,
                       [J41, J42, J43, J44, J45, J46],
                       [0.0, 0.0, 0.0, J54, 0.0, J56],
                       [0.0, 0.0, 0.0, 0.0, J65, J66]])
+                      [0.0, 0.0, 0.0, 0.0, J65, J66]])
 
 #def calculateWstarAnastomosis(U, k):
 #    W1 = U[0] + 4 * k[0] * U[3]
@@ -117,7 +125,14 @@ def calculateJacobianAnastomosis(U, k,
 #    W3 = U[2] - 4 * k[2] * U[5]
 #
 #    return jnp.array([W1, W2, W3])
+#def calculateWstarAnastomosis(U, k):
+#    W1 = U[0] + 4 * k[0] * U[3]
+#    W2 = U[1] + 4 * k[1] * U[4]
+#    W3 = U[2] - 4 * k[2] * U[5]
+#
+#    return jnp.array([W1, W2, W3])
 
+def calculateFAnastomosis(U,# k, W,
 def calculateFAnastomosis(U,# k, W,
                           A0s,
                           betas):
@@ -131,11 +146,15 @@ def calculateFAnastomosis(U,# k, W,
     f1 = 0 #U[0] + 4 * k[0] * U[3] - W[0]
     f2 = 0 #U[1] + 4 * k[1] * U[4] - W[1]
     f3 = 0 #U[2] - 4 * k[2] * U[5] - W[2]
+    f1 = 0 #U[0] + 4 * k[0] * U[3] - W[0]
+    f2 = 0 #U[1] + 4 * k[1] * U[4] - W[1]
+    f3 = 0 #U[2] - 4 * k[2] * U[5] - W[2]
     f4 = U[0] * U42**2 + U[1] * U52**2 - U[2] * U62**2
 
     f5 = beta1 * (U42 * jnp.sqrt(1/A01) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
     f6 = beta2 * (U52 * jnp.sqrt(1/A02) - 1.0) - (beta3 * (U62 * jnp.sqrt(1/A03) - 1.0))
 
+    return jnp.array([f1, f2, f3, f4, f5, f6])
     return jnp.array([f1, f2, f3, f4, f5, f6])
 
 def updateAnastomosis(U,
