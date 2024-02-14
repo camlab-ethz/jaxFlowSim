@@ -16,6 +16,8 @@ from numpyro.infer import MCMC,HMC
 os.chdir(os.path.dirname(__file__))
 config.update("jax_enable_x64", True)
 
+numpyro.set_host_device_count(8)
+
 config_filename = ""
 if len(sys.argv) == 1:
     # base cases
@@ -60,33 +62,37 @@ sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
 R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,ends[R_index]]
-R_scale = 1.1*R1
+R_scale = 1e8
+#R_scale = 1.1*R1
 print(R1, R_scale)
-def simLoopWrapper(R):#, R_scale):
-    R = R*1e8
+def simLoopWrapper(R, R_scale):
+    #R = R*1e8
     #R = 0.5*R*R_scale + R_scale
     ones = jnp.ones(ends[R_index]-starts[R_index]+4)
     #jax.debug.print("{x}", x = sim_dat)
     sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*ones)
-    sim_dat_temp, _, P = simulationLoopUnsafe(N, B,
+    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*R_scale*ones)
+    sim_dat_temp, _, _ = simulationLoopUnsafe(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
                     rho, nodes, 
                     starts, ends,
                     indices1, indices2, 120000)
-    return sim_dat_temp[2,:].flatten()/jnp.linalg.norm(sim_dat_temp[2,:].flatten())
-sim_loop_wrapper_jit = jit(simLoopWrapper)
-def logp(y, R, sigma):
-    y_hat = jnp.zeros_like(y)
-    y_hat = jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
-    #y_hat = sim_loop_wrapper_jit(R)
-    L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(y - y_hat, loc = 0, scale=sigma)))
+    return sim_dat_temp[2,:]/jnp.linalg.norm(sim_dat_temp[2,:])
 
-    #L = jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)
+sim_loop_wrapper_jit = jit(simLoopWrapper)
+
+def logp(y, R, R_scale):#, sigma):
+    #y_hat = jnp.zeros_like(y)
+    #y_hat = jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
+    y_hat = sim_loop_wrapper_jit(R, R_scale)
+    #L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc = 0, scale=sigma)))
+
+    L = jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)
     #jax.debug.print("{x}", x=jnp.linalg.norm(y))
     #jax.debug.print("L = {x}", x=L)
     #jax.debug.print("{x}", x=L)
+    #jax.debug.print("L = {x}", x=L)
     return L
 #def model(obs, R_scale):
 #    R_dist = numpyro.sample("R", dist.LogNormal())
@@ -101,13 +107,15 @@ def logp(y, R, sigma):
 #    sigma = numpyro.sample("sigma", dist.HalfNormal())
 #    with numpyro.plate("size", jnp.size(obs)):
 #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*(R_dist+0.1)),scale=sigma), obs=obs)
-def model():
+def model(sim_dat_new, R_scale):
     R_dist=numpyro.sample("R", dist.Normal())
-    sigma = numpyro.sample("sigma", dist.HalfNormal())
-    log_density = logp(sim_dat_new[0,:].flatten(), R_dist, sigma)
-    return numpyro.factor("custom_logp", log_density)
-mcmc = MCMC(numpyro.infer.NUTS(model),num_samples=200,num_warmup=12,num_chains=1)
-mcmc.run(jax.random.PRNGKey(3450))
+    #sigma = numpyro.sample("sigma", dist.Normal())
+    log_density = logp(sim_dat_new[2,:]/jnp.linalg.norm(sim_dat_new[2,:]), R_dist, R_scale)#, sigma)
+    #jax.debug.print("R_dist = {x}", x=R_dist)
+    numpyro.factor("custom_logp", log_density)
+
+mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=200,num_warmup=12,num_chains=8)
+mcmc.run(jax.random.PRNGKey(3450), sim_dat_new, R_scale)
 mcmc.print_summary()
 R = jnp.mean(mcmc.get_samples()["R"])
 print(R1)
