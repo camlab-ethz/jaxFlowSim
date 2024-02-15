@@ -78,7 +78,7 @@ def simLoopWrapper(R, R_scale):
                     rho, nodes, 
                     starts, ends,
                     indices1, indices2, 120000)
-    return P/jnp.linalg.norm(P)
+    return P
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)
 
@@ -155,13 +155,14 @@ def model(P_obs_norm, R_scale):
 #    params = optax.apply_updates(params, updates)
 #    print(params)
 
-compute_loss = lambda R: jnp.mean(sim_loop_wrapper_jit(R, R_scale)-P_obs)/jnp.mean(P_obs)
-grad_compute_loss = jax.grad(compute_loss)
+compute_loss = lambda R: jnp.linalg.norm(sim_loop_wrapper_jit(R, R_scale)-P_obs)/jnp.linalg.norm(P_obs)
+grad_compute_loss = jax.jit(jax.grad(compute_loss))
+step_size = 1#e16
 R_new = R_scale
 for i in range(100):
     grad = grad_compute_loss(R_new)
     print(grad)
-    R_new += grad
+    R_new += grad*step_size
     print(R_new)
 
     #updates, opt_state = gradient_transform.update(grads, opt_state)
