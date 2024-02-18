@@ -12,12 +12,11 @@ import jax
 import optax
 import numpyro
 from numpyro.infer import MCMC,HMC
-from numpyro.infer.reparam import TransformReparam
 
 os.chdir(os.path.dirname(__file__))
 config.update("jax_enable_x64", True)
 
-numpyro.set_host_device_count(1)
+numpyro.set_host_device_count(8)
 
 config_filename = ""
 if len(sys.argv) == 1:
@@ -79,7 +78,7 @@ def simLoopWrapper(R, R_scale):
                     rho, nodes, 
                     starts, ends,
                     indices1, indices2, 120000)
-    return P
+    return P/jnp.linalg.norm(P)
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)
 
@@ -89,7 +88,7 @@ def logp(y, R, R_scale):#, sigma):
     y_hat = sim_loop_wrapper_jit(R, R_scale)
     #L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc = 0, scale=sigma)))
 
-    L = -jnp.log(jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y))
+    L = jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)
     jax.debug.print("L = {x}", x=L)
     #jax.debug.print("{x}", x=jnp.linalg.norm(y))
     #jax.debug.print("L = {x}", x=L)
@@ -109,24 +108,15 @@ def logp(y, R, R_scale):#, sigma):
 #    with numpyro.plate("size", jnp.size(obs)):
 #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*(R_dist+0.1)),scale=sigma), obs=obs)
 def model(P_obs_norm, R_scale):
-    mu = numpyro.sample('mu', dist.Normal())
-    tau = numpyro.sample('tau', dist.HalfNormal())
-    with numpyro.handlers.reparam(config={'theta': TransformReparam()}):
-        R_dist = numpyro.sample(
-            'theta',
-            dist.TransformedDistribution(dist.Normal(),
-                                         dist.transforms.AffineTransform(mu, tau)))
-    #std = numpyro.sample("std", dist.Exponential())
-    #loc = numpyro.sample("loc", dist.Normal())
-    #R_dist=numpyro.sample("R", dist.Normal(loc,std))
+    R_dist=numpyro.sample("R", dist.Normal())
     jax.debug.print("R_dist = {x}", x=R_dist)
     #sigma = numpyro.sample("sigma", dist.Normal())
-    log_density = logp(P_obs_norm, R_dist, R_scale)#, sigma)
-    numpyro.factor("custom_logp", log_density)
+    sigma = numpyro.sample("sigma", dist.Exponential(1.0))
+    y_hat = sim_loop_wrapper_jit(R_dist, R_scale)
+    numpyro.sample("obs", dist.Normal(y_hat, sigma), obs=P_obs_norm)
 
-mcmc = MCMC(numpyro.infer.NUTS(model,
-                               forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-mcmc.run(jax.random.PRNGKey(3450), P_obs, R_scale)
+mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=200,num_warmup=12,num_chains=1)
+mcmc.run(jax.random.PRNGKey(3450), P_obs/jnp.linalg.norm(P_obs), R_scale)
 mcmc.print_summary()
 R = jnp.mean(mcmc.get_samples()["R"])
 print(R1)
