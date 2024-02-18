@@ -1,4 +1,5 @@
 from src.model import configSimulation, simulationLoopUnsafe
+from numpyro.infer.reparam import TransformReparam
 import os
 from jax.config import config
 import sys
@@ -107,15 +108,21 @@ def logp(y, R, R_scale, sigma):
 #    sigma = numpyro.sample("sigma", dist.HalfNormal())
 #    with numpyro.plate("size", jnp.size(obs)):
 #        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*(R_dist+0.1)),scale=sigma), obs=obs)
-def model(P_obs_norm, R_scale):
+def model(P_obs, R_scale):
+    #mu = numpyro.sample('mu', dist.Normal())
+    #tau = numpyro.sample('tau', dist.HalfNormal())
+    #with numpyro.handlers.reparam(config={'theta': TransformReparam()}):
+    #    R_dist = numpyro.sample(
+    #        'theta',
+    #        dist.TransformedDistribution(dist.Normal(),
+    #                                     dist.transforms.AffineTransform(mu, tau)))
     std = numpyro.sample("std", dist.Exponential())
     loc = numpyro.sample("loc", dist.Normal())
     R_dist=numpyro.sample("R", dist.Normal(loc,std))
     jax.debug.print("R_dist = {x}", x=R_dist)
     #sigma = numpyro.sample("sigma", dist.Normal())
-    sigma = numpyro.sample("sigma", dist.Exponential(1.0))
-    y_hat = sim_loop_wrapper_jit(R_dist, R_scale)
-    log_density = logp(y_hat, R_dist, R_scale, sigma=sigma) 
+    sigma = numpyro.sample("sigma", dist.HalfNormal())
+    log_density = logp(P_obs, R_dist, R_scale, sigma=sigma) 
     numpyro.factor("custom_logp", log_density)
 
 mcmc = MCMC(numpyro.infer.NUTS(model, forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
