@@ -45,34 +45,28 @@ verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
  timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, nodes, 
-            starts, ends,
-            indices1, indices2,
-            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+ rho, nodes, 
+ starts, ends,
+ indices1, indices2,
+ vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
-if verbose:
-    starting_time = time.time_ns()
-
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
-sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
+sim_loop_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+sim_dat_new, t, P_obs  = block_until_ready(sim_loop_jit(N, B,
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                       Ccfl, edges, input_data, 
                                       rho, nodes, 
                                       starts, ends,
                                       indices1, indices2, 120000))
-R_index = 1
-var_index = 7
-R1 = sim_dat_const[var_index,ends[R_index]]
-R_scale = 1e8
-#R_scale = 1.1*R1
-print(R1, R_scale)
+R1_vessel_index = 1
+R1_const_index = 7
+R1_real = sim_dat_const[R1_const_index,ends[R1_vessel_index]]
+R1_init = 1e8
+
+
 def simLoopWrapper(R, R_scale):
-    #R = R*1e8
-    #R = 0.5*R*R_scale + R_scale
-    ones = jnp.ones(ends[R_index]-starts[R_index]+4)
-    #jax.debug.print("{x}", x = sim_dat)
+    ones = jnp.ones(ends[R1_vessel_index]-starts[R1_vessel_index]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*R_scale*ones)
+    sim_dat_const_new = sim_dat_const_new.at[R1_const_index,starts[R1_vessel_index]-2:ends[R1_vessel_index]+2].set(R*R_scale*ones)
     _, _, P = simulationLoopUnsafe(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
@@ -84,39 +78,13 @@ def simLoopWrapper(R, R_scale):
 sim_loop_wrapper_jit = jit(simLoopWrapper)
 
 def logp(y, R, R_scale, sigma):
-    #y_hat = jnp.zeros_like(y)
-    #y_hat = jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
     y_hat = sim_loop_wrapper_jit(R, R_scale)
     L = jnp.mean(jnp.log(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc = 0, scale=sigma)))
 
-    #L = jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y)
     jax.debug.print("L = {x}", x=L)
-    #jax.debug.print("{x}", x=jnp.linalg.norm(y))
-    #jax.debug.print("L = {x}", x=L)
-    #jax.debug.print("{x}", x=L)
     return L
-#def model(obs, R_scale):
-#    R_dist = numpyro.sample("R", dist.LogNormal())
-#    #sigma = numpyro.sample("sigma", dist.Normal())
-#    print("R_dist",R_dist)
-#    #sigma = numpyro.sample("sigma", dist.Normal())
-#    log_density = logp(obs, (R_dist+0.1)*R_scale)#, sigma)
-#    return numpyro.factor("custom_logp", -log_density)
-### NUTS model with bultin loss
-#def model(obs, R_scale):
-#    R_dist=numpyro.sample("R", dist.LogNormal(loc=0,scale=0.25))
-#    sigma = numpyro.sample("sigma", dist.HalfNormal())
-#    with numpyro.plate("size", jnp.size(obs)):
-#        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*(R_dist+0.1)),scale=sigma), obs=obs)
 def model(P_obs, R_scale):
-    #mu = numpyro.sample('mu', dist.Normal())
-    #tau = numpyro.sample('tau', dist.HalfNormal())
-    #with numpyro.handlers.reparam(config={'theta': TransformReparam()}):
-    #    R_dist = numpyro.sample(
-    #        'theta',
-    #        dist.TransformedDistribution(dist.Normal(),
-    #                                     dist.transforms.AffineTransform(mu, tau)))
-    std = numpyro.sample("std", dist.Exponential())
+    std = numpyro.sample("std", dist.HalfNormal())
     loc = numpyro.sample("loc", dist.Normal())
     R_dist=numpyro.sample("R", dist.Normal(loc,std))
     jax.debug.print("R_dist = {x}", x=R_dist)
