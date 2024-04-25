@@ -171,4 +171,5 @@ test.py
 *_bckp*
 plotting/*.txt
 plotting/*.eps
-
+SA_test*
+.vscode/*
