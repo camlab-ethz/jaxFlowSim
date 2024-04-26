@@ -98,21 +98,53 @@ sensitivity_dict = {
 #sa.df
 #print(sa.df)
 
+print(P_t_base)
 
-def wrapped_linear(X: np.ndarray, rho=rho, Ccfl=Ccfl, func=sim_loop_jit) -> np.ndarray:
+def quick_wrap(N, B,
+                    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                    Ccfl, edges, input_data, 
+                    rho, nodes, 
+                    starts, ends,
+                    indices_1, indices_2, upper=120000):
+
+                    _, P_t_new, _ = sim_loop_jit(N, B,
+                                sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                Ccfl, edges, input_data, 
+                                rho, nodes, 
+                                starts, ends,
+                                indices_1, indices_2, upper=120000)
+                    return np.linalg.norm(P_t_base-P_t_new)
+
+def wrapped_linear(X: np.ndarray, l = 4, func=sim_loop_jit) -> np.ndarray:
     import numpy as np
-    N, D = X.shape
-    results = np.empty(N)
-    for i in range(N):
-        R01, R02, R03, E1, E2, E3, R11, R12, R21, R22, Cc1, Cc2, L1, L2, L3 = X[i, :]
+    M, D = X.shape
+    results = np.empty(M)
+    for i in range(M):
+        #R01, R02, R03, E1, E2, E3, R11, R12, R21, R22, Cc1, Cc2 = X[i, :] #, L1, L2, L3 = X[i, :]
+        #E1, E2, E3, R11, R12, R21, R22, Cc1, Cc2 = X[i, :] #, L1, L2, L3 = X[i, :]
+        #R01, R02, R03, R11, R12, R21, R22, Cc1, Cc2 = X[i, :] #, L1, L2, L3 = X[i, :]
+        (A01, A02, A03, 
+            beta1, beta2, beta3, 
+            gamma1, gamma2, gamma3, 
+            viscT1, viscT2, viscT3, 
+            R11, R12, R21, R22, Cc1, Cc2, 
+            L1, L2, L3, rho, Ccfl) = X[i,:]
 
-        sim_dat_const[0,starts[0]-B:ends[0]+B] = np.pi*R01*R01*np.ones(ends[0]-starts[0]+2*B)
-        sim_dat_const[0,starts[1]-B:ends[1]+B] = np.pi*R02*R02*np.ones(ends[1]-starts[1]+2*B)
-        sim_dat_const[0,starts[2]-B:ends[2]+B] = np.pi*R03*R03*np.ones(ends[2]-starts[2]+2*B)
+        sim_dat_const[0,starts[0]-B:ends[0]+B] = A01*np.ones(ends[0]-starts[0]+2*B)
+        sim_dat_const[0,starts[1]-B:ends[1]+B] = A02*np.ones(ends[1]-starts[1]+2*B)
+        sim_dat_const[0,starts[2]-B:ends[2]+B] = A03*np.ones(ends[2]-starts[2]+2*B)
 
-        sim_dat_const[3,starts[0]-B:ends[0]+B] = E1*np.ones(ends[0]-starts[0]+2*B)
-        sim_dat_const[3,starts[1]-B:ends[1]+B] = E2*np.ones(ends[1]-starts[1]+2*B)
-        sim_dat_const[3,starts[2]-B:ends[2]+B] = E3*np.ones(ends[2]-starts[2]+2*B)
+        sim_dat_const[1,starts[0]-B:ends[0]+B] = beta1*np.ones(ends[0]-starts[0]+2*B)
+        sim_dat_const[1,starts[1]-B:ends[1]+B] = beta2*np.ones(ends[1]-starts[1]+2*B)
+        sim_dat_const[1,starts[2]-B:ends[2]+B] = beta3*np.ones(ends[2]-starts[2]+2*B)
+
+        sim_dat_const[2,starts[0]-B:ends[0]+B] = gamma1*np.ones(ends[0]-starts[0]+2*B)
+        sim_dat_const[2,starts[1]-B:ends[1]+B] = gamma2*np.ones(ends[1]-starts[1]+2*B)
+        sim_dat_const[2,starts[2]-B:ends[2]+B] = gamma3*np.ones(ends[2]-starts[2]+2*B)
+
+        sim_dat_const[5,starts[0]-B:ends[0]+B] = viscT1*np.ones(ends[0]-starts[0]+2*B)
+        sim_dat_const[5,starts[1]-B:ends[1]+B] = viscT2*np.ones(ends[1]-starts[1]+2*B)
+        sim_dat_const[5,starts[2]-B:ends[2]+B] = viscT3*np.ones(ends[2]-starts[2]+2*B)
 
         sim_dat_const[7,starts[1]-B:ends[1]+B] = R11*np.ones(ends[1]-starts[1]+2*B)
         sim_dat_const[7,starts[2]-B:ends[2]+B] = R12*np.ones(ends[2]-starts[2]+2*B)
@@ -127,35 +159,67 @@ def wrapped_linear(X: np.ndarray, rho=rho, Ccfl=Ccfl, func=sim_loop_jit) -> np.n
         sim_dat_const[10,starts[1]-B:ends[1]+B] = L2*np.ones(ends[1]-starts[1]+2*B)
         sim_dat_const[10,starts[2]-B:ends[2]+B] = L3*np.ones(ends[2]-starts[2]+2*B)
 
-        _, P_t_new, _ = func(N, B,
+        sim_dat_new, _, _ = func(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
                     rho, nodes, 
                     starts, ends,
                     indices_1, indices_2, upper=120000)
-        results[i] = np.linalg.norm(P_t_base-P_t_new)
+        
+        #print(np.linalg.norm(sim_dat_base[l,:]-sim_dat_new[l,:])/np.linalg.norm(sim_dat_base[l,:]))
+        results[i] = np.linalg.norm(sim_dat_base[l,:]-sim_dat_new[l,:])/np.linalg.norm(sim_dat_base[l,:])
 
     return results
 
+print(sim_dat_const[:,starts[0]])
+print(sim_dat_const[:,starts[1]])
+print(sim_dat_const[:,starts[2]])
+
 sp = ProblemSpec({
-    'names': ['R01', 'R02', 'R03', 'E1', 'E2', 'E3', 'R11', 'R12', 'R21', 'R22', 'Cc1', 'Cc2', 'L1', 'L2', 'L3'],
+    #'names': ['R01', 'R02', 'R03', 'E1', 'E2', 'E3', 'R11', 'R12', 'R21', 'R22', 'Cc1', 'Cc2'], #, 'L1', 'L2', 'L3'],
+    'names': ['A01', 'A02', 'A03', 
+              'beta1', 'beta2', 'beta3', 
+              'gamma1', 'gamma2', 'gamma3', 
+              'viscT1', 'viscT2', 'viscT3', 
+              'R11', 'R12', 'R21', 'R22', 'Cc1', 'Cc2', 
+              'L1', 'L2', 'L3', 'rho', 'Ccfl'],
+    #'names': ['R01', 'R02', 'R03', 'R11', 'R12', 'R21', 'R22', 'Cc1', 'Cc2'], #, 'L1', 'L2', 'L3'],
     'bounds': [
-        [0.758242250e-2*0.1, 0.758242250e-2*10],
-        [0.5492e-2*0.1, 0.5492e-2*10],
-        [0.5492e-2*0.1, 0.5492e-2*10],
-        [500.0e3*0.1, 500.0e3*10],
-        [700.0e3*0.1, 700.0e3*10],
-        [700.0e3*0.1, 700.0e3*10],
-        [6.8123e7*0.1, 6.8123e7*10],
-        [6.8123e7*0.1, 6.8123e7*10],
-        [3.1013e9*0.1, 3.1013e9*10],
-        [3.1013e9*0.1, 3.1013e9*10],
-        [3.6664e-10*0.1, 3.6664e-10+10],
-        [3.6664e-10*0.1, 3.6664e-10+10],
-        [8.6e-2*0.1, 8.6e-2*10],
-        [8.5e-2*0.1, 8.5e-2*10],
-        [8.5e-2*0.1, 8.5e-2*10],
+        [1.80619998e-04*0.9,1.80619998e-04*1.1],
+        [9.47569187e-05*0.9,9.47569187e-05*1.1],
+        [9.47569187e-05*0.9,9.47569187e-05*1.1],
+        [8.51668358e+04*0.9,8.51668358e+04*1.1],
+        [1.32543517e+05*0.9,1.32543517e+05*1.1],
+        [1.32543517e+05*0.9,1.32543517e+05*1.1],
+        [1.99278514e+03*0.9,1.99278514e+03*1.1],
+        [4.28179535e+03*0.9,4.28179535e+03*1.1],
+        [4.28179535e+03*0.9,4.28179535e+03*1.1],
+        [2.60811466e-04*0.9,2.60811466e-04*1.1],
+        [2.60811466e-04*0.9,2.60811466e-04*1.1],
+        [2.60811466e-04*0.9,2.60811466e-04*1.1],
+        #[0.758242250e-2*0.9, 0.758242250e-2*1.1],
+        #[0.5492e-2*0.9, 0.5492e-2*1.1],
+        #[0.5492e-2*0.9, 0.5492e-2*1.1],
+        #[500.0e3*0.9999, 500.0e3*1],
+        #[700.0e3*0.9999, 700.0e3*1],
+        #[700.0e3*0.9999, 700.0e3*1],
+        [6.8123e7*0.9, 6.8123e7*1.1],
+        [6.8123e7*0.9, 6.8123e7*1.1],
+        [3.1013e9*0.9, 3.1013e9*1.1],
+        [3.1013e9*0.9, 3.1013e9*1.1],
+        [3.6664e-10*0.9, 3.6664e-10*1.1],
+        [3.6664e-10*0.9, 3.6664e-10*1.1],
+        [1e-3*0.9, 1e-3*1.1],
+        [1e-3*0.9, 1e-3*1.1],
+        [1e-3*0.9, 1e-3*1.1],
+        [rho*0.9, rho*1.1],
+        [Ccfl*0.9, Ccfl*1.1],
     ],
 })
 
-sp.sample_sobol(2**6).evaluate(wrapped_linear).analyze_sobol()####
+if __name__ == "__main__":
+    (sp.sample_sobol(2**8).evaluate(wrapped_linear).analyze_sobol()
+    )
+
+sp.to_df()
+print(sp.to_df())
