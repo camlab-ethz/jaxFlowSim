@@ -1,4 +1,5 @@
 from src.model import configSimulation, simulationLoopUnsafe
+from numpyro.infer.reparam import TransformReparam
 import os
 from jax.config import config
 import sys
@@ -12,7 +13,8 @@ import jax
 import optax
 import numpyro
 from numpyro.infer import MCMC,HMC
-from numpyro.infer.reparam import TransformReparam
+import numpy as np
+import itertools
 
 os.chdir(os.path.dirname(__file__))
 config.update("jax_enable_x64", True)
@@ -63,16 +65,14 @@ sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
 R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,ends[R_index]]
-R_scale = 1e8
-#R_scale = 1.1*R1
+#R_scales = np.linspace(1.1*R1, 2*R1, 16)
+R_scales = np.linspace(0.5*R1, 0.9*R1, 16)
+R_scale = R_scales[int(sys.argv[2])]
 print(R1, R_scale)
-def simLoopWrapper(R, R_scale):
-    #R = R*1e8
-    #R = 0.5*R*R_scale + R_scale
+def simLoopWrapper(R):
     ones = jnp.ones(ends[R_index]-starts[R_index]+4)
-    #jax.debug.print("{x}", x = sim_dat)
     sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*R_scale*ones)
+    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*ones)
     _, _, P = simulationLoopUnsafe(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
@@ -83,94 +83,73 @@ def simLoopWrapper(R, R_scale):
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)
 
-def logp(y, R, R_scale):#, sigma):
-    #y_hat = jnp.zeros_like(y)
-    #y_hat = jax.lax.cond(R>0, lambda: sim_loop_wrapper_jit(R), lambda: y_hat)
-    y_hat = sim_loop_wrapper_jit(R, R_scale)
-    #L = jnp.sum(jnp.log(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc = 0, scale=sigma)))
-
-    L = -jnp.log(jnp.linalg.norm(y - y_hat)/jnp.linalg.norm(y))
+def logp(y, R, sigma):
+    y_hat = sim_loop_wrapper_jit(R)
+    L = jnp.mean(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc = 0, scale=sigma))
     jax.debug.print("L = {x}", x=L)
-    #jax.debug.print("{x}", x=jnp.linalg.norm(y))
-    #jax.debug.print("L = {x}", x=L)
-    #jax.debug.print("{x}", x=L)
     return L
-#def model(obs, R_scale):
-#    R_dist = numpyro.sample("R", dist.LogNormal())
-#    #sigma = numpyro.sample("sigma", dist.Normal())
-#    print("R_dist",R_dist)
-#    #sigma = numpyro.sample("sigma", dist.Normal())
-#    log_density = logp(obs, (R_dist+0.1)*R_scale)#, sigma)
-#    return numpyro.factor("custom_logp", -log_density)
-### NUTS model with bultin loss
-#def model(obs, R_scale):
-#    R_dist=numpyro.sample("R", dist.LogNormal(loc=0,scale=0.25))
-#    sigma = numpyro.sample("sigma", dist.HalfNormal())
-#    with numpyro.plate("size", jnp.size(obs)):
-#        numpyro.sample("obs", dist.Normal(sim_loop_wrapper_jit(R_scale*(R_dist+0.1)),scale=sigma), obs=obs)
-def model(P_obs_norm, R_scale):
-    mu = numpyro.sample('mu', dist.Normal())
-    tau = numpyro.sample('tau', dist.HalfNormal())
+
+def model(P_obs, sigma, scale, R_scale):
     with numpyro.handlers.reparam(config={'theta': TransformReparam()}):
         R_dist = numpyro.sample(
             'theta',
             dist.TransformedDistribution(dist.Normal(),
-                                         dist.transforms.AffineTransform(mu, tau)))
-    #std = numpyro.sample("std", dist.Exponential())
-    #loc = numpyro.sample("loc", dist.Normal())
-    #R_dist=numpyro.sample("R", dist.Normal(loc,std))
+                                         dist.transforms.AffineTransform(0, scale*R_scale)))
     jax.debug.print("R_dist = {x}", x=R_dist)
-    #sigma = numpyro.sample("sigma", dist.Normal())
-    log_density = logp(P_obs_norm, R_dist, R_scale)#, sigma)
+    log_density = logp(P_obs, R_dist, sigma=sigma) 
     numpyro.factor("custom_logp", log_density)
 
-mcmc = MCMC(numpyro.infer.NUTS(model,
-                               forward_mode_differentiation=True),num_samples=100,num_warmup=10,num_chains=1)
-mcmc.run(jax.random.PRNGKey(3450), P_obs, R_scale)
-mcmc.print_summary()
-R = jnp.mean(mcmc.get_samples()["R"])
-print(R1)
-print(R) 
-#### adam optimizer example
-#start_learning_rate = 1e-2
-## Exponential decay of the learning rate.
-#scheduler = optax.exponential_decay(
-#init_value=start_learning_rate, 
-#transition_steps=1000,
-#decay_rate=0.99)
+#network_properties = {
+#        "sigma": [1e-1, 1e-3, 1e-5, 1e-7, 1e-9],
+#        "scale": [1, 5, 10],
+#        "num_warmup": np.arange(10, 60, 10),
+#        "num_samples": np.arange(100, 600, 100),
+#        "num_chains": [1]
+#        }
 
-## Combining gradient transforms using `optax.chain`.
-#gradient_transform = optax.chain(
-#    optax.clip_by_global_norm(1.0),  # Clip by the gradient by the global norm.
-#    optax.scale_by_adam(),  # Use the updates from adam.
-#    optax.scale_by_schedule(scheduler),  # Use the learning rate from the scheduler.
-#    # Scale updates by -1 since optax.apply_updates is additive and we want to descend on the loss.
-#    optax.scale(-1.0)
-#)
-#num_weights = 1
-##optimizer = optax.adam(learning_rate)
-#params = jnp.array([1, 0.0])  # Recall target_params=0.5.
-#opt_state = gradient_transform.init(params)
-##params = {'w': R_scale*jnp.ones((num_weights,))}
-##opt_state = optimizer.init(params)
-#compute_loss = lambda params, y: jnp.mean(optax.l2_loss(sim_loop_wrapper_jit(params[0]), y))/jnp.mean(y)
-##compute_loss = lambda params, y: jnp.linalg.norm(sim_loop_wrapper_jit(params[0]), y)/jnp.linalg.norm(y)
-#print("loss", compute_loss(jnp.array([R1, 0.0]), sim_dat_new[2,:].flatten()))
+network_properties = {
+        "sigma": [1e-5],
+        "scale": [10],
+        "num_warmup": np.arange(10, 110, 10),
+        "num_samples": np.arange(100, 1100, 100),
+        "num_chains": [1]
+        }
 
-#for i in range(100):
-#    grads = jax.jacfwd(compute_loss)(params, sim_dat_new[2,:].flatten())
-#    print(grads)
+#network_properties = {
+#        "sigma": [1e-5],
+#        "scale": [10],
+#        "num_warmup": np.arange(10, 20, 10),
+#        "num_samples": np.arange(10, 20, 10),
+#        "num_chains": [1]
+#        }
 
-#    updates, opt_state = gradient_transform.update(grads, opt_state)
-#    print(opt_state)
-#    params = optax.apply_updates(params, updates)
-#    print(params)
+settings = list(itertools.product(*network_properties.values()))
 
+results_folder = "results/inference_ensemble"
+if not os.path.isdir(results_folder):
+    os.makedirs(results_folder, mode = 0o777)
 
+for set_num, setup in enumerate(settings):
+    print("###################################", set_num, "###################################")
+    setup_properties = {
+            "sigma": setup[0],
+            "scale": setup[1],
+            "num_warmup": setup[2],
+            "num_samples": setup[3],
+            "num_chains": setup[4]
+            }
+    results_file = results_folder  + "/setup_" + str(setup_properties["sigma"]) + "_" + str(setup_properties["scale"]) + "_" + str(setup_properties["num_warmup"]) + "_" + str(setup_properties["num_samples"]) + "_" + str(setup_properties["num_chains"]) + ".txt"
+    mcmc = MCMC(numpyro.infer.NUTS(model, 
+                                   forward_mode_differentiation=True),
+                                   num_samples=setup_properties["num_samples"],
+                                   num_warmup=setup_properties["num_warmup"],
+                                   num_chains=setup_properties["num_chains"])
+    mcmc.run(jax.random.PRNGKey(3450), 
+             P_obs, setup_properties["sigma"], setup_properties["scale"], R_scale)
+    mcmc.print_summary()
+    R = jnp.mean(mcmc.get_samples()["theta"])
 
-if verbose:
-    print("\n")
-    ending_time = (time.time_ns() - starting_time) / 1.0e9
-    print(f"Elapsed time = {ending_time} seconds")
-
-    
+    #print(mcmc.get_samples())
+    file = open(results_file, "a")  
+    file.write(str(R_scale) + " " + str(R) + "  " + str(R1) + "\n")
+    file.close()
