@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 from jax import lax, debug
 from src.utils import pressure
-import optimistix as optx
 
 def setInletBC(inlet, u0, u1, 
                A, c0, c1, 

@@ -3,7 +3,6 @@ from jax import lax, jit, debug
 from functools import partial
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
-import optimistix as optx
 
 
 def solveConjunction(u1, u2, A1, 
