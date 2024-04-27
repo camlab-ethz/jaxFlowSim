@@ -6,10 +6,9 @@ from src.IOutils import saveTempData
 from src.solver import computeDt, solveModel
 from src.check_conv import printConvError, computeConvError, checkConv
 import numpy as np
-import numpyro
 
 
-numpyro.set_platform("cpu")
+#numpyro.set_platform("cpu")
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 #os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 32 CPU devices
 #jax.devices("cpu")[0]
