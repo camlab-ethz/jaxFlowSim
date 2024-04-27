@@ -55,6 +55,11 @@ if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9
     print(f"elapsed time = {ending_time} seconds")
 
+# save data for unittests
+#np.savetxt("test/test_data/bifurcation_sim_dat.dat", sim_dat)
+#np.savetxt("test/test_data/bifurcation_t.dat", t)
+#np.savetxt("test/test_data/bifurcation_P.dat", P)
+
 #jnp.set_printoptions(threshold=sys.maxsize)
 filename = config_filename.split("/")[-1]
 network_name = filename.split(".")[0]
