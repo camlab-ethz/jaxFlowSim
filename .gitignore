@@ -169,6 +169,7 @@ results/*
 parsing/models*
 parsing/openBF-hub
 test.py
+test/test_data
 *_bckp*
 plotting/*.txt
 plotting/*.eps
