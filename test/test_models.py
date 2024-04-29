@@ -5,11 +5,15 @@ sys.path.append('/home/diego/studies/uni/thesis_maths/jaxFlowSim')
 print('Updated sys.path:', sys.path)
 from src.model import configSimulation, simulationLoop
 import time
+import os
 from functools import partial
 from jax import block_until_ready, jit
 import numpy as np
+
+cwd = os.getcwd()
+os.chdir(cwd+"/..")
+
 jax.config.update("jax_enable_x64", True)
-#os.chdir(os.path.dirname(__file__))
 
 class TestStringMethods(unittest.TestCase):
 

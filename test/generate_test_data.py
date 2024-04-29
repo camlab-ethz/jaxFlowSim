@@ -6,10 +6,10 @@ import time
 import os
 from functools import partial
 from jax import block_until_ready, jit
-import matplotlib.pyplot as plt
 import numpy as np
 
-#os.chdir(os.path.dirname(__file__))
+cwd = os.getcwd()
+os.chdir(cwd+"/..")
 jax.config.update("jax_enable_x64", True)
 
 modelnames = ["single-artery", 
