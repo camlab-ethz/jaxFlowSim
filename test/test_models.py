@@ -10,8 +10,7 @@ from functools import partial
 from jax import block_until_ready, jit
 import numpy as np
 
-cwd = os.getcwd()
-os.chdir(cwd+"/..")
+os.chdir(os.path.dirname(__file__)+"/..")
 
 jax.config.update("jax_enable_x64", True)
 
