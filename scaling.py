@@ -17,22 +17,17 @@ jax.config.update("jax_enable_x64", True)
 verbose = True
 timeings = []
 num_vessels = []
-filenames = ["test/single-artery/single-artery.yml", "test/tapering/tapering.yml", "test/conjunction/conjunction.yml", "test/bifurcation/bifurcation.yml", "test/adan56/adan56.yml"]
-modelname = "0053_H_CERE_H"
-config_filename = "test/" + modelname + "/" + modelname + ".yml"
-filenames.append(config_filename)
-modelname = "0007_H_AO_H"
-config_filename = "test/" + modelname + "/" + modelname + ".yml"
-filenames.append(config_filename)
-modelname = "0029_H_ABAO_H"
-config_filename = "test/" + modelname + "/" + modelname + ".yml"
-filenames.append(config_filename)
+model_names = ["single-artery", "tapering", "conjunction", "bifurcation", "adan56", "0053_H_CERE_H", "0007_H_AO_H", "0029_H_ABAO_H"]
+filenames = []
+for model_name in model_names:
+    config_filename = "test/" + model_name + "/" + model_name + ".yml" 
+    filenames.append(config_filename)
 
 for config_filename in filenames:
     (N, B, J, 
      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      timepoints, conv_toll, Ccfl, edges, input_data, 
-                rho, total_time, nodes, 
+                rho, nodes, 
                 starts, ends,
                 indices_1, indices_2,
                 vessel_names, cardiac_T) = configSimulation(config_filename, make_results_folder=False)
@@ -42,7 +37,7 @@ for config_filename in filenames:
     _, _, _  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, conv_toll, Ccfl, edges, input_data, 
-                                          rho, total_time, nodes, 
+                                          rho, nodes, 
                                           starts, ends,
                                           indices_1, indices_2))
     if verbose:
