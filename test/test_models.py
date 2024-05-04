@@ -3,7 +3,7 @@ import jax
 import sys
 sys.path.append('/home/diego/studies/uni/thesis_maths/jaxFlowSim')
 print('Updated sys.path:', sys.path)
-from src.model import configSimulation, simulationLoop
+from src.model import configSimulation, simulationLoop, simulationLoopUnsafe
 import time
 import os
 from functools import partial
@@ -14,7 +14,7 @@ os.chdir(os.path.dirname(__file__)+"/..")
 
 jax.config.update("jax_enable_x64", True)
 
-class TestStringMethods(unittest.TestCase):
+class TestModels(unittest.TestCase):
 
     def test_models(self):
 
@@ -57,6 +57,54 @@ class TestStringMethods(unittest.TestCase):
             P_base = np.loadtxt("test/test_data/" + modelname + "_P.dat")
             sim_dat_base = np.loadtxt("test/test_data/" + modelname + "_sim_dat.dat")
             t_base = np.loadtxt("test/test_data/" + modelname + "_t.dat")
+
+            np.testing.assert_almost_equal(P, P_base)
+            np.testing.assert_almost_equal(sim_dat,sim_dat_base)
+            np.testing.assert_almost_equal(t, t_base)
+
+    def test_models_unsafe(self):
+
+        modelnames = ["single-artery", 
+                           "tapering",
+                           "conjunction",
+                           "bifurcation",
+                           "aspirator",
+                           "adan56",
+                           "0007_H_AO_H",
+                           "0029_H_ABAO_H",
+                           "0053_H_CERE_H"]
+
+        for modelname in modelnames:
+            config_filename = "test/" + modelname + "/" + modelname + ".yml"
+
+            verbose = True
+
+            (N, B, J, 
+             sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+             timepoints, conv_toll, Ccfl, edges, input_data, 
+                        rho, nodes, 
+                        starts, ends,
+                        indices_1, indices_2,
+                        vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+
+            if verbose:
+                starting_time = time.time_ns()
+
+            sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+            sim_dat, P, t = block_until_ready(sim_loop_old_jit(N, B,
+                                                  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                                  Ccfl, edges, input_data, 
+                                                  rho, nodes, 
+                                                  starts, ends,
+                                                  indices_1, indices_2, upper=120000))
+
+            if verbose:
+                ending_time = (time.time_ns() - starting_time) / 1.0e9
+                print(f"elapsed time = {ending_time} seconds")
+
+            P_base = np.loadtxt("test/test_data/" + modelname + "_P_unsafe.dat")
+            sim_dat_base = np.loadtxt("test/test_data/" + modelname + "_sim_dat_unsafe.dat")
+            t_base = np.loadtxt("test/test_data/" + modelname + "_t_unsafe.dat")
 
             np.testing.assert_almost_equal(P, P_base)
             np.testing.assert_almost_equal(sim_dat,sim_dat_base)
