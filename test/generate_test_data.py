@@ -70,7 +70,7 @@ for modelname in modelnames:
         starting_time = time.time_ns()
 
     sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
-    sim_dat, P_t, t_t = block_until_ready(sim_loop_old_jit(N, B,
+    sim_dat, P, t = block_until_ready(sim_loop_old_jit(N, B,
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, edges, input_data, 
                                           rho, nodes, 
