@@ -1,6 +1,4 @@
 import jax.numpy as jnp
-from functools import partial
-from jax import lax, jit
 from src.utils import pressure, waveSpeed
 from src.newton import newtonRaphson
 
