@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from jax import lax, debug
+from jax import lax
 from src.utils import pressure
 
 def setInletBC(inlet, u0, u1, 
