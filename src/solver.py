@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from functools import partial
-from jax import lax, vmap, debug, jit
+from jax import lax, vmap, jit
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
