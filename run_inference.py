@@ -6,13 +6,11 @@ import sys
 import time
 from functools import partial
 from jax import block_until_ready, jit
-import matplotlib.pyplot as plt
 import numpyro.distributions as dist
 import jax.numpy as jnp
 import jax
-import optax
 import numpyro
-from numpyro.infer import MCMC,HMC
+from numpyro.infer import MCMC
 import numpy as np
 import itertools
 
