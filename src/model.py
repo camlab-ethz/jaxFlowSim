@@ -1,12 +1,14 @@
 import jax.numpy as jnp
-from jax import lax#, debug
+from jax import lax, jit, block_until_ready
 import numpy as np
 from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempData
 from src.solver import computeDt, solveModel
 from src.check_conv import printConvError, computeConvError, checkConv
+from functools import partial 
 import numpy as np
 import numpyro
+import time
 
 
 numpyro.set_platform("cpu")
@@ -98,7 +100,7 @@ def simulationLoopUnsafe(N, B,
                                                 input_data, rho,
                                                 nodes, P_t))
     
-    return sim_dat, P_t, t_t
+    return sim_dat, t_t, P_t
     
 
 
@@ -194,4 +196,54 @@ def simulationLoop(N, B, num_snapshots,
                                                 nodes))
     
     return sim_dat, t_t, P_t
+
+def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True):
     
+    (N, B, J, 
+     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+     timepoints, conv_toll, Ccfl, edges, input_data, 
+                rho, nodes, 
+                starts, ends,
+                indices_1, indices_2,
+                vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+
+    if verbose:
+        starting_time = time.time_ns()
+
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+    sim_dat, t, P = block_until_ready(sim_loop_old_jit(N, B,
+                                          sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                          Ccfl, edges, input_data, 
+                                          rho, nodes, 
+                                          starts, ends,
+                                          indices_1, indices_2, upper=120000))
+
+    if verbose:
+        ending_time = (time.time_ns() - starting_time) / 1.0e9
+        print(f"elapsed time = {ending_time} seconds")
+    return sim_dat, t, P
+    
+def runSimulation(config_filename, verbose=False, make_results_folder=True):
+    (N, B, J, 
+     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+     timepoints, conv_tol, Ccfl, edges, input_data, 
+                rho, nodes, 
+                starts, ends,
+                indices_1, indices_2,
+                vessel_names, cardiac_T) = configSimulation(config_filename, verbose, make_results_folder)
+
+    if verbose:
+        starting_time = time.time_ns()
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
+    sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
+                                          sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+                                          timepoints, conv_tol, Ccfl, edges, input_data, 
+                                          rho, nodes, 
+                                          starts, ends,
+                                          indices_1, indices_2))
+
+    if verbose:
+        ending_time = (time.time_ns() - starting_time) / 1.0e9
+        print(f"elapsed time = {ending_time} seconds")
+    
+    return sim_dat, t, P
