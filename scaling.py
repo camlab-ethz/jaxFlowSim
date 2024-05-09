@@ -27,8 +27,7 @@ for config_filename in filenames:
     (N, B, J, 
      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      timepoints, conv_toll, Ccfl, edges, input_data, 
-                rho, nodes, 
-                starts, ends,
+                rho, strides, 
                 indices_1, indices_2,
                 vessel_names, cardiac_T) = configSimulation(config_filename, make_results_folder=False)
     if verbose:
@@ -37,8 +36,7 @@ for config_filename in filenames:
     _, _, _  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, conv_toll, Ccfl, edges, input_data, 
-                                          rho, nodes, 
-                                          starts, ends,
+                                          rho, strides, 
                                           indices_1, indices_2))
     if verbose:
         ending_time = (time.time_ns() - starting_time) / 1.0e9
