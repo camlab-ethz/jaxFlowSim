@@ -33,20 +33,20 @@ else:
 
 verbose = True
 (N, B, J, 
- sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_tol, Ccfl, edges, input_data, 
-            rho, strides, 
-            indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)#, junction_functions) = configSimulation(config_filename, verbose)
+ sim_dat, sim_dat_aux, 
+ sim_dat_const, sim_dat_const_aux, 
+ timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+ masks, strides, edges,
+ vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
 sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
-                                      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_tol, Ccfl, edges, input_data, 
-                                      rho, strides, 
-                                      indices_1, indices_2)) #, junction_functions))
+                                      sim_dat, sim_dat_aux, 
+                                      sim_dat_const, sim_dat_const_aux, 
+                                      timepoints, conv_tol, Ccfl, input_data, rho, 
+                                      masks, strides, edges))
 
 if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9
