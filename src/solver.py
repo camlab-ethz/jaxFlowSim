@@ -14,7 +14,7 @@ def computeDt(Ccfl, u, c, dx):
     return dt
 
 @partial(jit, static_argnums=(0, 1))
-def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+def solveModel(N, B, strides, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -46,8 +46,8 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
                   indices1, indices2))
 
     def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, starts, ends) = dat
-        end = ends[j]
+        (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, strides) = dat
+        end = strides[j,1]
 
         def setOutletBCWrapper(sim_dat, sim_dat_aux):
             u1 = sim_dat[0,end-1]
@@ -91,8 +91,8 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
         def solveBifurcationWrapper(sim_dat):
             d1_i = edges[j,4]
             d2_i = edges[j,5]
-            d1_i_start = starts[d1_i] 
-            d2_i_start = starts[d2_i] 
+            d1_i_start = strides[d1_i,0] 
+            d2_i_start = strides[d2_i,0] 
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,d1_i_start]
             u3 = sim_dat[0,d2_i_start]
@@ -141,7 +141,7 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
 
         def solveConjunctionWrapper(sim_dat, rho):
             d_i = edges[j,7]
-            d_i_start = starts[d_i]
+            d_i_start = strides[d_i,0]
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,d_i_start]
             A1 = sim_dat[2,end-1]
@@ -180,8 +180,8 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
             p1_i = edges[j,7]
             p2_i = edges[j,8]
             d = edges[j,9]
-            p1_i_end = ends[p1_i]
-            d_start = starts[d]
+            p1_i_end = strides[p1_i,1]
+            d_start = strides[d,0]
             u1 = sim_dat[0,end-1]
             u2 = sim_dat[0,p1_i_end-1]
             u3 = sim_dat[0,d_start]
@@ -241,13 +241,13 @@ def solveModel(N, B, starts, ends, indices1, indices2, t, dt, sim_dat, sim_dat_a
 
         return (sim_dat, sim_dat_aux, 
                 sim_dat_const, sim_dat_const_aux, 
-                edges, rho, starts, ends)
+                edges, rho, strides)
 
     (sim_dat, sim_dat_aux, _, 
      _, _, _, 
-     _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
+     _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                             sim_dat_const_aux, edges, rho, 
-                                            starts, ends))
+                                            strides))
 
     return sim_dat, sim_dat_aux
 

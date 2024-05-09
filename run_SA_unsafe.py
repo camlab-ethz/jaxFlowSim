@@ -41,22 +41,22 @@ verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
  timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, nodes, 
-            starts, ends,
+            rho, strides, 
             indices_1, indices_2,
             vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
 
-sim_loop_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
-sim_dat_base, P_t_base, t_t_base = block_until_ready(sim_loop_jit(N, B,
+sim_loop_jit = partial(jit, static_argnums=(0, 1, 13))(simulationLoopUnsafe)
+sim_dat_base, t_t_base, P_t_base = block_until_ready(sim_loop_jit(N, B,
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                       Ccfl, edges, input_data, 
-                                      rho, nodes, 
-                                      starts, ends,
+                                      rho, strides, 
                                       indices_1, indices_2, upper=120000))
 
+starts = strides[:,0]
+ends = strides[:,1]
 def sim_loop_jit_wrapper(rho, Ccfl, Ls, R0s, Es, R1s, R2s, Ccs):
     
     for i in range(N):
@@ -68,11 +68,10 @@ def sim_loop_jit_wrapper(rho, Ccfl, Ls, R0s, Es, R1s, R2s, Ccs):
        sim_dat_const[10,starts[i]-B:ends[i]+B] = Ls[i]*np.ones(ends[i]-starts[i]+2*B)
 
 
-    sim_dat_new, P_t_new, t_t_new =sim_loop_jit(N, B,
+    sim_dat_new, t_t_new, P_t_new =sim_loop_jit(N, B,
                 sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                 Ccfl, edges, input_data, 
-                rho, nodes, 
-                starts, ends,
+                rho, strides,
                 indices_1, indices_2, upper=120000)
     return np.linalg.norm(P_t_base-P_t_new)
 
@@ -103,15 +102,13 @@ print(P_t_base)
 def quick_wrap(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
-                    rho, nodes, 
-                    starts, ends,
+                    rho, strides,
                     indices_1, indices_2, upper=120000):
 
-                    _, P_t_new, _ = sim_loop_jit(N, B,
+                    _, _, P_t_new = sim_loop_jit(N, B,
                                 sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                 Ccfl, edges, input_data, 
-                                rho, nodes, 
-                                starts, ends,
+                                rho, strides,
                                 indices_1, indices_2, upper=120000)
                     return np.linalg.norm(P_t_base-P_t_new)
 
@@ -162,8 +159,7 @@ def wrapped_linear(X: np.ndarray, l = 4, func=sim_loop_jit) -> np.ndarray:
         sim_dat_new, _, _ = func(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
-                    rho, nodes, 
-                    starts, ends,
+                    rho, strides,
                     indices_1, indices_2, upper=120000)
         
         #print(np.linalg.norm(sim_dat_base[l,:]-sim_dat_new[l,:])/np.linalg.norm(sim_dat_base[l,:]))

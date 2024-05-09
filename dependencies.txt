@@ -4,4 +4,7 @@ numpy
 numpyro
 matplotlib
 PyYAML
+sensitivity
+SALib
+jinja2
 

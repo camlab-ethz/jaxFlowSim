@@ -27,8 +27,8 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
 
     (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      N, B, edges, 
-     input_data, nodes, vessel_names, 
-    starts, ends, indices_1, 
+     input_data, strides, vessel_names, 
+    indices_1, 
     indices_2) = buildArterialNetwork(data["network"], blood)#, junction_functions) = buildArterialNetwork(data["network"], blood)
     if make_results_folder:
         makeResultsFolder(data, input_filename)
@@ -44,8 +44,7 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
     return (N, B, J, 
             sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
             timepoints, 1, Ccfl, edges, input_data, 
-            blood.rho, nodes, 
-            starts, ends,
+            blood.rho, strides, 
             indices_1, indices_2, 
             vessel_names, cardiac_T) #, junction_functions)
 
@@ -54,8 +53,8 @@ def simulationLoopUnsafe(N, B,
                         sim_dat, sim_dat_aux, sim_dat_const, 
                         sim_dat_const_aux,
                         Ccfl, edges, input_data, 
-                        rho, nodes, 
-                        starts, ends, indices1, 
+                        rho, strides,
+                        indices1, 
                         indices2, upper = 100000):
     t = 0.0
     dt = 1
@@ -69,16 +68,16 @@ def simulationLoopUnsafe(N, B,
          dt, t, t_t, 
          edges, 
          input_data, rho, 
-         nodes, P_t) = args
+         P_t) = args
         dt = computeDt(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(N, B, starts, 
-                                          ends, indices1, indices2,
+        sim_dat, sim_dat_aux = solveModel(N, B, strides[:,:2], 
+                                          indices1, indices2,
                                           t, dt, sim_dat, 
                                           sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho)
         t = (t + dt)%sim_dat_const_aux[0,0]
         t_t = t_t.at[i].set(t)
-        P_t = P_t.at[i,:].set(saveTempData(N, starts, ends, nodes, sim_dat[4,:]))
+        P_t = P_t.at[i,:].set(saveTempData(N, strides, sim_dat[4,:]))
 
 
         return (sim_dat, sim_dat_aux, sim_dat_const, 
@@ -86,19 +85,19 @@ def simulationLoopUnsafe(N, B,
                 dt, t, t_t,
                 edges, 
                 input_data, rho, 
-                nodes, P_t)
+                P_t)
 
     (sim_dat, sim_dat_aux, sim_dat_const, 
      sim_dat_const_aux,
      dt, t, t_t, 
      edges, 
      input_data, rho, 
-     nodes, P_t) = lax.fori_loop(0, upper, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
+     P_t) = lax.fori_loop(0, upper, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                                 sim_dat_const_aux,
                                                 dt, t, t_t,
                                                 edges, 
                                                 input_data, rho,
-                                                nodes, P_t))
+                                                P_t))
     
     return sim_dat, t_t, P_t
     
@@ -108,8 +107,8 @@ def simulationLoop(N, B, num_snapshots,
                         sim_dat, sim_dat_aux, sim_dat_const, 
                         sim_dat_const_aux, timepoints, conv_tol, 
                         Ccfl, edges, input_data, 
-                        rho, nodes, 
-                        starts, ends, indices1, 
+                        rho, strides, 
+                        indices1, 
                         indices2): #, junction_functions):
     t = 0.0
     passed_cycles = 0
@@ -125,7 +124,7 @@ def simulationLoop(N, B, num_snapshots,
          _, passed_cycles_i, _, 
          P_t_i, P_l_i, _, 
          conv_tol, _, _, 
-         _, _, _) = args
+         _, _,) = args
         err = computeConvError(N, P_t_i, P_l_i)
         def printConvErrorWrapper():
             printConvError(err)
@@ -142,18 +141,17 @@ def simulationLoop(N, B, num_snapshots,
          timepoints, passed_cycles, dt, 
          P_t, P_l, t_t, 
          _, Ccfl, edges, 
-         input_data, rho, 
-         nodes) = args
+         input_data, rho) = args
         dt = computeDt(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
-        sim_dat, sim_dat_aux = solveModel(N, B, starts, 
-                                          ends, indices1, indices2,
+        sim_dat, sim_dat_aux = solveModel(N, B, strides[:,:2], 
+                                          indices1, indices2,
                                           t, dt, sim_dat, 
                                           sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           edges, input_data, rho) #, junction_functions)
 
         (P_t_temp,counter_temp) = lax.cond(t >= timepoints[counter], 
-                                         lambda: (saveTempData(N, starts, ends, 
-                                                                nodes, sim_dat[4,:]),counter+1), 
+                                         lambda: (saveTempData(N, strides,
+                                                                sim_dat[4,:]),counter+1), 
                                          lambda: (P_t[counter,:],counter))
         P_t = P_t.at[counter,:].set(P_t_temp)
         t_t = t_t.at[counter].set(t)
@@ -178,22 +176,19 @@ def simulationLoop(N, B, num_snapshots,
                 timepoints, passed_cycles, dt, 
                 P_t, P_l, t_t, 
                 conv_tol, Ccfl, edges, 
-                input_data, rho, 
-                nodes)
+                input_data, rho)
 
     (sim_dat, sim_dat_aux, sim_dat_const, 
      sim_dat_const_aux, t, counter, 
      timepoints, passed_cycles, dt, 
      P_t, P_l, t_t,  
      conv_tol, Ccfl, edges, 
-     input_data, rho, 
-     nodes) = lax.while_loop(condFun, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
+     input_data, rho) = lax.while_loop(condFun, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
                                                 sim_dat_const_aux, t, counter, 
                                                 timepoints, passed_cycles, dt, 
                                                 P_t, P_l, t_t, 
                                                 conv_tol, Ccfl, edges, 
-                                                input_data, rho, 
-                                                nodes))
+                                                input_data, rho))
     
     return sim_dat, t_t, P_t
 
@@ -202,20 +197,18 @@ def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True
     (N, B, J, 
      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      timepoints, conv_toll, Ccfl, edges, input_data, 
-                rho, nodes, 
-                starts, ends,
+                rho, strides, 
                 indices_1, indices_2,
                 vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
     if verbose:
         starting_time = time.time_ns()
 
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 13))(simulationLoopUnsafe)
     sim_dat, t, P = block_until_ready(sim_loop_old_jit(N, B,
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, edges, input_data, 
-                                          rho, nodes, 
-                                          starts, ends,
+                                          rho, strides, 
                                           indices_1, indices_2, upper=120000))
 
     if verbose:
@@ -227,8 +220,7 @@ def runSimulation(config_filename, verbose=False, make_results_folder=True):
     (N, B, J, 
      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
      timepoints, conv_tol, Ccfl, edges, input_data, 
-                rho, nodes, 
-                starts, ends,
+                rho, strides, 
                 indices_1, indices_2,
                 vessel_names, cardiac_T) = configSimulation(config_filename, verbose, make_results_folder)
 
@@ -238,8 +230,7 @@ def runSimulation(config_filename, verbose=False, make_results_folder=True):
     sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                           sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                           timepoints, conv_tol, Ccfl, edges, input_data, 
-                                          rho, nodes, 
-                                          starts, ends,
+                                          rho, strides, 
                                           indices_1, indices_2))
 
     if verbose:

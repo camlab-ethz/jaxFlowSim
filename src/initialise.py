@@ -171,19 +171,25 @@ def buildArterialNetwork(network, blood):
     starts[0] = B
     ends[0] = M_0 + B
 
+
     for i in range(1, N):
         L = float(network[i]["L"])
         _M = meshVessel(network[i], L)
         starts[i] = ends[i-1] + 2*B
         ends[i] = starts[i] + _M
 
+    strides = np.zeros((N,5), dtype=np.int64)
+    strides[:,0] = starts
+    strides[:,1] = ends
+    
+
     K = ends[-1] + B
-    starts_rep = np.zeros(ends[-1] + B, dtype=np.int64)
-    ends_rep = np.zeros(ends[-1] + B, dtype=np.int64)
+    starts_rep = np.zeros(K, dtype=np.int64)
+    ends_rep = np.zeros(K, dtype=np.int64)
 
     for i in range(0, N):
-        starts_rep[starts[i]-B:ends[i]+B] = starts[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
-        ends_rep[starts[i]-B:ends[i]+B] = ends[i]*np.ones(ends[i]-starts[i]+2*B, np.int64) 
+        starts_rep[strides[i,0]-B:strides[i,1]+B] = strides[i,0]*np.ones(strides[i,1]-strides[i,0]+2*B, np.int64) 
+        ends_rep[strides[i,0]-B:strides[i,1]+B] = strides[i,1]*np.ones(strides[i,1]-strides[i,0]+2*B, np.int64) 
     
     sim_dat = np.zeros((5, K), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
@@ -196,8 +202,8 @@ def buildArterialNetwork(network, blood):
     nodes = np.zeros((N,3), dtype=np.int64)
 
     for i in range(0, len(network)):
-        end = ends[i]
-        start = starts[i]
+        end = strides[i,1]
+        start = strides[i,0]
         M = end-start
 
         (_edges, _input_data, _sim_dat, 
@@ -218,7 +224,7 @@ def buildArterialNetwork(network, blood):
         edges[i, :3] = _edges
         input_data_temp.append(_input_data.transpose())
 
-        sim_dat_const[-1,starts[i]-B:ends[i]+B] = sim_dat_const[-1,starts[i]-B:ends[i]+B]/(M)
+        sim_dat_const[-1,start-B:end+B] = sim_dat_const[-1,start-B:end+B]/(M)
         vessel_names.append(vessel_name)
     
     input_sizes = [inpd.shape[1] for inpd in input_data_temp]
@@ -230,6 +236,9 @@ def buildArterialNetwork(network, blood):
     indices = np.arange(0, K, 1)
     indices_1 = indices-starts_rep==-starts_rep[0]+1
     indices_2 = indices-ends_rep==-starts_rep[0]+2
+    masks = np.zeros((2,K), dtype=np.int64)
+    masks[0,:] = indices_1
+    masks[1,:] = indices_2
     
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
@@ -251,10 +260,12 @@ def buildArterialNetwork(network, blood):
                 edges[j,8] = np.maximum(temp_1,temp_2)
                 edges[j,9] = np.where(edges[:, 1] == t)[0][0]
 
+    strides[:,2:] = nodes
+
     return (sim_dat, sim_dat_aux, sim_dat_const,
             sim_dat_const_aux, N, B,
-            edges, input_data, nodes, 
-            vessel_names, starts, ends, 
+            edges, input_data, strides, 
+            vessel_names,
             indices_1, indices_2)
 
 

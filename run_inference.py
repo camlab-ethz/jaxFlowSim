@@ -1,7 +1,6 @@
 from src.model import configSimulation, simulationLoopUnsafe
 from numpyro.infer.reparam import TransformReparam
 import os
-from jax.config import config
 import sys
 import time
 from functools import partial
@@ -15,7 +14,7 @@ import numpy as np
 import itertools
 
 os.chdir(os.path.dirname(__file__))
-config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
 
 numpyro.set_host_device_count(1)
 
@@ -45,37 +44,34 @@ verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
  timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, nodes, 
-            starts, ends,
+            rho, strides, 
             indices1, indices2,
             vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
 
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 15))(simulationLoopUnsafe)
+sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 13))(simulationLoopUnsafe)
 sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
                                       Ccfl, edges, input_data, 
-                                      rho, nodes, 
-                                      starts, ends,
+                                      rho, strides, 
                                       indices1, indices2, 120000))
 R_index = 1
 var_index = 7
-R1 = sim_dat_const[var_index,ends[R_index]]
+R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
 R_scales = np.linspace(0.5*R1, 0.9*R1, 16)
 R_scale = R_scales[int(sys.argv[2])]
 print(R1, R_scale)
 def simLoopWrapper(R):
-    ones = jnp.ones(ends[R_index]-starts[R_index]+4)
+    ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[var_index,starts[R_index]-2:ends[R_index]+2].set(R*ones)
+    sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
     _, _, P = simulationLoopUnsafe(N, B,
                     sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
                     Ccfl, edges, input_data, 
-                    rho, nodes, 
-                    starts, ends,
+                    rho, strides, 
                     indices1, indices2, 120000)
     return P
 
