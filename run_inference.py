@@ -42,21 +42,23 @@ else:
 
 verbose = True
 (N, B, J, 
- sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, strides, 
-            indices1, indices2,
-            vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+ sim_dat, sim_dat_aux, 
+ sim_dat_const, sim_dat_const_aux, 
+ timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+ masks, strides, edges,
+ vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
 
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 13))(simulationLoopUnsafe)
-sim_dat_new, t, P_obs  = block_until_ready(sim_loop_old_jit(N, B,
-                                      sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      Ccfl, edges, input_data, 
-                                      rho, strides, 
-                                      indices1, indices2, 120000))
+sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
+sim_dat_obs, t_obs, P_obs = block_until_ready(sim_loop_old_jit(N, B,
+                                      sim_dat, sim_dat_aux, 
+                                      sim_dat_const, sim_dat_const_aux, 
+                                      Ccfl, input_data, rho, 
+                                      masks, strides, edges,
+                                      upper=120000))
+
 R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
@@ -68,11 +70,12 @@ def simLoopWrapper(R):
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
-    _, _, P = simulationLoopUnsafe(N, B,
-                    sim_dat, sim_dat_aux, sim_dat_const_new, sim_dat_const_aux, 
-                    Ccfl, edges, input_data, 
-                    rho, strides, 
-                    indices1, indices2, 120000)
+    _, _, P = block_until_ready(sim_loop_old_jit(N, B,
+                                          sim_dat, sim_dat_aux, 
+                                          sim_dat_const, sim_dat_const_aux, 
+                                          Ccfl, input_data, rho, 
+                                          masks, strides, edges,
+                                          upper=120000))
     return P
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)

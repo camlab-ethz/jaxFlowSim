@@ -239,7 +239,7 @@ def buildArterialNetwork(network, blood):
     
     input_sizes = [inpd.shape[1] for inpd in input_data_temp]
     input_size = max(input_sizes)
-    input_data= np.ones((2*N,input_size), dtype=np.float64)*1000
+    input_data = np.ones((2*N,input_size), dtype=np.float64)*1000
     for i, inpd in enumerate(input_data_temp):
         input_data[2*i:2*i+2, :inpd.shape[1]] = inpd
 
@@ -359,11 +359,10 @@ def buildArterialNetwork(network, blood):
     mask1 = mask1[:,np.newaxis]*np.ones(3, dtype=np.int64)[np.newaxis,:]
     print(junction_functions)
         
-    return (sim_dat, sim_dat_aux, sim_dat_const,
-            sim_dat_const_aux, N, B,
-            edges, input_data, strides, 
-            vessel_names,
-            indices_1, indices_2)
+    return (sim_dat, sim_dat_aux, 
+            sim_dat_const, sim_dat_const_aux, N, B,
+            masks, strides, edges,
+            vessel_names, input_data)
 
 
 def buildVessel(ID, vessel_data, blood, M):

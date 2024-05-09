@@ -13,45 +13,42 @@ jax.config.update("jax_enable_x64", True)
 
 config_filename = "test/bifurcation/bifurcation.yml"
 (N, B, J, 
- sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, strides, 
-            indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename)
+ sim_dat, sim_dat_aux, 
+ sim_dat_const, sim_dat_const_aux, 
+ timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+ masks, strides, edges,
+ vessel_names, cardiac_T) = configSimulation(config_filename)
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
 sim_dat1, t1, P1  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_toll, Ccfl, edges, input_data, 
-                                      rho, strides,
-                                      indices_1, indices_2))
+                                      timepoints, conv_tol, Ccfl, input_data, rho,
+                                      masks, strides, edges))
 
 config_filename = "test/bifurcation2/bifurcation2.yml"
 (N, B, J, 
- sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, strides, 
-            indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename)
+ sim_dat, sim_dat_aux, 
+ sim_dat_const, sim_dat_const_aux, 
+ timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+ masks, strides, edges,
+ vessel_names, cardiac_T) = configSimulation(config_filename)
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
 sim_dat2, t2, P2  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_toll, Ccfl, edges, input_data, 
-                                      rho, strides, 
-                                      indices_1, indices_2))
+                                      timepoints, conv_tol, Ccfl, input_data, rho,
+                                      masks, strides, edges))
 
 config_filename = "test/bifurcation3/bifurcation3.yml"
 (N, B, J, 
- sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_toll, Ccfl, edges, input_data, 
-            rho, strides, 
-            indices_1, indices_2,
-            vessel_names, cardiac_T) = configSimulation(config_filename)
+ sim_dat, sim_dat_aux, 
+ sim_dat_const, sim_dat_const_aux, 
+ timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+ masks, strides, edges,
+ vessel_names, cardiac_T) = configSimulation(config_filename)
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
 sim_dat3, t3, P3  = block_until_ready(sim_loop_old_jit(N, B, J, 
                                       sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-                                      timepoints, conv_toll, Ccfl, edges, input_data, 
-                                      rho, strides, 
-                                      indices_1, indices_2))
+                                      timepoints, conv_tol, Ccfl, input_data, rho,
+                                      masks, strides, edges))
 
 r_folder = "results/compare_output_params_results"
 # delete existing folder and results

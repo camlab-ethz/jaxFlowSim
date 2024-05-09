@@ -14,7 +14,10 @@ def computeDt(Ccfl, u, c, dx):
     return dt
 
 @partial(jit, static_argnums=(0, 1))
-def solveModel(N, B, strides, indices1, indices2, t, dt, sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, input_data, rho):
+def solveModel(N, B, 
+               t, dt, input_data, rho, 
+               sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
+               masks, strides, edges):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -33,17 +36,17 @@ def solveModel(N, B, strides, indices1, indices2, t, dt, sim_dat, sim_dat_aux, s
                                                              input_data, cardiac_T, 1/dx, A00,
                                                              beta0, Pext))[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:])
 
-    sim_dat = sim_dat.at[:,B:-B].set(muscl(dt,
-                                           sim_dat[1,B:-B],
-                                           sim_dat[2,B:-B],
-                                           sim_dat_const[0,B:-B],
-                                           sim_dat_const[1,B:-B],
-                                           sim_dat_const[2,B:-B],
-                                           sim_dat_const[3,B:-B],
-                                           sim_dat_const[-1,B:-B],
-                                           sim_dat_const[4,B:-B],
-                                           sim_dat_const[5,B:-B],
-                                           indices1, indices2))
+    sim_dat = sim_dat.at[:,B:-B].set(muscl(dt, 
+                  sim_dat[1,B:-B],
+                  sim_dat[2,B:-B], 
+                  sim_dat_const[0,B:-B], 
+                  sim_dat_const[1,B:-B], 
+                  sim_dat_const[2,B:-B], 
+                  sim_dat_const[3,B:-B],
+                  sim_dat_const[-1,B:-B],
+                  sim_dat_const[4,B:-B],
+                  sim_dat_const[5,B:-B],
+                  masks))
 
     def bodyFun(j, dat):
         (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, strides) = dat
@@ -255,8 +258,8 @@ def solveModel(N, B, strides, indices1, indices2, t, dt, sim_dat, sim_dat_aux, s
 def muscl(dt,
           Q, A,
           A0, beta,  gamma, wallE,
-          dx, Pext, viscT,
-          indices1, indices2):
+          dx, Pext,viscT,
+          masks):
     K = len(Q) + 2
 
     s_A0 = vmap(lambda a: jnp.sqrt(a))(A0)
@@ -319,8 +322,8 @@ def muscl(dt,
     uStar2 = uStar1.at[:,1:-1].set(uStar)
     uStar3 = jnp.zeros((2, K+2))
     uStar3 = uStar1.at[:,2:].set(uStar)
-    uStar2 = jnp.where(indices1, uStar1, uStar2) 
-    uStar2 = jnp.where(indices2, uStar3, uStar2) 
+    uStar2 = jnp.where(masks[0,:], uStar1, uStar2) 
+    uStar2 = jnp.where(masks[1,:], uStar3, uStar2) 
     uStar = uStar2[:,1:-1]
 
     limiterA = computeLimiterIdx(uStar, 0, invDx_temp)
