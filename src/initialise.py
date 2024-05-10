@@ -194,7 +194,7 @@ def buildArterialNetwork(network, blood):
     sim_dat = np.zeros((5, K), dtype=np.float64)
     sim_dat_aux = np.zeros((N,3), dtype=np.float64)
     sim_dat_const = np.zeros((11, K), dtype=np.float64)
-    sim_dat_const_aux = np.zeros((N, 5), dtype=np.float64)
+    sim_dat_const_aux = np.zeros((N, 3), dtype=np.float64)
     edges = np.zeros((N, 10), dtype=np.int64)
     input_data_temp = []
     vessel_names = []
