@@ -186,12 +186,12 @@ def simulationLoop(N, B, num_snapshots,
     return sim_dat, t_t, P_t
 
 def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True):
-    (N, B, J, 
+    (N, B, _, 
      sim_dat, sim_dat_aux, 
      sim_dat_const, sim_dat_const_aux, 
-     timepoints, conv_tol, Ccfl, edges, input_data, rho, 
+     _, _, Ccfl, edges, input_data, rho, 
      masks, strides, edges,
-     vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+     _, _) = configSimulation(config_filename, verbose, make_results_folder)
    
 
     if verbose:
@@ -216,7 +216,7 @@ def runSimulation(config_filename, verbose=False, make_results_folder=True):
      sim_dat_const, sim_dat_const_aux, 
      timepoints, conv_tol, Ccfl, edges, input_data, rho, 
      masks, strides, edges,
-     vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+     _, _) = configSimulation(config_filename, verbose, make_results_folder)
 
     if verbose:
         starting_time = time.time_ns()
