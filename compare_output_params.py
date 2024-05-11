@@ -1,7 +1,5 @@
 from src.model import configSimulation, simulationLoop
 import jax
-import sys
-import time
 import os
 from functools import partial
 from jax import block_until_ready, jit

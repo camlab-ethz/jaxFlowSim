@@ -5,11 +5,8 @@ import time
 import os
 from functools import partial
 from jax import block_until_ready, jit
-import matplotlib.pyplot as plt
 import numpy as np
-from sensitivity import SensitivityAnalyzer
 from SALib import ProblemSpec
-from SALib.sample.sobol import sample
 
 
 os.chdir(os.path.dirname(__file__))
