@@ -1,6 +1,5 @@
 from src.model import configSimulation, simulationLoop
 import jax
-import sys
 import time
 import os
 import shutil
