@@ -3,7 +3,6 @@ from jax import lax, jit, debug
 from functools import partial
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
-import optimistix as optx
 
 def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, sim_dat_const_aux, 
