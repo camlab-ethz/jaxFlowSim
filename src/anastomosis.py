@@ -6,13 +6,10 @@ from src.utils import pressure, waveSpeed
 
 def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, 
-                       edges, starts, ends, i):
-    index1 = ends[i]
-    p1_i = edges[i,7]
-    p2_i = edges[i,8]
-    d = edges[i,9]
-    p1_i_end = ends[p1_i]
-    d_start = starts[d]
+                       start, ends):
+    index1 = ends[0]
+    p1_i_end = ends[1]
+    d_start = start
     u1 = sim_dat[0,index1]
     u2 = sim_dat[0,p1_i_end-1]
     u3 = sim_dat[0,d_start]
@@ -28,24 +25,10 @@ def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux,
     P1 = sim_dat[4,index1]
     P2 = sim_dat[4,p1_i_end-1]
     P3 = sim_dat[4,d_start]
-    u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
-        jnp.maximum(p1_i, p2_i) == i, 
-        lambda: solveAnastomosis(u1, u2, u3, 
+    u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = solveAnastomosis(u1, u2, u3, 
                                  A1, A2, A3,
-                                 sim_dat_const[0,index1],
-                                 sim_dat_const[0,p1_i_end-1],
-                                 sim_dat_const[0,d_start],
-                                 sim_dat_const[1,index1],
-                                 sim_dat_const[1,p1_i_end-1],
-                                 sim_dat_const[1,d_start],
-                                 sim_dat_const[2,index1],
-                                 sim_dat_const[2,p1_i_end-1],
-                                 sim_dat_const[2,d_start],
-                                 sim_dat_const[4,index1],
-                                 sim_dat_const[4,p1_i_end-1],
-                                 sim_dat_const[4,d_start],
-                                ), 
-        lambda: (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3))
+                                 *sim_dat_const
+                                ) 
     temp1 = jnp.array((u1, Q1, A1, c1, P1))
     temp2 = jnp.array((u2, Q2, A2, c2, P2))
     temp3 = jnp.array((u3, Q3, A3, c3, P3))
