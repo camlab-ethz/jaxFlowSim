@@ -4,7 +4,7 @@ from jax import lax, vmap, debug, jit
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
-from src.boundary_conditions import setInletBC, setOutletBC
+from src.boundary_conditions import setInletBC
 from src.utils import pressureSA, waveSpeedSA
 
 def computeDt(Ccfl, u, c, dx):

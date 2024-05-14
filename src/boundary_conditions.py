@@ -60,14 +60,13 @@ def areaFromPressure(P, A0, beta, P_ext):
     return A0 * ((P - P_ext) / beta + 1.0) * ((P - P_ext) / beta + 1.0)
 
 def setReflectionOutletBCWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, rho, B, ends, i, index2, index3):
+                       sim_dat_const, end, i):
 
-    #debug.print("{x}", x = (i, sim_dat_const_aux[i, 2]))
-    index1 = ends[i]
+    index1 = end
+    index2 = end-1
+    index3 = end-2
     u1 = sim_dat[0,index1]
     u2 = sim_dat[0,index2]
-    Q1 = sim_dat[1,index1]
     A1 = sim_dat[2,index1]
     c1 = sim_dat[3,index1]
     c2 = sim_dat[3,index2]
@@ -79,10 +78,9 @@ def setReflectionOutletBCWrapper(dt, sim_dat, sim_dat_aux,
     W2M0 = sim_dat_aux[i,1]
     P1 = 2.0 * P2 - P3
     u, Q, c = outletCompatibility(u1, u2, A1, 
-                                                 c1, c2, W1M0, 
-                                                 W2M0, dt, 
-                                                 sim_dat_const[-1, index1],
-                                                 sim_dat_const[6, index1])
+                                    c1, c2, W1M0, 
+                                    W2M0, dt, 
+                                    *sim_dat_const)
     temp = jnp.array((u,Q,A1,c,P1))
     sim_dat = lax.dynamic_update_slice(
         sim_dat, 
@@ -92,32 +90,17 @@ def setReflectionOutletBCWrapper(dt, sim_dat, sim_dat_aux,
     return sim_dat, sim_dat_aux
 
 def setWindkesselOutletBCWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, rho, B, ends, i, index2, index3):
+                       sim_dat_const, end, i):
 
-    #debug.print("{x}", x = (i, sim_dat_const_aux[i, 2]))
-    index1 = ends[i]
+    index1 = end
     u1 = sim_dat[0,index1]
-    u2 = sim_dat[0,index2]
     Q1 = sim_dat[1,index1]
     A1 = sim_dat[2,index1]
     c1 = sim_dat[3,index1]
-    c2 = sim_dat[3,index2]
     P1 = sim_dat[4,index1]
-    P2 = sim_dat[4,index2]
-    P3 = sim_dat[4,index3]
     Pc = sim_dat_aux[i,2]
-    W1M0 = sim_dat_aux[i,0]
-    W2M0 = sim_dat_aux[i,1]
-    u, A1, Pc = threeElementWindkessel(dt, u1, A1, 
-                                                    Pc, 
-                                                    sim_dat_const[9, index1], 
-                                                    sim_dat_const[7, index1],
-                                                    sim_dat_const[8, index1],
-                                                    sim_dat_const[1,index1],
-                                                    sim_dat_const[2,index1],
-                                                    sim_dat_const[0,index1],
-                                                    sim_dat_const[4, index1])
+    u, A1, Pc = threeElementWindkessel(dt, u1, A1, Pc, 
+                                       *sim_dat_const)
     temp = jnp.array((u,Q1,A1,c1,P1))
     sim_dat = lax.dynamic_update_slice(
         sim_dat, 
@@ -125,99 +108,6 @@ def setWindkesselOutletBCWrapper(dt, sim_dat, sim_dat_aux,
         (0,index1))
     sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
     return sim_dat, sim_dat_aux
-
-def setOutletBC(dt, u1, u2, 
-                Q1, A1, c1, 
-                c2, P1, P2, 
-                P3, Pc, W1M0, 
-                W2M0, A0, beta, 
-                gamma, dx, P_ext, 
-                outlet, Rt, R1, 
-                R2, Cc):
-    def outletCompatibility_wrapper(dt, u1, u2, 
-                                    Q1, A1, c1, 
-                                    c2, P1, P2, 
-                                    P3, Pc, W1M0, 
-                                    W2M0, A0, beta, 
-                                    gamma, dx, Pext, 
-                                    outlet, Rt, R1, 
-                                    R2, Cc):
-
-    
-        P1_out = 2.0 * P2 - P3
-        u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, 
-                                                     c1, c2, W1M0, 
-                                                     W2M0, dt, dx, 
-                                                     Rt)
-        return u1_out, Q1_out, A1, c1_out, P1_out, Pc
-
-    def threeElementWindkessel_wrapper(dt, u1, u2, 
-                                       Q1, A1, c1, 
-                                       c2, P1, P2, 
-                                       P3, Pc, W1M0, 
-                                       W2M0, A0, beta, 
-                                       gamma, dx, Pext, 
-                                       outlet, Rt, R1, 
-                                       R2, Cc):
-        debug.print("{x}", x = (dt, 111, outlet))
-        u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, 
-                                                        Pc, Cc, R1, 
-                                                        R2, beta, gamma, 
-                                                        A0, Pext)
-        return u1_out, Q1, A1_out, c1, P1, Pc_out
-
-    P1_out = 2.0 * P2 - P3
-    u1_out, Q1_out, c1_out = outletCompatibility(u1, u2, A1, 
-                                                 c1, c2, W1M0, 
-                                                 W2M0, dt, dx, 
-                                                 Rt)
-    return u1_out, Q1_out, A1, c1_out, P1_out, Pc
-    #u1_out, A1_out, Pc_out = threeElementWindkessel(dt, u1, A1, 
-    #                                                Pc, Cc, R1, 
-    #                                                R2, beta, gamma, 
-    #                                                A0, P_ext)
-    #return u1_out, Q1, A1_out, c1, P1, Pc_out
-    #debug.print("{x}", x = (outlet==1))
-    return lax.cond(outlet == 1,
-                  lambda dt, u1, u2, 
-                            Q1, A1, c1, 
-                            c2, P1, P2, 
-                            P3, Pc, W1M0, 
-                            W2M0, A0, beta, 
-                            gamma, dx, Pext, 
-                            outlet, Rt, R1, 
-                            R2, Cc: outletCompatibility_wrapper(dt, u1, u2, 
-                                                                Q1, A1, c1, 
-                                                                c2, P1, P2, 
-                                                                P3, Pc, W1M0, 
-                                                                W2M0, A0, beta, 
-                                                                gamma, dx, Pext, 
-                                                                outlet, Rt, R1, 
-                                                                R2, Cc),
-                  lambda dt, u1, u2, 
-                            Q1, A1, c1, 
-                            c2, P1, P2, 
-                            P3, Pc, W1M0, 
-                            W2M0, A0, beta, 
-                            gamma, dx, Pext, 
-                            outlet, Rt, R1, 
-                            R2, Cc: threeElementWindkessel_wrapper(dt, u1, u2, 
-                                                                   Q1, A1, c1, 
-                                                                   c2, P1, P2, 
-                                                                   P3, Pc, W1M0, 
-                                                                   W2M0, A0, beta, 
-                                                                   gamma, dx, Pext, 
-                                                                   outlet, Rt, R1, 
-                                                                   R2, Cc), 
-                  dt, u1, u2, 
-                  Q1, A1, c1, 
-                  c2, P1, P2, 
-                  P3, Pc, W1M0, 
-                  W2M0, A0, beta, 
-                  gamma, dx, P_ext, 
-                  outlet, Rt, R1, 
-                  R2, Cc)
-
 
 def outletCompatibility(u1, u2, A1, 
                         c1, c2, W1M0, 
