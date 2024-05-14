@@ -252,16 +252,16 @@ def buildArterialNetwork(network, blood):
             if edges[j,3] == 2:
                 edges[j,4] = np.where(edges[:, 1] == t)[0][0]
                 edges[j,5] = np.where(edges[:, 1] == t)[0][1]
-                junction_functions.append(Partial(solveBifurcationWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
-                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                junction_functions.append(Partial(solveBifurcationWrapper, sim_dat_const=sim_dat_const,  
+                                                  edges=edges, starts=starts, ends=ends-1, i=j))
                 mask[ends[j]-1:ends[j]+B] = j+1
                 mask[starts[edges[j,4]]-B:starts[edges[j,4]]+1] = j + 1
                 mask[starts[edges[j,5]]-B:starts[edges[j,5]]+1] = j + 1
 
             elif edges[j,6] == 1:
                 edges[j,7] = np.where(edges[:, 1] == t)[0][0]
-                junction_functions.append(Partial(solveConjunctionWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
-                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                junction_functions.append(Partial(solveConjunctionWrapper, sim_dat_const=sim_dat_const,
+                                                  edges=edges, starts=starts, rho=blood.rho, ends=ends-1, i=j))
                 mask[ends[j]-1:ends[j]+B] = j+1
                 mask[starts[edges[j,7]]-B:starts[edges[j,7]]+1] = j + 1
 
@@ -271,8 +271,8 @@ def buildArterialNetwork(network, blood):
                 edges[j,7] = np.minimum(temp_1,temp_2)
                 edges[j,8] = np.maximum(temp_1,temp_2)
                 edges[j,9] = np.where(edges[:, 1] == t)[0][0]
-                junction_functions.append(Partial(solveAnastomosisWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
-                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+                junction_functions.append(Partial(solveAnastomosisWrapper, sim_dat_const=sim_dat_const,
+                                                  edges=edges, starts=starts, ends=ends-1, i=j))
                 if j == edges[j,8]:
                     mask[starts[edges[j,9]]-B:starts[edges[j,9]]+1] = j + 1
                     mask[ends[edges[j,7]]-1:ends[edges[j,7]]+B] = j + 1

@@ -5,8 +5,8 @@ from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
 def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, rho, B, ends, i, index2, index3):
+                       sim_dat_const,
+                       edges, starts, rho, ends, i):
     index1 = ends[i]
     #debug.print("{x}", x = (rho, i, index1, index2, index3))
     d_i = edges[i,7]

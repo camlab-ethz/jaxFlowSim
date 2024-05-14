@@ -5,8 +5,8 @@ from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
 def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, ends, rho, B, i, index2, index3):
+                       sim_dat_const, 
+                       edges, starts, ends, i):
     index1 = ends[i]
     p1_i = edges[i,7]
     p2_i = edges[i,8]

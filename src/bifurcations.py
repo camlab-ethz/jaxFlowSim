@@ -5,8 +5,8 @@ from src.utils import pressure, waveSpeed
 from src.newton import newtonRaphson
 
 def solveBifurcationWrapper(dt, sim_dat, sim_dat_aux, 
-                       sim_dat_const, sim_dat_const_aux, 
-                       edges, starts, rho, B, ends, i, index2, index3):
+                       sim_dat_const, 
+                       edges, starts, ends, i):
     index1 = ends[i]
     d1_i = edges[i,4]
     d2_i = edges[i,5]
