@@ -250,10 +250,25 @@ def buildArterialNetwork(network, blood):
             edges[j,3] = np.where(edges[:, 1] == t,np.ones_like(edges[:,1]), np.zeros_like(edges[:,1])).sum().astype(int)
             edges[j,6] = np.where(edges[:, 2] == t,np.ones_like(edges[:,2]), np.zeros_like(edges[:,2])).sum().astype(int)
             if edges[j,3] == 2:
+                index1 = ends[j]-1
                 edges[j,4] = np.where(edges[:, 1] == t)[0][0]
                 edges[j,5] = np.where(edges[:, 1] == t)[0][1]
-                junction_functions.append(Partial(solveBifurcationWrapper, sim_dat_const=sim_dat_const,  
-                                                  edges=edges, starts=starts, ends=ends-1, i=j))
+                d1_i_start = starts[edges[j,4]]
+                d2_i_start = starts[edges[j,5]]
+                sim_dat_const_temp = (sim_dat_const[0,index1],
+                                    sim_dat_const[0,d1_i_start],
+                                    sim_dat_const[0,d2_i_start],
+                                    sim_dat_const[1,index1],
+                                    sim_dat_const[1,d1_i_start],
+                                    sim_dat_const[1,d2_i_start],
+                                    sim_dat_const[2,index1],
+                                    sim_dat_const[2,d1_i_start],
+                                    sim_dat_const[2,d2_i_start],
+                                    sim_dat_const[4, index1],
+                                    sim_dat_const[4, d1_i_start],
+                                    sim_dat_const[4, d2_i_start])
+                junction_functions.append(Partial(solveBifurcationWrapper, sim_dat_const=sim_dat_const_temp,  
+                                                  starts=(d1_i_start, d2_i_start), end=index1))
                 mask[ends[j]-1:ends[j]+B] = j+1
                 mask[starts[edges[j,4]]-B:starts[edges[j,4]]+1] = j + 1
                 mask[starts[edges[j,5]]-B:starts[edges[j,5]]+1] = j + 1

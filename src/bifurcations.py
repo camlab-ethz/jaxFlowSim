@@ -6,12 +6,10 @@ from src.newton import newtonRaphson
 
 def solveBifurcationWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, 
-                       edges, starts, ends, i):
-    index1 = ends[i]
-    d1_i = edges[i,4]
-    d2_i = edges[i,5]
-    d1_i_start = starts[d1_i] 
-    d2_i_start = starts[d2_i] 
+                       starts, end):
+    index1 = end 
+    d1_i_start = starts[0] 
+    d2_i_start = starts[1] 
     u1 = sim_dat[0,index1]
     u2 = sim_dat[0,d1_i_start]
     u3 = sim_dat[0,d2_i_start]
@@ -24,19 +22,7 @@ def solveBifurcationWrapper(dt, sim_dat, sim_dat_aux,
      c1, c2, c3, 
      P1, P2, P3) = solveBifurcation(u1, u2, u3, 
                                     A1, A2, A3,
-                                    sim_dat_const[0,index1],
-                                    sim_dat_const[0,d1_i_start],
-                                    sim_dat_const[0,d2_i_start],
-                                    sim_dat_const[1,index1],
-                                    sim_dat_const[1,d1_i_start],
-                                    sim_dat_const[1,d2_i_start],
-                                    sim_dat_const[2,index1],
-                                    sim_dat_const[2,d1_i_start],
-                                    sim_dat_const[2,d2_i_start],
-                                    sim_dat_const[4, index1],
-                                    sim_dat_const[4, d1_i_start],
-                                    sim_dat_const[4, d2_i_start],
-                                    )
+                                    *sim_dat_const)
     temp1 = jnp.array((u1, Q1, A1, c1, P1))
     temp2 = jnp.array((u2, Q2, A2, c2, P2))
     temp3 = jnp.array((u3, Q3, A3, c3, P3))
