@@ -1,10 +1,9 @@
-project name: aspirator
+proj_name: aspirator
 
 solver:
   Ccfl: 0.9
-  cycles: 100
-  jump: 100
-  convergence tolerance: 1.0
+  num_snapshots: 100
+  conv_tol: 1.0
 
 blood:
   mu:  4.0e-3

@@ -10,7 +10,7 @@ from src.components import Blood
 from src.anastomosis import solveAnastomosisWrapper
 from src.bifurcations import solveBifurcationWrapper
 from src.conjunctions import solveConjunctionWrapper
-from src.boundary_conditions import setOutletBCWrapper
+from src.boundary_conditions import setReflectionOutletBCWrapper, setWindkesselOutletBCWrapper
 
 #JUNCTION_FUNCTIONS = []
 
@@ -244,7 +244,7 @@ def buildArterialNetwork(network, blood):
     mask = np.zeros(K, dtype=np.int64)
     mask1 = np.zeros(N, dtype=np.int64)
     
-    for j in np.arange(0,edges.shape[0],1):
+    for j in range(N):
         if sim_dat_const_aux[j,2] == 0: #"none":
             t = edges[j,2]
             edges[j,3] = np.where(edges[:, 1] == t,np.ones_like(edges[:,1]), np.zeros_like(edges[:,1])).sum().astype(int)
@@ -260,8 +260,10 @@ def buildArterialNetwork(network, blood):
 
             elif edges[j,6] == 1:
                 edges[j,7] = np.where(edges[:, 1] == t)[0][0]
+                print(edges[j,7])
+                print(starts[edges[j,7]])
                 junction_functions.append(Partial(solveConjunctionWrapper, sim_dat_const=sim_dat_const,
-                                                  edges=edges, starts=starts, rho=blood.rho, ends=ends-1, i=j))
+                                                  start=starts[edges[j,7]], rho=blood.rho, end=ends[j]-1))
                 mask[ends[j]-1:ends[j]+B] = j+1
                 mask[starts[edges[j,7]]-B:starts[edges[j,7]]+1] = j + 1
 
@@ -277,8 +279,13 @@ def buildArterialNetwork(network, blood):
                     mask[starts[edges[j,9]]-B:starts[edges[j,9]]+1] = j + 1
                     mask[ends[edges[j,7]]-1:ends[edges[j,7]]+B] = j + 1
                     mask[ends[edges[j,8]]-1:ends[edges[j,8]]+B] = j + 1
+        elif sim_dat_const_aux[j,2] == 1:
+            junction_functions.append(Partial(setReflectionOutletBCWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+                                                  edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
+            mask[ends[j]-1:ends[j]+B] = j+1#j+1
+            mask1[j] = j+1#j+1
         else:
-            junction_functions.append(Partial(setOutletBCWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
+            junction_functions.append(Partial(setWindkesselOutletBCWrapper, sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
                                                   edges=edges, starts=starts, rho=blood.rho, B=B+1, ends=ends-1, i=j, index2=ends[j]-2, index3=ends[j]-3))
             mask[ends[j]-1:ends[j]+B] = j+1#j+1
             mask1[j] = j+1#j+1

@@ -6,11 +6,10 @@ from src.utils import pressure, waveSpeed
 
 def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const,
-                       edges, starts, rho, ends, i):
-    index1 = ends[i]
+                       start, rho, end):
+    index1 = end
     #debug.print("{x}", x = (rho, i, index1, index2, index3))
-    d_i = edges[i,7]
-    d_i_start = starts[d_i]
+    d_i_start = start
     u1 = sim_dat[0,index1]
     u2 = sim_dat[0,d_i_start]
     A1 = sim_dat[2,index1]
