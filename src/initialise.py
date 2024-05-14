@@ -348,13 +348,8 @@ def buildArterialNetwork(network, blood):
         
     mask = np.ones(5, dtype=np.int64)[:,np.newaxis]*mask[np.newaxis,:]
     mask1 = mask1[:,np.newaxis]*np.ones(3, dtype=np.int64)[np.newaxis,:]
-    print(mask)
-    print(mask1)
     print(junction_functions)
-    
         
-    #global JUNCTION_FUNCTIONS
-    #JUNCTION_FUNCTIONS = junction_functions
     return (sim_dat, sim_dat_aux, sim_dat_const,
             sim_dat_const_aux, N, B,
             edges, input_data, nodes, 
