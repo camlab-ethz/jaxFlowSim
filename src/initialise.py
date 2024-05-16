@@ -354,6 +354,8 @@ def buildArterialNetwork(network, blood):
                                               end=index1, i=j))
             mask[ends[j]-1:ends[j]+B] = j+1#j+1
             mask1[j] = j+1#j+1
+    
+    strides[:,2:] = nodes
         
     mask = np.ones(5, dtype=np.int64)[:,np.newaxis]*mask[np.newaxis,:]
     mask1 = mask1[:,np.newaxis]*np.ones(3, dtype=np.int64)[np.newaxis,:]
