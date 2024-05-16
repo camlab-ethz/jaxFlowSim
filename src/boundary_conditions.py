@@ -205,12 +205,15 @@ def threeElementWindkessel(dt, u1, A1,
                            R2, beta, gamma, 
                            A0, Pext):
     #debug.print("{x}", x=1111111)
+    debug.print("{x}", x = (dt, u1, A1, 
+                           Pc, Cc, R1, 
+                           R2, beta, gamma, 
+                           A0, Pext))
     Pout = 0.0
 
     Al = A1
     ul = u1
     Pc += dt / Cc * (Al * ul - (Pc - Pout) / R2)
-
     As = Al
     ssAl = jnp.sqrt(jnp.sqrt(Al))
     sgamma = 2 * jnp.sqrt(6 * gamma)
