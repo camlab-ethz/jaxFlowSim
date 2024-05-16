@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+from jax import lax
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
 
@@ -28,13 +29,11 @@ def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux,
         (0,d_i_start-2))
     return sim_dat, sim_dat_aux
 
-
 def solveConjunction(u1, u2, A1, 
                      A2, A01, A02, 
                      beta1, beta2, gamma1, 
                      gamma2, Pext1, Pext2,
                      rho):
-    U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))))
     U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))))
 
     k1 = jnp.sqrt(1.5*gamma1)
@@ -48,11 +47,18 @@ def solveConjunction(u1, u2, A1,
     U = newtonRaphson(#calculateWStarConjunction, 
                       calculateFConjunction, 
                       J, U0,# k,
-    U = newtonRaphson(#calculateWStarConjunction, 
-                      calculateFConjunction, 
-                      J, U0,# k,
                       (A01, A02),
-                      (beta1, beta2))[0]
+                      (beta1, beta2))
+    
+    #debug.print("{x}", x = counter)
+    
+    #def F_wrapper(U, args):
+    #    k, A01, A02, beta1, beta2 = args
+    #    return calculateFConjunction(U, k, calculateWStarConjunction(U, k), (A01, A02), (beta1, beta2))
+
+    #solver = optx.LevenbergMarquardt(rtol=1e-2, atol=1e-2)#, lower=-jnp.ones(4)*2, upper=jnp.ones(4)*2)
+    
+    #U = optx.root_find(F_wrapper, solver, U0, (k, A01, A02, beta1, beta2), max_steps=1000000000).value
 
     return updateConjunction(U,
                              A01, A02,
@@ -77,8 +83,6 @@ def calculateJacobianConjunction(U, k,
 
     #J41 =  k[2] * U[0]
     #J42 = -k[2] * U[1]
-    #J41 =  k[2] * U[0]
-    #J42 = -k[2] * U[1]
     J43 =  2.0 * beta1  * U[2] * jnp.sqrt(1/A01)
     J44 = -2.0 * beta2 * U[3] * jnp.sqrt(1/A02)
 
@@ -87,8 +91,6 @@ def calculateJacobianConjunction(U, k,
                       [J31, J32, J33, J34],
                       [0.0, 0.0, J43, J44]])
                       #[J41, J42, J43, J44]], dtype=jnp.float64)
-                      [0.0, 0.0, J43, J44]])
-                      #[J41, J42, J43, J44]], dtype=jnp.float64)
 
 
 #def calculateWStarConjunction(U, k):
@@ -96,14 +98,8 @@ def calculateJacobianConjunction(U, k,
 #    W2 = U[1] - 4.0 * k[1] * U[3]
 #
 #    return jnp.array([W1, W2], dtype=jnp.float64)
-#def calculateWStarConjunction(U, k):
-#    W1 = U[0] + 4.0 * k[0] * U[2]
-#    W2 = U[1] - 4.0 * k[1] * U[3]
-#
-#    return jnp.array([W1, W2], dtype=jnp.float64)
 
 
-def calculateFConjunction(U,# k, W,
 def calculateFConjunction(U,# k, W,
                           A0s,
                           betas):
@@ -116,12 +112,8 @@ def calculateFConjunction(U,# k, W,
 
     f1 =  0 #U[0] + 4.0 * k[0] * U[2] - W[0]
     f2 =  0 #U[1] - 4.0 * k[1] * U[3] - W[1]
-    f1 =  0 #U[0] + 4.0 * k[0] * U[2] - W[0]
-    f2 =  0 #U[1] - 4.0 * k[1] * U[3] - W[1]
     f3 = U[0] * U32*U32 - U[1] * U42*U42
 
-    #f4 = 0.5 * k[2] * U[0]**2 + beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) - (0.5 * k[2] * U[1]**2 + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0))
-    f4 =  beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) -  + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0)
     #f4 = 0.5 * k[2] * U[0]**2 + beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) - (0.5 * k[2] * U[1]**2 + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0))
     f4 =  beta1 * (U32 * jnp.sqrt(1/A01) - 1.0) -  + beta2 * (U42 * jnp.sqrt(1/A02) - 1.0)
 
