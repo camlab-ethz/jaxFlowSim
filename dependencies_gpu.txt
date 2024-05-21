@@ -7,4 +7,6 @@ PyYAML
 sensitivity
 SALib
 jinja2
-
+tensorflow[and-cuda]
+tensorboard-plugin-profile
+tensorrt

@@ -82,12 +82,7 @@ def setReflectionOutletBCWrapper(dt, sim_dat, sim_dat_aux,
                                     W2M0, dt, 
                                     *sim_dat_const)
     temp = jnp.array((u,Q,A1,c,P1))
-    sim_dat = lax.dynamic_update_slice(
-        sim_dat, 
-        temp[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
-    return sim_dat, sim_dat_aux
+    return temp, temp, temp, Pc
 
 def setWindkesselOutletBCWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, end, i):
@@ -102,12 +97,7 @@ def setWindkesselOutletBCWrapper(dt, sim_dat, sim_dat_aux,
     u, A1, Pc = threeElementWindkessel(dt, u1, A1, Pc, 
                                        *sim_dat_const)
     temp = jnp.array((u,Q1,A1,c1,P1))
-    sim_dat = lax.dynamic_update_slice(
-        sim_dat, 
-        temp[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat_aux = sim_dat_aux.at[i,2].set(Pc)
-    return sim_dat, sim_dat_aux
+    return temp, temp, temp, Pc
 
 def setOutletBC(dt, u1, u2, 
                 Q1, A1, c1, 
@@ -205,10 +195,10 @@ def threeElementWindkessel(dt, u1, A1,
                            R2, beta, gamma, 
                            A0, Pext):
     #debug.print("{x}", x=1111111)
-    debug.print("{x}", x = (dt, u1, A1, 
-                           Pc, Cc, R1, 
-                           R2, beta, gamma, 
-                           A0, Pext))
+    #debug.print("{x}", x = (dt, u1, A1, 
+    #                       Pc, Cc, R1, 
+    #                       R2, beta, gamma, 
+    #                       A0, Pext))
     Pout = 0.0
 
     Al = A1

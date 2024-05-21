@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from functools import partial
-from jax import lax, vmap, jit
+from jax import lax, jit, debug, vmap
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
@@ -17,7 +17,7 @@ def computeDt(Ccfl, u, c, dx):
 def solveModel(N, B, 
                t, dt, input_data, rho, 
                sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, 
-               masks, strides, edges, junction_functions):
+               masks, strides, edges, junction_functions, mask1, mask2, mask_assign):
 
     inlet = sim_dat_const_aux[0,1] 
     u0 = sim_dat[0,B]
@@ -48,11 +48,50 @@ def solveModel(N, B,
                   sim_dat_const[5,B:-B],
                   masks))
 
-    def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux) = dat
-        return lax.switch(j, junction_functions, dt,sim_dat,sim_dat_aux)
+    args = (dt, sim_dat, sim_dat_aux)
+    results = junction_functions(args)
+    results1 = jnp.array(results[0])
+    results2 = jnp.array(results[1])
+    results3 = jnp.array(results[2])
+    results4 = jnp.array(results[3])
 
-    (sim_dat, sim_dat_aux)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux))
+    def bodyFun(j, dat):
+        (sim_dat, sim_dat_aux, strides, edges, 
+         results1, results2, results3, results4, mask_assign) = dat
+
+        temp1 = results1[j]
+        temp2 = results2[j]
+        temp3 = results3[j]
+        sim_dat = lax.dynamic_update_slice( 
+            sim_dat, 
+            temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+            (0,mask_assign[j,0]))
+        sim_dat = lax.dynamic_update_slice( 
+            sim_dat, 
+            temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+            (0,mask_assign[j,1]))
+        sim_dat = lax.dynamic_update_slice( 
+            sim_dat, 
+            temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+            (0,mask_assign[j,2]))
+        sim_dat_aux = sim_dat_aux.at[j,2].set(results4[j])
+
+
+        return (sim_dat, sim_dat_aux, 
+                strides, edges, results1, results2, results3, results4, mask_assign)
+
+    (sim_dat, sim_dat_aux, _, 
+     _, _, _, _, _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, strides,
+                                            edges, results1, results2, results3, results4, mask_assign))
+    #sim_dat_results = jnp.vstack((sim_dat[None], results[0]))
+    #sim_dat_aux_results = jnp.vstack((sim_dat_aux[None], results[1]))
+    #sim_dat = jnp.choose(mask1, sim_dat_results, mode="clip")
+    #sim_dat_aux = jnp.choose(mask2, sim_dat_aux_results, mode="clip")
+    #def bodyFun(j, dat):
+    #    (sim_dat, sim_dat_aux) = dat
+    #    return lax.switch(j, junction_functions, dt,sim_dat,sim_dat_aux)
+
+    #(sim_dat, sim_dat_aux)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux))
 
     return sim_dat, sim_dat_aux
 

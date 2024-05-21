@@ -5,7 +5,7 @@ from src.utils import pressure, waveSpeed
 
 def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const, 
-                       start, ends):
+                       start, ends, i):
     index1 = ends[0]
     p1_i_end = ends[1]
     d_start = start
@@ -31,19 +31,7 @@ def solveAnastomosisWrapper(dt, sim_dat, sim_dat_aux,
     temp1 = jnp.array((u1, Q1, A1, c1, P1))
     temp2 = jnp.array((u2, Q2, A2, c2, P2))
     temp3 = jnp.array((u3, Q3, A3, c3, P3))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp1[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp2[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,p1_i_end-1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp3[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,d_start-2))
-    return sim_dat, sim_dat_aux
+    return temp1, temp2, temp3, sim_dat_aux[i,2]
 
 def solveAnastomosis(u1, u2, u3, 
                      A1, A2, A3,

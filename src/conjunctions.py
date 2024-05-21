@@ -5,7 +5,7 @@ from src.utils import pressure, waveSpeed
 
 def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux, 
                        sim_dat_const,
-                       start, end):
+                       start, end, i):
     index1 = end
     #debug.print("{x}", x = (rho, i, index1, index2, index3))
     d_i_start = start
@@ -19,15 +19,7 @@ def solveConjunctionWrapper(dt, sim_dat, sim_dat_aux,
                                                 *sim_dat_const)
     temp1 = jnp.array((u1, Q1, A1, c1, P1))
     temp2 = jnp.array((u2, Q2, A2, c2, P2))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp1[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,index1))
-    sim_dat = lax.dynamic_update_slice( 
-        sim_dat, 
-        temp2[:,jnp.newaxis]*jnp.ones(3)[jnp.newaxis,:],
-        (0,d_i_start-2))
-    return sim_dat, sim_dat_aux
+    return temp1, temp2, temp2, sim_dat_aux[i,2]
 
 def solveConjunction(u1, u2, A1, 
                      A2, A01, A02, 
