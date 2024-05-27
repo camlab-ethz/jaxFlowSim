@@ -154,10 +154,6 @@ def threeElementWindkessel(dt, u1, A1,
                            Pc, Cc, R1, 
                            R2, beta, gamma, 
                            A0, Pext):
-    debug.print("{x}", x = (dt, u1, A1, 
-                           Pc, Cc, R1, 
-                           R2, beta, gamma, 
-                           A0, Pext))
     Pout = 0.0
 
     Al = A1
