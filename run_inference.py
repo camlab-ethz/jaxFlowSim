@@ -4,7 +4,7 @@ import os
 import sys
 import time
 from functools import partial
-from jax import block_until_ready, jit
+from jax import jit
 import numpyro.distributions as dist
 import jax.numpy as jnp
 import jax
