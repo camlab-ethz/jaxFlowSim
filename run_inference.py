@@ -74,7 +74,7 @@ def simLoopWrapper(R):
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
     _, _, P = sim_loop_old_jit(N, B,
                                           sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
+                                          sim_dat_const_new, sim_dat_const_aux, 
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges,
                                           upper=120000)
