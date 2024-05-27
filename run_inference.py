@@ -54,12 +54,12 @@ if verbose:
     starting_time = time.time_ns()
 
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
-sim_dat_obs, t_obs, P_obs = block_until_ready(sim_loop_old_jit(N, B,
+sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, 
                                       sim_dat_const, sim_dat_const_aux, 
                                       Ccfl, input_data, rho, 
                                       masks, strides, edges,
-                                      upper=120000))
+                                      upper=120000)
 
 R_index = 1
 var_index = 7
@@ -72,12 +72,12 @@ def simLoopWrapper(R):
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
-    _, _, P = block_until_ready(sim_loop_old_jit(N, B,
+    _, _, P = sim_loop_old_jit(N, B,
                                           sim_dat, sim_dat_aux, 
                                           sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges,
-                                          upper=120000))
+                                          upper=120000)
     return P
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)
