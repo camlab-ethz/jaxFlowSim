@@ -85,9 +85,10 @@ if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
 
 learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
-for learning_rate in learning_rates:
+for (j, learning_rate) in enumerate(learning_rates):
     R_star = R_scales[int(sys.argv[2])]
     for i in range(10000):
+        print(j,i)
         gradient = sim_loop_wrapper_jit(R_star)
         R_star -= learning_rate*gradient
 
