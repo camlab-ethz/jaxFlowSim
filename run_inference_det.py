@@ -76,10 +76,11 @@ def simLoopWrapper(R):
     #jax.debug.print("P={x}", x=P)
     #jax.debug.print("R={x}", x=R)
     #jax.debug.print("P_obs={x}", x=P_obs)
-    return (P-P_obs).mean()
+    return jnp.sqrt(jnp.sum(jnp.square((P-P_obs))))
 
+print(simLoopWrapper(R1))
 sim_loop_wrapper_jit = jit(jacfwd(simLoopWrapper))
-
+print(grad(simLoopWrapper)(R1))
 results_folder = "results/inference_ensemble_det"
 if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
@@ -87,12 +88,12 @@ if not os.path.isdir(results_folder):
 learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
 for (j, learning_rate) in enumerate(learning_rates):
     R_star = R_scales[int(sys.argv[2])]
-    for i in range(10000):
+    for i in range(1000):
         print(j,i)
         gradient = sim_loop_wrapper_jit(R_star)
         R_star -= learning_rate*gradient
 
-    results_file = results_folder  + "/setup_" + learning_rate + ".txt"
+    results_file = results_folder  + "/setup_" + str(learning_rate) + ".txt"
     file = open(results_file, "a")  
     file.write(str(R_scales[int(sys.argv[2])]) + " " + str(R_star) + "  " + str(R1) + "\n")
     file.close()
