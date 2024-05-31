@@ -7,4 +7,5 @@ PyYAML
 sensitivity
 SALib
 jinja2
-
+optax
+flax
