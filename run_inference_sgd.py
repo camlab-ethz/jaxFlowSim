@@ -64,7 +64,7 @@ R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, 16)
+R_scales = np.linspace(0.1*R1, 10*R1, 32)
 def simLoopWrapper(params):
     R = params[0]
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
