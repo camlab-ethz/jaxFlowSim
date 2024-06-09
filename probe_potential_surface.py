@@ -12,6 +12,7 @@ import numpyro
 from numpyro.infer import MCMC
 import numpy as np
 import itertools
+from jax import jit, grad, jacfwd
 
 os.chdir(os.path.dirname(__file__))
 jax.config.update("jax_enable_x64", True)
@@ -62,8 +63,9 @@ R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, int(1e6))
+R_scales = np.linspace(0.1, 10, int(1e6))
 def simLoopWrapper(R):
+    R=R*R1
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
@@ -73,9 +75,10 @@ def simLoopWrapper(R):
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges,
                                           upper=120000)
-    return jnp.sqrt(jnp.sum(jnp.square((P-P_obs))))
+    return jnp.sqrt(jnp.sum(jnp.square((P-P_obs))))/jnp.sqrt(jnp.sum(jnp.square((P_obs))))
 
 sim_loop_wrapper_jit = jit(simLoopWrapper)
+sim_loop_wrapper_grad_jit = jit(jacfwd(simLoopWrapper))
 
 results_folder = "results/potential_surface"
 if not os.path.isdir(results_folder):
@@ -86,7 +89,8 @@ slices = int(1e6/int(sys.argv[3]))
 for i in range(int(sys.argv[2])*slices,(int(sys.argv[2])+1)*slices):
     results_file = results_folder  + "/potential_surface.txt"
     R = R_scales[i]
-    loss = simLoopWrapper(R)
+    loss = sim_loop_wrapper_jit(R)
+    gradient = sim_loop_wrapper_grad_jit(R)
     file = open(results_file, "a")  
-    file.write(str(R) + " " + str(loss) + "\n")
+    file.write(str(R) + " " + str(loss) + " " + str(gradient) + "\n")
     file.close()
