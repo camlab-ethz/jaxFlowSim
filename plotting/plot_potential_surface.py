@@ -21,7 +21,7 @@ ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
 
 color = 'tab:blue'
 ax2.set_ylabel('grad', color=color)  # we already handled the x-label with ax1
-ax2.set_ylim([-1e2, 1e2])
+#ax2.set_ylim([-1e2, 1e2])
 ax2.plot(potential_surface[100000:150000,0], potential_surface[100000:150000,2], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 
