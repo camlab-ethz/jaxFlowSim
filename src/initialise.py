@@ -402,7 +402,7 @@ def buildArterialNetwork(network, blood):
     return (sim_dat, sim_dat_aux, 
             sim_dat_const, sim_dat_const_aux, N, B,
             masks, strides, edges,
-            vessel_names, input_data, junction_functions_wrapper, mask, mask1, mask_assign)
+            vessel_names, input_data, junction_functions, mask, mask1, mask_assign)
 
 
 def buildVessel(ID, vessel_data, blood, M):

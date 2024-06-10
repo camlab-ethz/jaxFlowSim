@@ -44,12 +44,11 @@ verbose = True
 if verbose:
     starting_time = time.time_ns()
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
-with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-    sim_dat, t, P  = block_until_ready(sim_loop_old_jit(N, B, J, 
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          timepoints, conv_tol, Ccfl, input_data, rho, 
-                                          masks, strides, edges, junction_functions, mask1, mask2, mask_assign))
+sim_dat_out, t_out, P_out  = block_until_ready(sim_loop_old_jit(N, B, J, 
+                                      sim_dat, sim_dat_aux, 
+                                      sim_dat_const, sim_dat_const_aux, 
+                                      timepoints, conv_tol, Ccfl, input_data, rho, 
+                                      masks, strides, edges, junction_functions, mask1, mask2, mask_assign))
 
 if verbose:
     ending_time = (time.time_ns() - starting_time) / 1.0e9

@@ -49,19 +49,18 @@ def solveModel(N, B,
                   masks))
 
     args = (dt, sim_dat, sim_dat_aux)
-    results = junction_functions(args)
-    results1 = jnp.array(results[0])
-    results2 = jnp.array(results[1])
-    results3 = jnp.array(results[2])
-    results4 = jnp.array(results[3])
+    #results = junction_functions(args)
+    #results1 = jnp.array(results[0])
+    #results2 = jnp.array(results[1])
+    #results3 = jnp.array(results[2])
+    #results4 = jnp.array(results[3])
 
-    def bodyFun(j, dat):
-        (sim_dat, sim_dat_aux, strides, edges, 
-         results1, results2, results3, results4, mask_assign) = dat
+    for j in range(N):
+        results = junction_functions[j](*args)
 
-        temp1 = results1[j]
-        temp2 = results2[j]
-        temp3 = results3[j]
+        temp1 = results[0]
+        temp2 = results[1]
+        temp3 = results[2]
         sim_dat = lax.dynamic_update_slice( 
             sim_dat, 
             temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
@@ -74,15 +73,8 @@ def solveModel(N, B,
             sim_dat, 
             temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
             (0,mask_assign[j,2]))
-        sim_dat_aux = sim_dat_aux.at[j,2].set(results4[j])
+        sim_dat_aux = sim_dat_aux.at[j,2].set(results[3])
 
-
-        return (sim_dat, sim_dat_aux, 
-                strides, edges, results1, results2, results3, results4, mask_assign)
-
-    (sim_dat, sim_dat_aux, _, 
-     _, _, _, _, _, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, strides,
-                                            edges, results1, results2, results3, results4, mask_assign))
     #sim_dat_results = jnp.vstack((sim_dat[None], results[0]))
     #sim_dat_aux_results = jnp.vstack((sim_dat_aux[None], results[1]))
     #sim_dat = jnp.choose(mask1, sim_dat_results, mode="clip")
