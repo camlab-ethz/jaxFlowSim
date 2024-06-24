@@ -3,7 +3,7 @@ from jax import lax, jit, block_until_ready
 import numpy as np
 from src.initialise import loadConfig, buildBlood, buildArterialNetwork, makeResultsFolder
 from src.IOutils import saveTempData
-from src.solver import computeDt, solveModel
+from src.solver import computeDt, solveModel, solveModel_nn
 from src.check_conv import printConvError, computeConvError, checkConv
 from functools import partial 
 import numpy as np
@@ -99,6 +99,56 @@ def simulationLoopUnsafe(N, B,
     
     return sim_dat, t_t, P_t
     
+def simulationLoopUnsafe_nn(N, B,
+                        sim_dat, sim_dat_aux, 
+                        sim_dat_const, sim_dat_const_aux,
+                        Ccfl, input_data, rho, 
+                        masks, strides, edges,
+                        nn_params, upper = 100000):
+    t = 0.0
+    dt = 1
+    P_t = jnp.zeros((upper,5*N))
+    t_t = jnp.zeros(upper)
+
+
+    def bodyFun(i, args):
+        (sim_dat, sim_dat_aux, sim_dat_const, 
+         sim_dat_const_aux,
+         dt, t, t_t, 
+         edges, 
+         input_data, rho, 
+         P_t, nn_params) = args
+        dt = computeDt(Ccfl, sim_dat[0,:],sim_dat[3,:], sim_dat_const[-1,:])
+        sim_dat, sim_dat_aux = solveModel_nn(N, B, 
+                                          t, dt, input_data, rho,
+                                          sim_dat, sim_dat_aux, 
+                                          sim_dat_const, sim_dat_const_aux, 
+                                          masks, strides[:,:2], edges, nn_params)
+        t = (t + dt)%sim_dat_const_aux[0,0]
+        t_t = t_t.at[i].set(t)
+        P_t = P_t.at[i,:].set(saveTempData(N, strides, sim_dat[4,:]))
+
+
+        return (sim_dat, sim_dat_aux, sim_dat_const, 
+                sim_dat_const_aux,
+                dt, t, t_t,
+                edges, 
+                input_data, rho, 
+                P_t, nn_params)
+
+    (sim_dat, sim_dat_aux, sim_dat_const, 
+     sim_dat_const_aux,
+     dt, t, t_t, 
+     edges, 
+     input_data, rho, 
+     P_t, nn_params) = lax.fori_loop(0, upper, bodyFun, (sim_dat, sim_dat_aux, sim_dat_const, 
+                                                sim_dat_const_aux,
+                                                dt, t, t_t,
+                                                edges, 
+                                                input_data, rho,
+                                                P_t, nn_params))
+    
+    return sim_dat, t_t, P_t
 
 
 def simulationLoop(N, B, num_snapshots, 

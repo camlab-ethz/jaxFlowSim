@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from src.newton import newtonRaphson
-from src.utils import pressure, waveSpeed
+from src.utils import pressure, pressure_nn, waveSpeed
 
 
 def solveConjunction(u1, u2, A1, 
@@ -40,6 +40,42 @@ def solveConjunction(u1, u2, A1,
                              gamma1, gamma2,
                              Pext1, Pext2)
 
+def solveConjunction_nn(u1, u2, A1, 
+                     A2, A01, A02, 
+                     beta1, beta2, gamma1, 
+                     gamma2, Pext1, Pext2,
+                     rho, nn_params):
+    U0 = jnp.array((u1, u2, jnp.sqrt(jnp.sqrt(A1)), jnp.sqrt(jnp.sqrt(A2))))
+
+    k1 = jnp.sqrt(1.5*gamma1)
+    k2 = jnp.sqrt(1.5*gamma2)
+    k3 = rho
+    k = jnp.array([k1, k2, k3])
+
+    J = calculateJacobianConjunction(U0, k, 
+                                     A01, A02, 
+                                     beta1, beta2)
+    U = newtonRaphson(#calculateWStarConjunction, 
+                      calculateFConjunction, 
+                      J, U0,# k,
+                      (A01, A02),
+                      (beta1, beta2))
+    
+    #debug.print("{x}", x = counter)
+    
+    #def F_wrapper(U, args):
+    #    k, A01, A02, beta1, beta2 = args
+    #    return calculateFConjunction(U, k, calculateWStarConjunction(U, k), (A01, A02), (beta1, beta2))
+
+    #solver = optx.LevenbergMarquardt(rtol=1e-2, atol=1e-2)#, lower=-jnp.ones(4)*2, upper=jnp.ones(4)*2)
+    
+    #U = optx.root_find(F_wrapper, solver, U0, (k, A01, A02, beta1, beta2), max_steps=1000000000).value
+
+    return updateConjunction_nn(U,
+                             A01, A02,
+                             beta1, beta2,
+                             gamma1, gamma2,
+                             Pext1, Pext2, nn_params)
 
 def calculateJacobianConjunction(U, k, 
                                  A01, A02, 
@@ -110,6 +146,28 @@ def updateConjunction(U,
 
     P1 = pressure(A1, A01, beta1, Pext1)
     P2 = pressure(A2, A02, beta2, Pext2)
+
+    c1 = waveSpeed(A1, gamma1)
+    c2 = waveSpeed(A2, gamma2)
+
+    return u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2
+
+def updateConjunction_nn(U,
+                      A01, A02, 
+                      beta1, beta2,
+                      gamma1, gamma2,
+                      Pext1, Pext2, nn_params):
+    u1 = U[0]
+    u2 = U[1]
+
+    A1 = U[2]*U[2]*U[2]*U[2]
+    Q1 = u1 * A1
+
+    A2  = U[3]*U[3]*U[3]*U[3]
+    Q2  = u2 * A2
+
+    P1 = pressure_nn(A1, A01, beta1, Pext1, nn_params)
+    P2 = pressure_nn(A2, A02, beta2, Pext2, nn_params)
 
     c1 = waveSpeed(A1, gamma1)
     c2 = waveSpeed(A2, gamma2)

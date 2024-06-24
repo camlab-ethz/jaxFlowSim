@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from src.newton import newtonRaphson
-from src.utils import pressure, waveSpeed
+from src.utils import pressure, pressure_nn, waveSpeed
 
 
 def solveAnastomosis(u1, u2, u3, 
@@ -35,6 +35,39 @@ def solveAnastomosis(u1, u2, u3,
                              beta1, beta2, beta3,
                              gamma1, gamma2, gamma3,
                              Pext1, Pext2, Pext3)
+
+def solveAnastomosis_nn(u1, u2, u3, 
+                     A1, A2, A3,
+                     A01, A02, A03,
+                     beta1, beta2, beta3,
+                     gamma1, gamma2, gamma3,
+                     Pext1, Pext2, Pext3, nn_params):
+    U0 = jnp.array((u1,
+                    u2,
+                    u3,
+                    jnp.sqrt(jnp.sqrt(A1)),
+                    jnp.sqrt(jnp.sqrt(A2)),
+                    jnp.sqrt(jnp.sqrt(A3))))
+    
+
+    k1 = jnp.sqrt(1.5*gamma1)
+    k2 = jnp.sqrt(1.5*gamma2)
+    k3 = jnp.sqrt(1.5*gamma3)
+    k = jnp.array([k1, k2, k3])
+
+    J = calculateJacobianAnastomosis(U0, k,
+                                     A01, A02, A03,
+                                     beta1, beta2, beta3)
+    U = newtonRaphson(calculateFAnastomosis, 
+                      J, U0,
+                      (A01, A02, A03),
+                      (beta1, beta2, beta3))
+
+    return updateAnastomosis_nn(U,
+                             A01, A02, A03,
+                             beta1, beta2, beta3,
+                             gamma1, gamma2, gamma3,
+                             Pext1, Pext2, Pext3, nn_params)
 
 def calculateJacobianAnastomosis(U, k,
                                  A01, A02, A03,
@@ -118,5 +151,32 @@ def updateAnastomosis(U,
     P1 = pressure(A1, A01, beta1, Pext1)
     P2 = pressure(A2, A02, beta2, Pext2)
     P3 = pressure(A3, A03, beta3, Pext3)
+
+    return u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3
+
+def updateAnastomosis_nn(U,
+                      A01, A02, A03,
+                      beta1, beta2, beta3,
+                      gamma1, gamma2, gamma3,
+                      Pext1, Pext2, Pext3, nn_params):
+    u1 = U[0]
+    u2 = U[1]
+    u3 = U[2]
+
+    A1 = U[3]**4
+    A2 = U[4]**4
+    A3 = U[5]**4
+
+    Q1 = u1 * A1
+    Q2 = u2 * A2
+    Q3 = u3 * A3
+
+    c1 = waveSpeed(A1, gamma1)
+    c2 = waveSpeed(A2, gamma2)
+    c3 = waveSpeed(A3, gamma3)
+
+    P1 = pressure_nn(A1, A01, beta1, Pext1, nn_params)
+    P2 = pressure_nn(A2, A02, beta2, Pext2, nn_params)
+    P3 = pressure_nn(A3, A03, beta3, Pext3, nn_params)
 
     return u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3
