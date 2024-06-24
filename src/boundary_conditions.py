@@ -28,6 +28,7 @@ def inputFromData(t, input_data, cardiac_T):
     idx = jnp.where((t >= idt) & (t <= idt1), jnp.arange(0,idt.size,1),jnp.zeros(idt.size)).sum().astype(int) #[0][0]
 
     qu = idq[idx] + (t - idt[idx]) * (idq[idx+1] - idq[idx]) / (idt[idx+1] - idt[idx])
+    #debug.print("{x}", x = qu)
 
     return qu
 

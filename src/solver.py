@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from functools import partial
-from jax import lax, vmap, jit
+from jax import lax, vmap, jit, debug
 from src.anastomosis import solveAnastomosis
 from src.conjunctions import solveConjunction
 from src.bifurcations import solveBifurcation
@@ -322,8 +322,13 @@ def muscl(dt,
     uStar2 = uStar1.at[:,1:-1].set(uStar)
     uStar3 = jnp.zeros((2, K+2))
     uStar3 = uStar1.at[:,2:].set(uStar)
+    #for (i,index) in enumerate(masks[0,:]):
+    #    uStar2 = uStar2.at[i].set(lax.cond(index, lambda x,y: x, lambda x,y: y, uStar1[i], uStar2[i]))
+    #for (i,index) in enumerate(masks[1,:]):
+    #    uStar2 = uStar2.at[i].set(lax.cond(index, lambda x,y: x, lambda x,y: y, uStar3[i], uStar2[i]))
     uStar2 = jnp.where(masks[0,:], uStar1, uStar2) 
     uStar2 = jnp.where(masks[1,:], uStar3, uStar2) 
+    #debug.print("{x}", x=uStar2)
     uStar = uStar2[:,1:-1]
 
     limiterA = computeLimiterIdx(uStar, 0, invDx_temp)

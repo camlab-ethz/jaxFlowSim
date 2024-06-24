@@ -41,20 +41,21 @@ verbose = True
  masks, strides, edges,
  vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
-if verbose:
-    starting_time = time.time_ns()
-
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
-sim_dat, t_t, P_t = block_until_ready(sim_loop_old_jit(N, B,
-                                      sim_dat, sim_dat_aux, 
-                                      sim_dat_const, sim_dat_const_aux, 
-                                      Ccfl, input_data, rho, 
-                                      masks, strides, edges,
-                                      upper=120000))
-
-if verbose:
-    ending_time = (time.time_ns() - starting_time) / 1.0e9
-    print(f"elapsed time = {ending_time} seconds")
+for i in range(10):
+    if verbose:
+        starting_time = time.time_ns()
+    
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
+    sim_dat, t_t, P_t = block_until_ready(sim_loop_old_jit(N, B,
+                                          sim_dat, sim_dat_aux, 
+                                          sim_dat_const, sim_dat_const_aux, 
+                                          Ccfl, input_data, rho, 
+                                          masks, strides, edges,
+                                          upper=120000))
+    
+    if verbose:
+        ending_time = (time.time_ns() - starting_time) / 1.0e9
+        print(f"elapsed time = {ending_time} seconds")
 
 #jnp.set_printoptions(threshold=sys.maxsize)
 filename = config_filename.split("/")[-1]

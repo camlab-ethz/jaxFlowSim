@@ -1,6 +1,6 @@
 import Pkg
 Pkg.add("Revise")
-Pkg.add(path="../")
+Pkg.develop(path="../")
 
 using Test
 using DelimitedFiles

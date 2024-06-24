@@ -239,6 +239,7 @@ def buildArterialNetwork(network, blood):
     masks = np.zeros((2,K), dtype=np.int64)
     masks[0,:] = indices_1
     masks[1,:] = indices_2
+    print(masks)
     
     for j in np.arange(0,edges.shape[0],1):
         i = edges[j,0]-1
