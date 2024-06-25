@@ -55,12 +55,39 @@ def solveModel(N, B,
     #results3 = jnp.array(results[2])
     #results4 = jnp.array(results[3])
 
-    for j in range(N):
-        results = junction_functions[j](*args)
+    #for j in range(N):
+    #    results = junction_functions[j](*args)
 
-        temp1 = results[0]
-        temp2 = results[1]
-        temp3 = results[2]
+    #    temp1 = results[0]
+    #    temp2 = results[1]
+    #    temp3 = results[2]
+    #    sim_dat = lax.dynamic_update_slice( 
+    #        sim_dat, 
+    #        temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #        (0,mask_assign[j,0]))
+    #    sim_dat = lax.dynamic_update_slice( 
+    #        sim_dat, 
+    #        temp2[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #        (0,mask_assign[j,1]))
+    #    sim_dat = lax.dynamic_update_slice( 
+    #        sim_dat, 
+    #        temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
+    #        (0,mask_assign[j,2]))
+    #    sim_dat_aux = sim_dat_aux.at[j,2].set(results[3])
+
+    #def bodyFun(j, dat):
+    #    (sim_dat, sim_dat_aux) = dat
+    #    return lax.switch(j, junction_functions, dt,sim_dat,sim_dat_aux)
+
+    #(sim_dat, sim_dat_aux)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux))
+    results = vmap(lambda j: lax.switch(j, junction_functions, dt,sim_dat,sim_dat_aux))(jnp.arange(N))
+
+    def bodyFun(j, dat):
+        (sim_dat, sim_dat_aux, results) = dat
+        temp1 = results[j][0]
+        temp2 = results[j][1]
+        temp3 = results[j][2]
+        temp4 = results[j][3]
         sim_dat = lax.dynamic_update_slice( 
             sim_dat, 
             temp1[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
@@ -73,18 +100,11 @@ def solveModel(N, B,
             sim_dat, 
             temp3[:,jnp.newaxis]*jnp.ones(B+1)[jnp.newaxis,:],
             (0,mask_assign[j,2]))
-        sim_dat_aux = sim_dat_aux.at[j,2].set(results[3])
+        sim_dat_aux = sim_dat_aux.at[j,2].set(temp4)
+        return sim_dat, sim_dat_aux, results
 
-    #sim_dat_results = jnp.vstack((sim_dat[None], results[0]))
-    #sim_dat_aux_results = jnp.vstack((sim_dat_aux[None], results[1]))
-    #sim_dat = jnp.choose(mask1, sim_dat_results, mode="clip")
-    #sim_dat_aux = jnp.choose(mask2, sim_dat_aux_results, mode="clip")
-    #def bodyFun(j, dat):
-    #    (sim_dat, sim_dat_aux) = dat
-    #    return lax.switch(j, junction_functions, dt,sim_dat,sim_dat_aux)
 
-    #(sim_dat, sim_dat_aux)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux))
-
+    (sim_dat, sim_dat_aux, _)  = lax.fori_loop(0, N, bodyFun, (sim_dat, sim_dat_aux, results))
     return sim_dat, sim_dat_aux
 
 
