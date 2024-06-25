@@ -102,7 +102,8 @@ sim_loop_wrapper_jit = jit(simLoopWrapper)
 for i in range(100):
     gradient = sim_loop_wrapper_grad_jit(nn_params)
     for (i,a) in enumerate(gradient):
-        nn_params[i] -= a
+        nn_params[i][0] -= a[0]
+        nn_params[i][1] -= a[1]
     print(gradient)
     print(sim_loop_wrapper_jit(nn_params))
 
