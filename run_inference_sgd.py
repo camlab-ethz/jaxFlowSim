@@ -96,7 +96,6 @@ network_properties = {
         #       optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
         "tx": [optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
         "learning_rate": [1e7],
-        "learning_rate": [1e7],
         "epochs": [100,1000,2000]
         }
 

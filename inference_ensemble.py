@@ -11,8 +11,9 @@ filename_best = ""
 for filename in onlyfiles:
     results = np.nan_to_num(np.loadtxt(mypath + filename))/1e8
     print(filename) 
-    print(np.sqrt(np.sum(np.square(results[1,:]-results[2,:])))/np.sqrt(np.sum(np.square(results[2,:]))))
-    if np.sqrt(np.sum(np.square(results[1,:]-results[2,:])))/np.sqrt(np.sum(np.square(results[2,:]))) < count:
+    val = np.sqrt(np.sum(np.square(results[1,:]-results[2,:])))/np.sqrt(np.sum(np.square(results[2,:])))
+
+    if val < count and not np.isnan(val) and not np.isneginf(val) and not np.isposinf(val):
         count = np.sqrt(np.sum(np.square(results[1,:]-results[2,:])))/np.sqrt(np.sum(np.square(results[2,:])))
         filename_best = filename
         print("update")
