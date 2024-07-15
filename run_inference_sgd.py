@@ -1,21 +1,20 @@
-from src.model import configSimulation, simulationLoopUnsafe
-from numpyro.infer.reparam import TransformReparam
-import os
+from src.model import configSimulation, simulationLoopUnsafe_nn, simulationLoopUnsafe
+import jax
 import sys
 import time
+import os
 from functools import partial
-from jax import jit, grad, jacfwd
-import numpyro.distributions as dist
-import jax.numpy as jnp
-import jax
+from jax import block_until_ready, jit, random, jacfwd
+import matplotlib.pyplot as plt
 import numpy as np
-import itertools
+import jax.numpy as jnp
 import optax
+import itertools
 from flax.training.train_state import TrainState
+import matplotlib.pyplot as plt
 
 os.chdir(os.path.dirname(__file__))
 jax.config.update("jax_enable_x64", True)
-
 
 config_filename = ""
 if len(sys.argv) == 1:
@@ -39,8 +38,6 @@ if len(sys.argv) == 1:
 else:
     config_filename = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
 
-
-
 verbose = True
 (N, B, J, 
  sim_dat, sim_dat_aux, 
@@ -49,38 +46,60 @@ verbose = True
  masks, strides, edges,
  vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
+Ccfl = 0.5
+# A helper function to randomly initialize weights and biases
+# for a dense neural network layer
+def random_layer_params(m, n, key, scale=1e-2):
+  w_key, b_key = random.split(key)
+  return scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
+
+# Initialize all layers for a fully-connected neural network with sizes "sizes"
+def init_network_params(sizes, key):
+  keys = random.split(key, len(sizes))
+  return [random_layer_params(m, n, k) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
+
+layer_sizes = [3, 3, 3, 1]
+nn_params = init_network_params(layer_sizes, random.key(0))
+print(nn_params)
+
+def relu(x):
+    return np.maximum(0, x)
+
+def predict(params, s_A_over_A0, beta, Pext):
+    # per-example predictions
+    activations = np.array((s_A_over_A0, beta, Pext))
+    for w, b in params:
+        outputs = np.dot(w, activations) + b
+        activations = relu(outputs)
+    return activations
+
+
 if verbose:
     starting_time = time.time_ns()
 
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
-sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
+sim_dat, t_t, P_t = block_until_ready(sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, 
                                       sim_dat_const, sim_dat_const_aux, 
                                       Ccfl, input_data, rho, 
                                       masks, strides, edges,
-                                      upper=120000)
+                                      upper=120000))
 
-R_index = 1
-var_index = 7
-R1 = sim_dat_const[var_index,strides[R_index,1]]
-#R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, 32)
-def simLoopWrapper(params):
-    R = params[0]
-    ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
-    sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
-    _, _, P = sim_loop_old_jit(N, B,
+if verbose:
+    ending_time = (time.time_ns() - starting_time) / 1.0e9
+    print(f"elapsed time = {ending_time} seconds")
+
+def simLoopWrapper(nn_params):
+    _, _, P = simulationLoopUnsafe_nn(N, B,
                                           sim_dat, sim_dat_aux, 
-                                          sim_dat_const_new, sim_dat_const_aux, 
+                                          sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, input_data, rho, 
-                                          masks, strides, edges,
+                                          masks, strides, edges, nn_params, 
                                           upper=120000)
     #jax.debug.print("P={x}", x=P)
     #jax.debug.print("R={x}", x=R)
     #jax.debug.print("P_obs={x}", x=P_obs)
     return P
-
 results_folder = "results/inference_ensemble_det"
 if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
@@ -88,9 +107,9 @@ if not os.path.isdir(results_folder):
 learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
 
 network_properties = {
-        "tx": [optax.adam, optax.sgd, optax.lars],
-        "learning_rate": [1e-5, 1e-3, 1e-1, 1e2, 1e4],
-        "epochs": [100,1000,2000]
+        "tx": [optax.adabelief],
+        "learning_rate": [1e-3],
+        "epochs": [100]
         }
 
 settings = list(itertools.product(*network_properties.values()))
@@ -104,9 +123,9 @@ for set_num, setup in enumerate(settings):
     results_file = results_folder  + "/setup_" + str(setup[0].__name__) + "_" + str(setup[1]) +  "_" + str(setup[2]) +".txt"
 
     model = simLoopWrapper
-    variables = [R_scales[int(sys.argv[2])]]
+    variables = init_network_params(layer_sizes, random.key(0))
     tx = setup[0]
-    y = P_obs
+    y = P_t
     x = simLoopWrapper
 
     state = TrainState.create(
@@ -120,12 +139,16 @@ for set_num, setup in enumerate(settings):
       return loss
 
 
-    for _ in range(setup[2]):
+    for _ in range(100):
+        print(loss_fn(state.params, x, y))
+        plt.plot(y)
+        plt.plot(state.apply_fn(state.params))
+        plt.show()
+        plt.close()
         grads = jax.jacfwd(loss_fn)(state.params, x, y)
         state = state.apply_gradients(grads=grads)
-        print(loss_fn(state.params, x, y))
     file = open(results_file, "a")  
-    file.write(str(R_scales[int(sys.argv[2])]) + " " + str(state.params[0]) + "  " + str(R1) + "\n")
+    #file.write(str(R_scales[int(sys.argv[2])]) + " " + str(state.params[0]) + "  " + str(R1) + "\n")
     file.close()
 
 #for (j, learning_rate) in enumerate(learning_rates):

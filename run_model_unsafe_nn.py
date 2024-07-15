@@ -42,6 +42,7 @@ verbose = True
  masks, strides, edges,
  vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
+Ccfl = 0.5
 # A helper function to randomly initialize weights and biases
 # for a dense neural network layer
 def random_layer_params(m, n, key, scale=1e-2):
@@ -103,8 +104,8 @@ for i in range(100):
     gradient = sim_loop_wrapper_grad_jit(nn_params)
     for (i,a) in enumerate(gradient):
         w, b = a
-        nn_params[i][0] -= a[0]
-        nn_params[i][1] -= a[1]
+        nn_params[i] = (nn_params[i][0] - a[0], nn_params[i][1] - a[1])
+        
     print(gradient)
     print(sim_loop_wrapper_jit(nn_params))
 
