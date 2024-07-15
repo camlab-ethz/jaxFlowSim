@@ -2,7 +2,7 @@
 
 source venv/bin/activate
 
-for i in {0..31}
+for i in {0..7}
 do
 	#screen -dmS inference_ensemble$i "source venv/bin/activate; python run_inference6.py bifurcation $i" &
 	screen -dmS inference_ensemble_sgd$i bash -c "source .venv/bin/activate; python run_inference_sgd.py bifurcation $i" & 

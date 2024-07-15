@@ -47,6 +47,7 @@ verbose = True
  masks, strides, edges,
  vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
+Ccfl = 0.5
 if verbose:
     starting_time = time.time_ns()
 
@@ -62,8 +63,9 @@ R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, 16)
+R_scales = np.linspace(0.1, 1, 16)
 def simLoopWrapper(R):
+    R = R*1e8
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
@@ -81,22 +83,23 @@ def simLoopWrapper(R):
 print(simLoopWrapper(R1))
 sim_loop_wrapper_jit = jit(jacfwd(simLoopWrapper))
 print(sim_loop_wrapper_jit(R1))
-results_folder = "results/inference_ensemble_det"
-if not os.path.isdir(results_folder):
-    os.makedirs(results_folder, mode = 0o777)
+#results_folder = "results/inference_ensemble_det"
+#if not os.path.isdir(results_folder):
+#    os.makedirs(results_folder, mode = 0o777)
 
-learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
+learning_rates = [1e-3]
 for (j, learning_rate) in enumerate(learning_rates):
     R_star = R_scales[int(sys.argv[2])]
     for i in range(1000):
         print(j,i)
         gradient = sim_loop_wrapper_jit(R_star)
         R_star -= learning_rate*gradient
+        print(gradient, R_star)
 
-    results_file = results_folder  + "/setup_" + str(learning_rate) + ".txt"
-    file = open(results_file, "a")  
-    file.write(str(R_scales[int(sys.argv[2])]) + " " + str(R_star) + "  " + str(R1) + "\n")
-    file.close()
+    #results_file = results_folder  + "/setup_" + str(learning_rate) + ".txt"
+    #file = open(results_file, "a")  
+    #file.write(str(R_scales[int(sys.argv[2])]) + " " + str(R_star) + "  " + str(R1) + "\n")
+    #file.close()
 
     
 

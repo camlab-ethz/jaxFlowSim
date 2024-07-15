@@ -60,11 +60,13 @@ sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
                                       masks, strides, edges,
                                       upper=120000)
 
+Ccfl = 0.5 
+
 R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, 32)
+R_scales = np.linspace(0.1*R1, 10*R1, 8)
 def simLoopWrapper(params):
     R = params[0]
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
@@ -85,11 +87,16 @@ results_folder = "results/inference_ensemble_det"
 if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
 
-learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
 
 network_properties = {
-        "tx": [optax.adam, optax.sgd, optax.lars],
-        "learning_rate": [1e-5, 1e-3, 1e-1, 1e2, 1e4],
+        #"tx": [optax.adam, optax.sgd, optax.lars],
+        #"tx": [optax.adabelief, optax.adadelta, optax.adafactor, optax.adagrad, 
+        #       optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
+        #"tx": [optax.adagrad, 
+        #       optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
+        "tx": [optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
+        "learning_rate": [1e7],
+        "learning_rate": [1e7],
         "epochs": [100,1000,2000]
         }
 
@@ -122,7 +129,9 @@ for set_num, setup in enumerate(settings):
 
     for _ in range(setup[2]):
         grads = jax.jacfwd(loss_fn)(state.params, x, y)
+        print(grads)
         state = state.apply_gradients(grads=grads)
+        print(state)
         print(loss_fn(state.params, x, y))
     file = open(results_file, "a")  
     file.write(str(R_scales[int(sys.argv[2])]) + " " + str(state.params[0]) + "  " + str(R1) + "\n")
