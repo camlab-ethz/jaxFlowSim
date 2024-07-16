@@ -66,9 +66,9 @@ R_index = 1
 var_index = 7
 R1 = sim_dat_const[var_index,strides[R_index,1]]
 #R_scales = np.linspace(1.1*R1, 2*R1, 16)
-R_scales = np.linspace(0.1*R1, 10*R1, 8)
+R_scales = np.linspace(0.1, 10, 8)
 def simLoopWrapper(params):
-    R = params[0]
+    R = params[0]*R1
     ones = jnp.ones(strides[R_index,1]-strides[R_index,0]+4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[var_index,strides[R_index,0]-2:strides[R_index,1]+2].set(R*ones)
@@ -94,9 +94,9 @@ network_properties = {
         #       optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
         #"tx": [optax.adagrad, 
         #       optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
-        "tx": [optax.adamw, optax.adamax, optax.adamaxw, optax.amsgrad],
-        "learning_rate": [1e7],
-        "epochs": [100,1000,2000]
+        "tx": [optax.adabelief],
+        "learning_rate": [1e3, 1e4, 1e5, 1e6, 1e7, 1e8],
+        "epochs": [2000]
         }
 
 settings = list(itertools.product(*network_properties.values()))
@@ -107,7 +107,7 @@ if not os.path.isdir(results_folder):
 
 for set_num, setup in enumerate(settings):
     print("###################################", set_num, "###################################")
-    results_file = results_folder  + "/setup_" + str(setup[0].__name__) + "_" + str(setup[1]) +  "_" + str(setup[2]) +".txt"
+    results_file = results_folder  + "/setup_" + str(setup[0].__name__) + "_" + str(setup[1]) +  "_" + str(setup[2]) +"_test.txt"
 
     model = simLoopWrapper
     variables = [R_scales[int(sys.argv[2])]]
@@ -122,15 +122,15 @@ for set_num, setup in enumerate(settings):
 
     def loss_fn(params, x, y):
       predictions = state.apply_fn(params)
-      loss = optax.l2_loss(predictions=predictions, targets=y).mean()
+      loss = jnp.log(optax.l2_loss(predictions=predictions, targets=y).mean()/optax.l2_loss(predictions=np.ones_like(y), targets=y).mean()+1)
       return loss
 
 
     for _ in range(setup[2]):
         grads = jax.jacfwd(loss_fn)(state.params, x, y)
-        print(grads)
+        #print(grads)
         state = state.apply_gradients(grads=grads)
-        print(state)
+        #print(state)
         print(loss_fn(state.params, x, y))
     file = open(results_file, "a")  
     file.write(str(R_scales[int(sys.argv[2])]) + " " + str(state.params[0]) + "  " + str(R1) + "\n")
