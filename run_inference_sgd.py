@@ -96,25 +96,22 @@ def simLoopWrapper(nn_params):
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges, nn_params, 
                                           upper=120000)
-    #jax.debug.print("P={x}", x=P)
-    #jax.debug.print("R={x}", x=R)
-    #jax.debug.print("P_obs={x}", x=P_obs)
     return P
 results_folder = "results/inference_ensemble_det"
 if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
 
-learning_rates = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
+learning_rates = [1e-2, 1e-1, 1, 1e2, 1e3, 1e4, 1e5]
 
 network_properties = {
-        "tx": [optax.adabelief],
-        "learning_rate": [1e-3],
-        "epochs": [100]
+        "tx": [optax.adabelief, optax.adadelta, optax.adagrad, optax.adam, optax.adamax, optax.adamaxw, optax.adamw, optax.amsgrad, optax.lars, optax.sgd],
+        "learning_rate": learning_rates,
+        "epochs": [100, 1000, 2000]
         }
 
 settings = list(itertools.product(*network_properties.values()))
 
-results_folder = "results/inference_ensemble_sgd"
+results_folder = "results/inference_ensemble_nn"
 if not os.path.isdir(results_folder):
     os.makedirs(results_folder, mode = 0o777)
 
@@ -123,7 +120,7 @@ for set_num, setup in enumerate(settings):
     results_file = results_folder  + "/setup_" + str(setup[0].__name__) + "_" + str(setup[1]) +  "_" + str(setup[2]) +".txt"
 
     model = simLoopWrapper
-    variables = init_network_params(layer_sizes, random.key(0))
+    variables = init_network_params(layer_sizes, random.key(int(sys.argv[2])))
     tx = setup[0]
     y = P_t
     x = simLoopWrapper
@@ -141,35 +138,13 @@ for set_num, setup in enumerate(settings):
 
     for _ in range(100):
         print(loss_fn(state.params, x, y))
-        plt.plot(y)
-        plt.plot(state.apply_fn(state.params))
-        plt.show()
-        plt.close()
+        #plt.plot(y)
+        #plt.plot(state.apply_fn(state.params))
+        #plt.show()
+        #plt.close()
         grads = jax.jacfwd(loss_fn)(state.params, x, y)
         state = state.apply_gradients(grads=grads)
     file = open(results_file, "a")  
-    #file.write(str(R_scales[int(sys.argv[2])]) + " " + str(state.params[0]) + "  " + str(R1) + "\n")
+    file.write(str(loss_fn(state.params, x, y)) + "\n")
     file.close()
 
-#for (j, learning_rate) in enumerate(learning_rates):
-#    R_star = R_scales[int(sys.argv[2])]
-#    for i in range(1000):
-#        print(j,i)
-#        gradient = sim_loop_wrapper_jit(R_star)
-#        R_star -= learning_rate*gradient
-#
-#    results_file = results_folder  + "/setup_" + str(learning_rate) + ".txt"
-#    file = open(results_file, "a")  
-#    file.write(str(R_scales[int(sys.argv[2])]) + " " + str(R_star) + "  " + str(R1) + "\n")
-#    file.close()
-
-    
-
-
-network_properties = {
-        "sigma": [1e-5],
-        "scale": [10],
-        "num_warmup": np.arange(10, 110, 10),
-        "num_samples": np.arange(100, 1100, 100),
-        "num_chains": [1]
-        }
