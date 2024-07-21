@@ -13,7 +13,7 @@ import numpyro
 from numpyro.infer import MCMC
 import numpy as np
 import itertools
-from jax import jit, grad, jacfwd
+from jax import jit, grad, jacfwd, value_and_grad
 from jax.test_util import check_grads
 
 os.chdir(os.path.dirname(__file__))
@@ -53,7 +53,7 @@ verbose = True
  masks, strides, edges,
  vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
 
-num_iterations = 120000
+num_iterations = 1000
 sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
 sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, 
@@ -61,6 +61,8 @@ sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
                                       0.5, input_data, rho, 
                                       masks, strides, edges,
                                       num_iterations)
+
+
 
 
 
@@ -94,24 +96,18 @@ def simLoopWrapper1(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
                                           sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges):
-    R=R*R1
-    ones = jnp.ones(M)
-    
-    #sim_dat_const_new = sim_dat_const_new.at[var_index, start:end].set(R*ones)
-    sim_dat_const_new = lax.dynamic_update_slice(sim_dat_const,
-                                                 ((R*ones)[:,jnp.newaxis]*jnp.ones(1)[jnp.newaxis,:]).transpose(),
-                                                 (var_index, start))
     sim_dat, _, P = sim_loop_old_jit(N, B,
                                           sim_dat, sim_dat_aux, 
-                                          sim_dat_const_new, sim_dat_const_aux, 
+                                          sim_dat_const, sim_dat_const_aux, 
                                           Ccfl, input_data, rho, 
                                           masks, strides, edges,
                                           120000)
+                                          120000)
     return sim_dat
 
-sim_loop_wrapper_jit = partial(jit, static_argnums=(1, 5, 6, 7, 8, 9))(simLoopWrapper)
-sim_loop_wrapper_grad_jit = partial(jit, static_argnums=(1, 5, 6, 7, 8, 9))(jacfwd(simLoopWrapper,0))
-sim_loop_wrapper_grad_jit1 = partial(jit, static_argnums=(1, 5, 6, 7, 8, 9))(jacfwd(simLoopWrapper1,0))
+sim_loop_wrapper_jit = partial(jit, static_argnums=(1, 2))(simLoopWrapper)
+#sim_loop_wrapper_grad_jit = partial(jit, static_argnums=(2, 6, 7, 8, 9, 10))(jacfwd(simLoopWrapper,14))
+#sim_loop_wrapper_grad_jit1 = partial(jit, static_argnums=(1, 5, 6, 7, 8, 9))(value_and_grad(simLoopWrapper1,14))
 #sim_loop_wrapper_grad_jit = jit(jacfwd(simLoopWrapper, 0))
 
 results_folder = "results/potential_surface"
