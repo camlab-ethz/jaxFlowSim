@@ -15,7 +15,7 @@ The module makes use of the following imported utilities:
 
 Functions:
 -----------
-- solve_anastomosis(u1, u2, u3, a1, a2, a3, a01, a02, a03, beta1, beta2, beta3, gamma1, gamma2, gamma3, p_ext1, p_ext2, p_ext3): 
+- solve_anastomosis(u1, u2, u3, a1, a2, a3, a01, a02, a03, beta1, beta2, beta3, gamma1, gamma2, gamma3, p_ext1, p_ext2, p_ext3):
   Solves the anastomosis problem and returns the updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures.
 
 - calculate_jacobian_anastomosis(u, k, a01, a02, a03, beta1, beta2, beta3):
