@@ -12,119 +12,62 @@ The module makes use of the following imported utilities:
 - `pressure` and `waveSpeed` from `src.utils` for calculating pressure and wave speed in the vessels.
 - `jax.numpy` for numerical operations and array handling.
 - `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
-
-Functions:
------------
-- solve_anastomosis(u1, u2, u3, a1, a2, a3, a01, a02, a03, beta1, beta2, beta3, gamma1, gamma2, gamma3, p_ext1, p_ext2, p_ext3):
-  Solves the anastomosis problem and returns the updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures.
-
-- calculate_jacobian_anastomosis(u, k, a01, a02, a03, beta1, beta2, beta3):
-  Calculates the Jacobian matrix needed for the Newton-Raphson method.
-
-- calculate_f_anastomosis(u, a0s, betas):
-  Computes the function vector for the current state of the anastomosis problem.
-
-- update_anastomosis(u, a01, a02, a03, beta1, beta2, beta3, gamma1, gamma2, gamma3, p_ext1, p_ext2, p_ext3):
-  Updates and returns the state of the system after solving the anastomosis equations.
 """
 
 import jax.numpy as jnp
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
-from jaxtyping import Float, Array, jaxtyped, Scalar
+from jaxtyping import Float, Array, jaxtyped
 from typeguard import typechecked as typechecker
 
 
 @jaxtyped(typechecker=typechecker)
 def solve_anastomosis(
-    u1: Scalar,
-    u2: Scalar,
-    u3: Scalar,
-    a1: Scalar,
-    a2: Scalar,
-    a3: Scalar,
-    a01: Scalar,
-    a02: Scalar,
-    a03: Scalar,
-    beta1: Scalar,
-    beta2: Scalar,
-    beta3: Scalar,
-    gamma1: Scalar,
-    gamma2: Scalar,
-    gamma3: Scalar,
-    p_ext1: Scalar,
-    p_ext2: Scalar,
-    p_ext3: Scalar,
-) -> tuple[
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-]:
+    us: Float[Array, " 3"],
+    a: Float[Array, " 3"],
+    a0s: Float[Array, " 3"],
+    betas: Float[Array, " 3"],
+    gammas: Float[Array, " 3"],
+    p_exts: Float[Array, " 3"],
+) -> Float[Array, " 15"]:
     """
     Solves the anastomosis problem using the Newton-Raphson method.
 
     Parameters:
-    u1, u2, u3 (Scalar): Initial velocities for vessels 1, 2, and 3.
-    a1, a2, a3 (Scalar): Initial cross-sectional areas for vessels 1, 2, and 3.
-    a01, a02, a03 (Scalar): Reference cross-sectional areas for vessels 1, 2, and 3.
-    beta1, beta2, beta3 (Scalar): Stiffness coefficients for vessels 1, 2, and 3.
-    gamma1, gamma2, gamma3 (Scalar): Admittance coefficients for vessels 1, 2, and 3.
-    p_ext1, p_ext2, p_ext3 (Scalar): External pressures for vessels 1, 2, and 3.
+    us (Float[Array, "3"]): Initial velocities for vessels 1, 2, and 3.
+    a (Float[Array, "3"]): Initial cross-sectional areas for vessels 1, 2, and 3.
+    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
+    gammas (Float[Array, "3"]): Admittance coefficients for vessels 1, 2, and 3.
+    p_exts (Float[Array, "3"]): External pressures for vessels 1, 2, and 3.
 
     Returns:
-    tuple: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Float[Array, "15"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
     """
-    u0 = jnp.array(
-        (
-            u1,
-            u2,
-            u3,
-            jnp.sqrt(jnp.sqrt(a1)),
-            jnp.sqrt(jnp.sqrt(a2)),
-            jnp.sqrt(jnp.sqrt(a3)),
-        )
+    u0 = jnp.concatenate(
+        [
+            us,
+            jnp.sqrt(jnp.sqrt(a)),
+        ]
     )
 
-    k1 = jnp.sqrt(1.5 * gamma1)
-    k2 = jnp.sqrt(1.5 * gamma2)
-    k3 = jnp.sqrt(1.5 * gamma3)
-    k = jnp.array([k1, k2, k3])
+    k = jnp.sqrt(1.5 * gammas)
 
-    j = calculate_jacobian_anastomosis(u0, k, a01, a02, a03, beta1, beta2, beta3)
+    j = calculate_jacobian_anastomosis(u0, k, a0s, betas)
     u = newtonRaphson(
         calculate_f_anastomosis,
         j,
         u0,
-        jnp.array([a01, a02, a03]),
-        jnp.array([beta1, beta2, beta3]),
+        a0s,
+        betas,
     )
 
     return update_anastomosis(
         u,
-        a01,
-        a02,
-        a03,
-        beta1,
-        beta2,
-        beta3,
-        gamma1,
-        gamma2,
-        gamma3,
-        p_ext1,
-        p_ext2,
-        p_ext3,
+        a0s,
+        betas,
+        gammas,
+        p_exts,
     )
 
 
@@ -132,21 +75,17 @@ def solve_anastomosis(
 def calculate_jacobian_anastomosis(
     u: Float[Array, " 6"],
     k: Float[Array, " 3"],
-    a01: Scalar,
-    a02: Scalar,
-    a03: Scalar,
-    beta1: Scalar,
-    beta2: Scalar,
-    beta3: Scalar,
+    a0s: Float[Array, " 3"],
+    betas: Float[Array, " 3"],
 ) -> Float[Array, "6 6"]:
     """
     Calculates the Jacobian matrix for the anastomosis problem.
 
     Parameters:
-    u (Float[Array, " 6"]): Current state vector.
-    k (Float[Array, " 3"]): Array of constants derived from gamma values.
-    a01, a02, a03 (Scalar): Reference cross-sectional areas for vessels 1, 2, and 3.
-    beta1, beta2, beta3 (Scalar): Stiffness coefficients for vessels 1, 2, and 3.
+    u (Float[Array, "6"]): Current state vector.
+    k (Float[Array, "3"]): Array of constants derived from gamma values.
+    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
 
     Returns:
     Float[Array, "6 6"]: Jacobian matrix.
@@ -166,6 +105,8 @@ def calculate_jacobian_anastomosis(
     j45 = 4.0 * u[1] * u53
     j46 = -4.0 * u[2] * u63
 
+    beta1, beta2, beta3 = betas
+    a01, a02, a03 = a0s
     j54 = 2.0 * beta1 * u[3] * jnp.sqrt(1 / a01)
     j56 = -2.0 * beta3 * u[5] * jnp.sqrt(1 / a03)
 
@@ -192,12 +133,12 @@ def calculate_f_anastomosis(
     Calculates the function vector for the anastomosis problem.
 
     Parameters:
-    u (Float[Array, " 6"]): Current state vector.
-    a0s (Float[Array, " 3"]): Tuple of reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (Float[Array, " 3"]): Tuple of stiffness coefficients for vessels 1, 2, and 3.
+    u (Float[Array, "6"]): Current state vector.
+    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
 
     Returns:
-    Float[Array, " 6"]: Function vector.
+    Float[Array, "6"]: Function vector.
     """
     a01, a02, a03 = a0s
     beta1, beta2, beta3 = betas
@@ -224,67 +165,31 @@ def calculate_f_anastomosis(
 @jaxtyped(typechecker=typechecker)
 def update_anastomosis(
     u: Float[Array, " 6"],
-    a01: Scalar,
-    a02: Scalar,
-    a03: Scalar,
-    beta1: Scalar,
-    beta2: Scalar,
-    beta3: Scalar,
-    gamma1: Scalar,
-    gamma2: Scalar,
-    gamma3: Scalar,
-    p_ext1: Scalar,
-    p_ext2: Scalar,
-    p_ext3: Scalar,
-) -> tuple[
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-    Scalar,
-]:
+    a0s: Float[Array, " 3"],
+    betas: Float[Array, " 3"],
+    gammas: Float[Array, " 3"],
+    p_exts: Float[Array, " 3"],
+) -> Float[Array, " 15"]:
     """
     Updates the state of the anastomosis problem based on the current state vector.
 
     Parameters:
-    u (Float[Array, " 6"]): Current state vector.
-    a01, a02, a03 (Scalar): Reference cross-sectional areas for vessels 1, 2, and 3.
-    beta1, beta2, beta3 (Scalar): Stiffness coefficients for vessels 1, 2, and 3.
-    gamma1, gamma2, gamma3 (Scalar): Admittance coefficients for vessels 1, 2, and 3.
-    p_ext1, p_ext2, p_ext3 (Scalar): External pressures for vessels 1, 2, and 3.
+    u (Float[Array, "6"]): Current state vector.
+    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
+    gammas (Float[Array, "3"]): Admittance coefficients for vessels 1, 2, and 3.
+    p_exts (Float[Array, "3"]): External pressures for vessels 1, 2, and 3.
 
     Returns:
-    tuple: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Float[Array, "15"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
     """
 
-    u1 = u[0]
-    u2 = u[1]
-    u3 = u[2]
+    a = u[3:] ** 4
 
-    a1 = u[3] ** 4
-    a2 = u[4] ** 4
-    a3 = u[5] ** 4
+    qs = u[:3] * a
 
-    q1 = u1 * a1
-    q2 = u2 * a2
-    q3 = u3 * a3
+    cs = waveSpeed(a, gammas)
 
-    c1 = waveSpeed(a1, gamma1)
-    c2 = waveSpeed(a2, gamma2)
-    c3 = waveSpeed(a3, gamma3)
+    ps = pressure(a, a0s, betas, p_exts)
 
-    p1 = pressure(a1, a01, beta1, p_ext1)
-    p2 = pressure(a2, a02, beta2, p_ext2)
-    p3 = pressure(a3, a03, beta3, p_ext3)
-
-    return u1, u2, u3, q1, q2, q3, a1, a2, a3, c1, c2, c3, p1, p2, p3
+    return jnp.concatenate([u[:3], qs, a, cs, ps])
