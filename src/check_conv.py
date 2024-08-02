@@ -1,24 +1,95 @@
+"""
+This module provides functions to calculate norms, compute convergence errors, print error messages, and check for convergence in a vascular network model using JAX.
+
+It includes functions to:
+- Calculate norms between two sets of pressure data (`calc_norms`).
+- Compute the maximum convergence error (`compute_conv_error`).
+- Print the convergence error (`print_conv_error`).
+- Check if the convergence error is within a specified tolerance (`check_conv`).
+
+The module makes use of the following imported utilities:
+- `jax.lax` for control flow operations.
+- `jax.numpy` for numerical operations and array handling.
+- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+"""
+
 from jax import lax, debug
 import jax.numpy as jnp
+from jaxtyping import Array, Float, jaxtyped
+from typeguard import typechecked as typechecker
 
 
-def calcNorms(N, P_t, P_l):
-    norms = jnp.zeros(N)
-    def body_fun(i,norms):
-        err = P_l[:, i*5 + 2] - P_t[:, i*5 + 2]
+@jaxtyped(typechecker=typechecker)
+def calc_norms(
+    n: Float[Array, ""], p_t: Float[Array, ""], p_l: Float[Array, ""]
+) -> Float[Array, ""]:
+    """
+    Calculates the norms between two sets of pressure data.
+
+    Parameters:
+    n (Float[Array, ""]): Number of data points.
+    p_t (Float[Array, ""]): Target pressure data.
+    p_l (Float[Array, ""]): Learned pressure data.
+
+    Returns:
+    Float[Array, ""]: Array of norms for each data point.
+    """
+    norms = jnp.zeros(n)
+
+    def body_fun(i, norms):
+        err = p_l[:, i * 5 + 2] - p_t[:, i * 5 + 2]
         norms = norms.at[i].set(jnp.sqrt(jnp.sum(err**2)))
         return norms
-    norms = lax.fori_loop(0,N,body_fun, norms)
+
+    norms = lax.fori_loop(0, n, body_fun, norms)
     return norms
 
-def computeConvError(N, P_t, P_l):
-    current_norms = calcNorms(N, P_t, P_l)
+
+@jaxtyped(typechecker=typechecker)
+def compute_conv_error(
+    n: Float[Array, ""], p_t: Float[Array, ""], p_l: Float[Array, ""]
+) -> Float[Array, ""]:
+    """
+    Computes the maximum convergence error between two sets of pressure data.
+
+    Parameters:
+    n (Float[Array, ""]): Number of data points.
+    p_t (Float[Array, ""]): Target pressure data.
+    p_l (Float[Array, ""]): Learned pressure data.
+
+    Returns:
+    Float[Array, ""]: Maximum convergence error.
+    """
+    current_norms = calc_norms(n, p_t, p_l)
     maxnorm = jnp.max(current_norms)
     return maxnorm
 
-def printConvError(err):
+
+@jaxtyped(typechecker=typechecker)
+def print_conf_error(err: Float[Array, ""]):
+    """
+    Prints the convergence error in mmHg.
+
+    Parameters:
+    err (Float[Array, ""]): Convergence error.
+
+    Returns:
+    None
+    """
     err /= 133.332
     debug.print("error norm = {x} mmHg", x=err)
 
-def checkConv(err, conv_toll):
+
+@jaxtyped(typechecker=typechecker)
+def check_conv(err: Float[Array, ""], conv_toll: Float[Array, ""]) -> Float[Array, ""]:
+    """
+    Checks if the convergence error is within the specified tolerance.
+
+    Parameters:
+    err (Float[Array, ""]): Convergence error.
+    conv_toll (Float[Array, ""]): Convergence tolerance.
+
+    Returns:
+    Float[Array, ""]: Boolean value indicating if the error is within the tolerance.
+    """
     return err / 133.332 <= conv_toll
