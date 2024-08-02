@@ -3,8 +3,8 @@ from functools import partial
 from jax import lax, vmap, jit, debug
 from src.anastomosis import solve_anastomosis
 from src.conjunctions import solveConjunction
-from src.bifurcations import solveBifurcation
-from src.boundary_conditions import setInletBC, setOutletBC
+from src.bifurcations import solve_bifurcation
+from src.boundary_conditions import set_inlet_bc, set_outlet_bc
 from src.utils import pressureSA, waveSpeedSA
 
 
@@ -33,11 +33,9 @@ def solveModel(
 ):
 
     inlet = sim_dat_const_aux[0, 1]
-    u0 = sim_dat[0, B]
-    u1 = sim_dat[0, B + 1]
+    us = jnp.array([sim_dat[0, B], sim_dat[0, B + 1]])
     A0 = sim_dat[2, B]
-    c0 = sim_dat[3, B]
-    c1 = sim_dat[3, B + 1]
+    cs = jnp.array([sim_dat[3, B], sim_dat[3, B + 1]])
     cardiac_T = sim_dat_const_aux[0, 0]
     dx = sim_dat_const[-1, B]
     A00 = sim_dat_const[0, B]
@@ -46,13 +44,11 @@ def solveModel(
 
     sim_dat = sim_dat.at[1:3, 0 : B + 1].set(
         jnp.array(
-            setInletBC(
+            set_inlet_bc(
                 inlet,
-                u0,
-                u1,
+                us,
                 A0,
-                c0,
-                c1,
+                cs,
                 t,
                 dt,
                 input_data,
@@ -95,42 +91,38 @@ def solveModel(
         end = strides[j, 1]
 
         def setOutletBCWrapper(sim_dat, sim_dat_aux):
-            u1 = sim_dat[0, end - 1]
-            u2 = sim_dat[0, end - 2]
+            us = jnp.array([sim_dat[0, end - 1], sim_dat[0, end - 2]])
             Q1 = sim_dat[1, end - 1]
             A1 = sim_dat[2, end - 1]
-            c1 = sim_dat[3, end - 1]
-            c2 = sim_dat[3, end - 2]
-            P1 = sim_dat[4, end - 1]
-            P2 = sim_dat[4, end - 2]
-            P3 = sim_dat[4, end - 3]
+            cs = jnp.array([sim_dat[3, end - 1], sim_dat[3, end - 2]])
+            ps = jnp.array(
+                [sim_dat[4, end - 1], sim_dat[4, end - 2], sim_dat[4, end - 3]]
+            )
             Pc = sim_dat_aux[j, 2]
-            W1M0 = sim_dat_aux[j, 0]
-            W2M0 = sim_dat_aux[j, 1]
-            u, Q, A, c, P1, Pc = setOutletBC(
+            wks = jnp.array(
+                [
+                    sim_dat_const[6, end - 1],
+                    sim_dat_const[7, end - 1],
+                    sim_dat_const[8, end - 1],
+                    sim_dat_const[9, end - 1],
+                ]
+            )
+            u, Q, A, c, P1, Pc = set_outlet_bc(
                 dt,
-                u1,
-                u2,
+                us,
                 Q1,
                 A1,
-                c1,
-                c2,
-                P1,
-                P2,
-                P3,
+                cs,
+                ps,
                 Pc,
-                W1M0,
-                W2M0,
+                sim_dat_aux[j, :2],
                 sim_dat_const[0, end - 1],
                 sim_dat_const[1, end - 1],
                 sim_dat_const[2, end - 1],
                 sim_dat_const[-1, end - 1],
                 sim_dat_const[4, end - 1],
                 sim_dat_const_aux[j, 2],
-                sim_dat_const[6, end - 1],
-                sim_dat_const[7, end - 1],
-                sim_dat_const[8, end - 1],
-                sim_dat_const[9, end - 1],
+                wks,
             )
             temp = jnp.array((u, Q, A, c, P1))
             sim_dat = lax.dynamic_update_slice(
@@ -154,34 +146,59 @@ def solveModel(
             d2_i = edges[j, 5]
             d1_i_start = strides[d1_i, 0]
             d2_i_start = strides[d2_i, 0]
-            u1 = sim_dat[0, end - 1]
-            u2 = sim_dat[0, d1_i_start]
-            u3 = sim_dat[0, d2_i_start]
-            A1 = sim_dat[2, end - 1]
-            A2 = sim_dat[2, d1_i_start]
-            A3 = sim_dat[2, d2_i_start]
-            (u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3) = (
-                solveBifurcation(
-                    u1,
-                    u2,
-                    u3,
-                    A1,
-                    A2,
-                    A3,
+            us = jnp.array(
+                [sim_dat[0, end - 1], sim_dat[0, d1_i_start], sim_dat[0, d2_i_start]]
+            )
+            a = jnp.array(
+                [sim_dat[2, end - 1], sim_dat[2, d1_i_start], sim_dat[2, d2_i_start]]
+            )
+            a0s = jnp.array(
+                [
                     sim_dat_const[0, end - 1],
                     sim_dat_const[0, d1_i_start],
                     sim_dat_const[0, d2_i_start],
+                ]
+            )
+            betas = jnp.array(
+                [
                     sim_dat_const[1, end - 1],
                     sim_dat_const[1, d1_i_start],
                     sim_dat_const[1, d2_i_start],
+                ]
+            )
+            gammas = jnp.array(
+                [
                     sim_dat_const[2, end - 1],
                     sim_dat_const[2, d1_i_start],
                     sim_dat_const[2, d2_i_start],
+                ]
+            )
+            p_exts = jnp.array(
+                [
                     sim_dat_const[4, end - 1],
                     sim_dat_const[4, d1_i_start],
                     sim_dat_const[4, d2_i_start],
-                )
+                ]
             )
+            (
+                u1,
+                u2,
+                u3,
+                Q1,
+                Q2,
+                Q3,
+                A1,
+                A2,
+                A3,
+                c1,
+                c2,
+                c3,
+                P1,
+                P2,
+                P3,
+            ) = solve_bifurcation(  # pylint: disable=E1111
+                us, a, a0s, betas, gammas, p_exts
+            )  # pylint: disable=E1111  # pylint: disable=E1111
             temp1 = jnp.array((u1, Q1, A1, c1, P1))
             temp2 = jnp.array((u2, Q2, A2, c2, P2))
             temp3 = jnp.array((u3, Q3, A3, c3, P3))

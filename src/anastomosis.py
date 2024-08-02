@@ -15,10 +15,11 @@ The module makes use of the following imported utilities:
 """
 
 import jax.numpy as jnp
+from jaxtyping import Array, Float, jaxtyped
+from typeguard import typechecked as typechecker
+
 from src.newton import newtonRaphson
 from src.utils import pressure, waveSpeed
-from jaxtyping import Float, Array, jaxtyped
-from typeguard import typechecked as typechecker
 
 
 @jaxtyped(typechecker=typechecker)
@@ -53,7 +54,7 @@ def solve_anastomosis(
 
     k = jnp.sqrt(1.5 * gammas)
 
-    j = calculate_jacobian_anastomosis(u0, k, a0s, betas)
+    j = calculate_jacobian_anastomosis(u0, k, a0s, betas)  # pylint: disable=E1111
     u = newtonRaphson(
         calculate_f_anastomosis,
         j,
@@ -73,7 +74,7 @@ def solve_anastomosis(
 
 @jaxtyped(typechecker=typechecker)
 def calculate_jacobian_anastomosis(
-    u: Float[Array, " 6"],
+    u0: Float[Array, " 6"],
     k: Float[Array, " 3"],
     a0s: Float[Array, " 3"],
     betas: Float[Array, " 3"],
@@ -90,28 +91,28 @@ def calculate_jacobian_anastomosis(
     Returns:
     Float[Array, "6 6"]: Jacobian matrix.
     """
-    u43 = u[3] * u[3] * u[3]
-    u53 = u[4] * u[4] * u[4]
-    u63 = u[5] * u[5] * u[5]
+    u43 = u0[3] * u0[3] * u0[3]
+    u53 = u0[4] * u0[4] * u0[4]
+    u63 = u0[5] * u0[5] * u0[5]
 
     j14 = 4.0 * k[0]
     j25 = 4.0 * k[1]
     j36 = -4.0 * k[2]
 
-    j41 = u[3] * u43
-    j42 = u[4] * u53
-    j43 = -u[5] * u63
-    j44 = 4.0 * u[0] * u43
-    j45 = 4.0 * u[1] * u53
-    j46 = -4.0 * u[2] * u63
+    j41 = u0[3] * u43
+    j42 = u0[4] * u53
+    j43 = -u0[5] * u63
+    j44 = 4.0 * u0[0] * u43
+    j45 = 4.0 * u0[1] * u53
+    j46 = -4.0 * u0[2] * u63
 
     beta1, beta2, beta3 = betas
     a01, a02, a03 = a0s
-    j54 = 2.0 * beta1 * u[3] * jnp.sqrt(1 / a01)
-    j56 = -2.0 * beta3 * u[5] * jnp.sqrt(1 / a03)
+    j54 = 2.0 * beta1 * u0[3] * jnp.sqrt(1 / a01)
+    j56 = -2.0 * beta3 * u0[5] * jnp.sqrt(1 / a03)
 
-    j65 = 2.0 * beta2 * u[4] * jnp.sqrt(1 / a02)
-    j66 = -2.0 * beta3 * u[5] * jnp.sqrt(1 / a03)
+    j65 = 2.0 * beta2 * u0[4] * jnp.sqrt(1 / a02)
+    j66 = -2.0 * beta3 * u0[5] * jnp.sqrt(1 / a03)
 
     return jnp.array(
         [
