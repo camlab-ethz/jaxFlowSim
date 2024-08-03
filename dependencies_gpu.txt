@@ -9,3 +9,4 @@ SALib
 jinja2
 optax
 flax
+jaxtyping
