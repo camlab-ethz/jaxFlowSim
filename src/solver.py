@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from functools import partial
 from jax import lax, vmap, jit, debug
 from src.anastomosis import solve_anastomosis
-from src.conjunctions import solveConjunction
+from src.conjunctions import solve_conjunction
 from src.bifurcations import solve_bifurcation
 from src.boundary_conditions import set_inlet_bc, set_outlet_bc
 from src.utils import pressureSA, waveSpeedSA
@@ -229,23 +229,39 @@ def solveModel(
         def solveConjunctionWrapper(sim_dat, rho):
             d_i = edges[j, 7]
             d_i_start = strides[d_i, 0]
-            u1 = sim_dat[0, end - 1]
-            u2 = sim_dat[0, d_i_start]
-            A1 = sim_dat[2, end - 1]
-            A2 = sim_dat[2, d_i_start]
-            (u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2) = solveConjunction(
-                u1,
-                u2,
-                A1,
-                A2,
-                sim_dat_const[0, end - 1],
-                sim_dat_const[0, d_i_start],
-                sim_dat_const[1, end - 1],
-                sim_dat_const[1, d_i_start],
-                sim_dat_const[2, end - 1],
-                sim_dat_const[2, d_i_start],
-                sim_dat_const[4, end - 1],
-                sim_dat_const[4, d_i_start],
+            us = jnp.array([sim_dat[0, end - 1], sim_dat[0, d_i_start]])
+            a = jnp.array([sim_dat[2, end - 1], sim_dat[2, d_i_start]])
+            a0s = jnp.array(
+                [
+                    sim_dat_const[0, end - 1],
+                    sim_dat_const[0, d_i_start],
+                ]
+            )
+            betas = jnp.array(
+                [
+                    sim_dat_const[1, end - 1],
+                    sim_dat_const[1, d_i_start],
+                ]
+            )
+            gammas = jnp.array(
+                [
+                    sim_dat_const[2, end - 1],
+                    sim_dat_const[2, d_i_start],
+                ]
+            )
+            p_exts = jnp.array(
+                [
+                    sim_dat_const[4, end - 1],
+                    sim_dat_const[4, d_i_start],
+                ]
+            )
+            (u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2) = solve_conjunction(
+                us,
+                a,
+                a0s,
+                betas,
+                gammas,
+                p_exts,
                 rho,
             )
             temp1 = jnp.array((u1, Q1, A1, c1, P1))

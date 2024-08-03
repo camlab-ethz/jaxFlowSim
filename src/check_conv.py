@@ -15,14 +15,14 @@ The module makes use of the following imported utilities:
 
 from jax import lax, debug
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import Array, Float, jaxtyped, Bool
 from typeguard import typechecked as typechecker
 
 
 @jaxtyped(typechecker=typechecker)
 def calc_norms(
-    n: Float[Array, ""], p_t: Float[Array, ""], p_l: Float[Array, ""]
-) -> Float[Array, ""]:
+    n: int, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
+) -> Float[Array, "..."]:
     """
     Calculates the norms between two sets of pressure data.
 
@@ -47,14 +47,14 @@ def calc_norms(
 
 @jaxtyped(typechecker=typechecker)
 def compute_conv_error(
-    n: Float[Array, ""], p_t: Float[Array, ""], p_l: Float[Array, ""]
+    n: int, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
 ) -> Float[Array, ""]:
     """
     Computes the maximum convergence error between two sets of pressure data.
 
     Parameters:
     n (Float[Array, ""]): Number of data points.
-    p_t (Float[Array, ""]): Target pressure data.
+    p_t (Float[ArrayTraced<ShapedArray(float64[100,5])>with<DynamicJaxprTrace(level=2/0)>, ""]): Target pressure data.
     p_l (Float[Array, ""]): Learned pressure data.
 
     Returns:
@@ -81,7 +81,7 @@ def print_conf_error(err: Float[Array, ""]):
 
 
 @jaxtyped(typechecker=typechecker)
-def check_conv(err: Float[Array, ""], conv_toll: Float[Array, ""]) -> Float[Array, ""]:
+def check_conv(err: Float[Array, ""], conv_toll) -> Bool[Array, ""]:
     """
     Checks if the convergence error is within the specified tolerance.
 
