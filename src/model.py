@@ -2,10 +2,10 @@ import jax.numpy as jnp
 from jax import lax, jit, block_until_ready
 import numpy as np
 from src.initialise import (
-    loadConfig,
-    buildBlood,
-    buildArterialNetwork,
-    makeResultsFolder,
+    load_config,
+    build_blood,
+    build_arterial_network,
+    make_results_folder,
 )
 from src.IOutils import saveTempData
 from src.solver import computeDt, solveModel
@@ -23,9 +23,9 @@ numpyro.set_platform("cpu")
 # print(jax.local_device_count())
 
 
-def configSimulation(input_filename, verbose=False, make_results_folder=True):
-    data = loadConfig(input_filename)
-    blood = buildBlood(data["blood"])
+def configSimulation(input_filename, verbose=False, make_results_folder_bool=True):
+    data = load_config(input_filename)
+    blood = build_blood(data["blood"])
 
     J = data["solver"]["num_snapshots"]
 
@@ -41,11 +41,11 @@ def configSimulation(input_filename, verbose=False, make_results_folder=True):
         edges,
         vessel_names,
         input_data,
-    ) = buildArterialNetwork(
+    ) = build_arterial_network(
         data["network"], blood
     )  # , junction_functions) = buildArterialNetwork(data["network"], blood)
-    if make_results_folder:
-        makeResultsFolder(data, input_filename)
+    if make_results_folder_bool:
+        make_results_folder(data, input_filename)
 
     cardiac_T = sim_dat_const_aux[0, 0]
     Ccfl = float(data["solver"]["Ccfl"])
