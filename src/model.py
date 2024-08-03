@@ -7,7 +7,7 @@ from src.initialise import (
     build_arterial_network,
     make_results_folder,
 )
-from src.IOutils import saveTempData
+from src.IOutils import save_temp_data
 from src.solver import computeDt, solveModel
 from src.check_conv import print_conf_error, compute_conv_error, check_conv
 from functools import partial
@@ -129,7 +129,7 @@ def simulationLoopUnsafe(
         )
         t = (t + dt) % sim_dat_const_aux[0, 0]
         t_t = t_t.at[i].set(t)
-        P_t = P_t.at[i, :].set(saveTempData(N, strides, sim_dat[4, :]))
+        P_t = P_t.at[i, :].set(save_temp_data(N, strides, sim_dat[4, :]))
 
         return (
             sim_dat,
@@ -283,7 +283,7 @@ def simulationLoop(
 
         (P_t_temp, counter_temp) = lax.cond(
             t >= timepoints[counter],
-            lambda: (saveTempData(N, strides, sim_dat[4, :]), counter + 1),
+            lambda: (save_temp_data(N, strides, sim_dat[4, :]), counter + 1),
             lambda: (P_t[counter, :], counter),
         )
         P_t = P_t.at[counter, :].set(P_t_temp)
