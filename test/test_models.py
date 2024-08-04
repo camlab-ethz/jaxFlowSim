@@ -4,7 +4,7 @@ import sys
 
 sys.path.append("/home/diego/studies/uni/thesis_maths/jaxFlowSim")
 print("Updated sys.path:", sys.path)
-from src.model import runSimulation, runSimulationUnsafe
+from src.model import run_simulation, run_simulation_unsafe
 import time
 import os
 from functools import partial
@@ -36,7 +36,7 @@ class TestModels(unittest.TestCase):
             config_filename = "test/" + modelname + "/" + modelname + ".yml"
 
             verbose = True
-            sim_dat, t, P = runSimulation(config_filename, verbose)
+            sim_dat, t, P = run_simulation(config_filename, verbose)
 
             P_base = np.loadtxt("test/test_data/" + modelname + "_P.dat")
             sim_dat_base = np.loadtxt("test/test_data/" + modelname + "_sim_dat.dat")
@@ -64,7 +64,7 @@ class TestModels(unittest.TestCase):
             config_filename = "test/" + modelname + "/" + modelname + ".yml"
 
             verbose = True
-            sim_dat, t, P = runSimulationUnsafe(config_filename, verbose)
+            sim_dat, t, P = run_simulation_unsafe(config_filename, verbose)
 
             P_base = np.loadtxt("test/test_data/" + modelname + "_P_unsafe.dat")
             sim_dat_base = np.loadtxt(

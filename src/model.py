@@ -1,20 +1,39 @@
+"""
+This module provides functions to configure and run vascular network simulations using JAX.
+
+It includes functions to:
+- Configure the simulation (`config_simulation`).
+- Run the main simulation loop with and without safety checks (`simulation_loop`, `simulation_loop_unsafe`).
+- Execute the simulation with JIT compilation for performance optimization (`run_simulation_unsafe`, `run_simulation`).
+
+The module makes use of the following imported utilities:
+- Functions from `src.check_conv` for convergence checks and error computations.
+- Functions from `src.initialise` for building the network and blood properties, and loading configurations.
+- `save_temp_data` from `src.IOutils` for saving temporary data.
+- Functions from `src.solver` for time-step computation and solving the model.
+- `jax.numpy` and `jax.lax` for numerical operations and control flow.
+- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+"""
+
+import time
+from functools import partial
+
 import jax.numpy as jnp
-from jax import lax, jit, block_until_ready
 import numpy as np
+import numpyro  # type: ignore
+from jax import block_until_ready, jit, lax
+from jaxtyping import Array, Float, Integer, jaxtyped
+from typeguard import typechecked as typechecker
+
+from src.check_conv import check_conv, compute_conv_error, print_conv_error
 from src.initialise import (
-    load_config,
-    build_blood,
     build_arterial_network,
+    build_blood,
+    load_config,
     make_results_folder,
 )
 from src.IOutils import save_temp_data
 from src.solver import computeDt, solveModel
-from src.check_conv import print_conf_error, compute_conv_error, check_conv
-from functools import partial
-import numpy as np
-import numpyro
-import time
-
 
 numpyro.set_platform("cpu")
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
@@ -23,81 +42,114 @@ numpyro.set_platform("cpu")
 # print(jax.local_device_count())
 
 
-def configSimulation(input_filename, verbose=False, make_results_folder_bool=True):
+@jaxtyped(typechecker=typechecker)
+def config_simulation(
+    input_filename: str, verbose: bool = False, make_results_folder_bool: bool = True
+) -> tuple:
+    """
+    Configures the simulation by loading the configuration, building the blood properties, and arterial network.
+
+    Parameters:
+    input_filename (str): Path to the YAML configuration file.
+    verbose (bool): Whether to print verbose output.
+    make_results_folder_bool (bool): Whether to create a results folder.
+
+    Returns:
+    tuple: Configuration parameters for the simulation.
+    """
     data = load_config(input_filename)
     blood = build_blood(data["blood"])
 
-    J = data["solver"]["num_snapshots"]
+    j = data["solver"]["num_snapshots"]
 
     (
         sim_dat,
         sim_dat_aux,
         sim_dat_const,
         sim_dat_const_aux,
-        N,
-        B,
+        n,
+        b,
         masks,
         strides,
         edges,
         vessel_names,
         input_data,
-    ) = build_arterial_network(
-        data["network"], blood
-    )  # , junction_functions) = buildArterialNetwork(data["network"], blood)
+    ) = build_arterial_network(data["network"], blood)
     if make_results_folder_bool:
         make_results_folder(data, input_filename)
 
-    cardiac_T = sim_dat_const_aux[0, 0]
-    Ccfl = float(data["solver"]["Ccfl"])
+    cardiac_t = sim_dat_const_aux[0, 0]
+    ccfl = float(data["solver"]["Ccfl"])
 
     if verbose:
         print("start simulation")
 
-    timepoints = np.linspace(0, cardiac_T, J)
+    timepoints = np.linspace(0, cardiac_t, j)
 
     return (
-        N,
-        B,
-        J,
+        n,
+        b,
+        j,
         sim_dat,
         sim_dat_aux,
         sim_dat_const,
         sim_dat_const_aux,
         timepoints,
         1,
-        Ccfl,
-        edges,
+        ccfl,
         input_data,
         blood.rho,
         masks,
         strides,
         edges,
         vessel_names,
-        cardiac_T,
+        cardiac_t,
     )
 
 
-def simulationLoopUnsafe(
-    N,
-    B,
-    sim_dat,
-    sim_dat_aux,
-    sim_dat_const,
-    sim_dat_const_aux,
-    Ccfl,
-    input_data,
-    rho,
-    masks,
-    strides,
-    edges,
+@jaxtyped(typechecker=typechecker)
+def simulation_loop_unsafe(
+    n: int,
+    b: int,
+    sim_dat: Float[Array, "..."],
+    sim_dat_aux: Float[Array, "..."],
+    sim_dat_const: Float[Array, "..."],
+    sim_dat_const_aux: Float[Array, "..."],
+    ccfl: Float[Array, ""],
+    input_data: Float[Array, "..."],
+    rho: Float[Array, ""],
+    masks: Integer[Array, "..."],
+    strides: Integer[Array, "..."],
+    edges: Integer[Array, "..."],
     upper=100000,
-):
+) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Runs the simulation loop without convergence checks.
+
+    Parameters:
+    n (int): Number of vessels.
+    b (int): Buffer size.
+    sim_dat (Float[Array, "..."]): Simulation data array.
+    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
+    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
+    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
+    ccfl (Float[Array, ""]): CFL condition value.
+    input_data (Float[Array, "..."]): Input data array.
+    rho (Float[Array, ""]): Blood density.
+    masks (Integer[Array, "..."]): Masks array.
+    strides (Integer[Array, "..."]): Strides array.
+    edges (Integer[Array, "..."]): Edges array.
+    upper (int): Upper limit for the loop.
+
+    Returns:
+    tuple: Updated simulation data, time steps, and pressure data.
+    """
     t = 0.0
     dt = 1
-    P_t = jnp.zeros((upper, 5 * N))
+    p_t = jnp.zeros((upper, 5 * n))
     t_t = jnp.zeros(upper)
 
-    def bodyFun(i, args):
+    def simulation_one_step(i, args):
         (
             sim_dat,
             sim_dat_aux,
@@ -109,12 +161,12 @@ def simulationLoopUnsafe(
             edges,
             input_data,
             rho,
-            P_t,
+            p_t,
         ) = args
-        dt = computeDt(Ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
+        dt = computeDt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
         sim_dat, sim_dat_aux = solveModel(
-            N,
-            B,
+            n,
+            b,
             t,
             dt,
             input_data,
@@ -129,7 +181,7 @@ def simulationLoopUnsafe(
         )
         t = (t + dt) % sim_dat_const_aux[0, 0]
         t_t = t_t.at[i].set(t)
-        P_t = P_t.at[i, :].set(save_temp_data(N, strides, sim_dat[4, :]))
+        p_t = p_t.at[i, :].set(save_temp_data(n, strides, sim_dat[4, :]))
 
         return (
             sim_dat,
@@ -142,7 +194,7 @@ def simulationLoopUnsafe(
             edges,
             input_data,
             rho,
-            P_t,
+            p_t,
         )
 
     (
@@ -156,11 +208,11 @@ def simulationLoopUnsafe(
         edges,
         input_data,
         rho,
-        P_t,
+        p_t,
     ) = lax.fori_loop(
         0,
         upper,
-        bodyFun,
+        simulation_one_step,
         (
             sim_dat,
             sim_dat_aux,
@@ -172,39 +224,63 @@ def simulationLoopUnsafe(
             edges,
             input_data,
             rho,
-            P_t,
+            p_t,
         ),
     )
 
-    return sim_dat, t_t, P_t
+    return sim_dat, t_t, p_t
 
 
-def simulationLoop(
-    N,
-    B,
-    num_snapshots,
-    sim_dat,
-    sim_dat_aux,
-    sim_dat_const,
-    sim_dat_const_aux,
-    timepoints,
-    conv_tol,
-    Ccfl,
-    input_data,
-    rho,
-    masks,
-    strides,
-    edges,
-):
+@jaxtyped(typechecker=typechecker)
+def simulation_loop(
+    n: int,
+    b: int,
+    num_snapshots: int,
+    sim_dat: Float[Array, "..."],
+    sim_dat_aux: Float[Array, "..."],
+    sim_dat_const: Float[Array, "..."],
+    sim_dat_const_aux: Float[Array, "..."],
+    timepoints: Float[Array, "..."],
+    conv_tol: Float[Array, ""],
+    ccfl: Float[Array, ""],
+    input_data: Float[Array, "..."],
+    rho: Float[Array, ""],
+    masks: Integer[Array, "..."],
+    strides: Integer[Array, "..."],
+    edges: Integer[Array, "..."],
+) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Runs the main simulation loop with convergence checks.
+
+    Parameters:
+    n (int): Number of vessels.
+    b (int): Buffer size.
+    num_snapshots (int): Number of snapshots to capture.
+    sim_dat (Float[Array, "..."]): Simulation data array.
+    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
+    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
+    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
+    timepoints (Float[Array, "..."]): Timepoints array.
+    conv_tol (Float[Array, ""]): Convergence tolerance.
+    ccfl (Float[Array, ""]): CFL condition value.
+    input_data (Float[Array, "..."]): Input data array.
+    rho (Float[Array, ""]): Blood density.
+    masks (Integer[Array, "..."]): Masks array.
+    strides (Integer[Array, "..."]): Strides array.
+    edges (Integer[Array, "..."]): Edges array.
+
+    Returns:
+    tuple: Updated simulation data, time steps, and pressure data.
+    """
     t = 0.0
     passed_cycles = 0
     counter = 0
-    P_t = jnp.empty((num_snapshots, N * 5))
+    p_t = jnp.empty((num_snapshots, n * 5))
     t_t = jnp.empty(num_snapshots)
-    P_l = jnp.empty((num_snapshots, N * 5))
+    p_l = jnp.empty((num_snapshots, n * 5))
     dt = 0
 
-    def condFun(args):
+    def conv_error_condition(args):
         (
             _,
             _,
@@ -215,8 +291,8 @@ def simulationLoop(
             _,
             passed_cycles_i,
             _,
-            P_t_i,
-            P_l_i,
+            p_t_i,
+            p_l_i,
             _,
             conv_tol,
             _,
@@ -224,10 +300,10 @@ def simulationLoop(
             _,
             _,
         ) = args
-        err = compute_conv_error(N, P_t_i, P_l_i)
+        err = compute_conv_error(n, p_t_i, p_l_i)
 
-        def printConvErrorWrapper():
-            print_conf_error(err)
+        def print_conv_error_wrapper():
+            print_conv_error(err)
             return False
 
         ret = lax.cond(
@@ -239,12 +315,12 @@ def simulationLoop(
                     >= sim_dat_const_aux[0, 0]
                 )
             ),
-            printConvErrorWrapper,
+            print_conv_error_wrapper,
             lambda: True,
         )
         return ret
 
-    def bodyFun(args):
+    def simulation_one_step(args):
         (
             sim_dat,
             sim_dat_aux,
@@ -255,19 +331,19 @@ def simulationLoop(
             timepoints,
             passed_cycles,
             dt,
-            P_t,
-            P_l,
+            p_t,
+            p_l,
             t_t,
             _,
-            Ccfl,
+            ccfl,
             edges,
             input_data,
             rho,
         ) = args
-        dt = computeDt(Ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
+        dt = computeDt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
         sim_dat, sim_dat_aux = solveModel(
-            N,
-            B,
+            n,
+            b,
             t,
             dt,
             input_data,
@@ -281,31 +357,31 @@ def simulationLoop(
             edges,
         )
 
-        (P_t_temp, counter_temp) = lax.cond(
+        (p_t_temp, counter_temp) = lax.cond(
             t >= timepoints[counter],
-            lambda: (save_temp_data(N, strides, sim_dat[4, :]), counter + 1),
-            lambda: (P_t[counter, :], counter),
+            lambda: (save_temp_data(n, strides, sim_dat[4, :]), counter + 1),
+            lambda: (p_t[counter, :], counter),
         )
-        P_t = P_t.at[counter, :].set(P_t_temp)
+        p_t = p_t.at[counter, :].set(p_t_temp)
         t_t = t_t.at[counter].set(t)
         counter = counter_temp
 
-        def checkConv():
-            err = compute_conv_error(N, P_t, P_l)
-            print_conf_error(err)
+        def print_conv_error_wrapper():
+            err = compute_conv_error(n, p_t, p_l)
+            print_conv_error(err)
 
         lax.cond(
             (
                 (t - sim_dat_const_aux[0, 0] * passed_cycles >= sim_dat_const_aux[0, 0])
                 * (passed_cycles + 1 > 1)
             ),
-            checkConv,
+            print_conv_error_wrapper,
             lambda: None,
         )
-        (P_l, counter, timepoints, passed_cycles) = lax.cond(
+        (p_l, counter, timepoints, passed_cycles) = lax.cond(
             (t - sim_dat_const_aux[0, 0] * passed_cycles >= sim_dat_const_aux[0, 0]),
-            lambda: (P_t, 0, timepoints + sim_dat_const_aux[0, 0], passed_cycles + 1),
-            lambda: (P_l, counter, timepoints, passed_cycles),
+            lambda: (p_t, 0, timepoints + sim_dat_const_aux[0, 0], passed_cycles + 1),
+            lambda: (p_l, counter, timepoints, passed_cycles),
         )
 
         t += dt
@@ -320,11 +396,11 @@ def simulationLoop(
             timepoints,
             passed_cycles,
             dt,
-            P_t,
-            P_l,
+            p_t,
+            p_l,
             t_t,
             conv_tol,
-            Ccfl,
+            ccfl,
             edges,
             input_data,
             rho,
@@ -340,17 +416,17 @@ def simulationLoop(
         timepoints,
         passed_cycles,
         dt,
-        P_t,
-        P_l,
+        p_t,
+        p_l,
         t_t,
         conv_tol,
-        Ccfl,
+        ccfl,
         edges,
         input_data,
         rho,
     ) = lax.while_loop(
-        condFun,
-        bodyFun,
+        conv_error_condition,
+        simulation_one_step,
         (
             sim_dat,
             sim_dat_aux,
@@ -361,24 +437,38 @@ def simulationLoop(
             timepoints,
             passed_cycles,
             dt,
-            P_t,
-            P_l,
+            p_t,
+            p_l,
             t_t,
             conv_tol,
-            Ccfl,
+            ccfl,
             edges,
             input_data,
             rho,
         ),
     )
 
-    return sim_dat, t_t, P_t
+    return sim_dat, t_t, p_t
 
 
-def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True):
+def run_simulation_unsafe(
+    config_filename, verbose=False, make_results_folder_bool=True
+) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Runs the simulation without convergence checks.
+
+    Parameters:
+    config_filename (str): Path to the YAML configuration file.
+    verbose (bool): Whether to print verbose output.
+    make_results_folder_bool (bool): Whether to create a results folder.
+
+    Returns:
+    tuple: Updated simulation data, time steps, and pressure data.
+    """
+
     (
-        N,
-        B,
+        n,
+        b,
         _,
         sim_dat,
         sim_dat_aux,
@@ -386,8 +476,7 @@ def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True
         sim_dat_const_aux,
         _,
         _,
-        Ccfl,
-        edges,
+        ccfl,
         input_data,
         rho,
         masks,
@@ -395,21 +484,24 @@ def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True
         edges,
         _,
         _,
-    ) = configSimulation(config_filename, verbose, make_results_folder)
+    ) = config_simulation(config_filename, verbose, make_results_folder_bool)
 
+    starting_time = 0.0
     if verbose:
         starting_time = time.time_ns()
 
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
-    sim_dat, t, P = block_until_ready(
-        sim_loop_old_jit(
-            N,
-            B,
+    sim_loop_unsafe_jit = partial(jit, static_argnums=(0, 1, 12))(
+        simulation_loop_unsafe
+    )
+    sim_dat, t, p = block_until_ready(
+        sim_loop_unsafe_jit(  # pylint: disable=E1102
+            n,
+            b,
             sim_dat,
             sim_dat_aux,
             sim_dat_const,
             sim_dat_const_aux,
-            Ccfl,
+            ccfl,
             input_data,
             rho,
             masks,
@@ -422,22 +514,34 @@ def runSimulationUnsafe(config_filename, verbose=False, make_results_folder=True
     if verbose:
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"elapsed time = {ending_time} seconds")
-    return sim_dat, t, P
+    return sim_dat, t, p
 
 
-def runSimulation(config_filename, verbose=False, make_results_folder=True):
+def run_simulation(
+    config_filename, verbose=False, make_results_folder_bool=True
+) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Runs the simulation with convergence checks.
+
+    Parameters:
+    config_filename (str): Path to the YAML configuration file.
+    verbose (bool): Whether to print verbose output.
+    make_results_folder_bool (bool): Whether to create a results folder.
+
+    Returns:
+    tuple: Updated simulation data, time steps, and pressure data.
+    """
     (
-        N,
-        B,
-        J,
+        n,
+        b,
+        j,
         sim_dat,
         sim_dat_aux,
         sim_dat_const,
         sim_dat_const_aux,
         timepoints,
         conv_tol,
-        Ccfl,
-        edges,
+        ccfl,
         input_data,
         rho,
         masks,
@@ -445,23 +549,24 @@ def runSimulation(config_filename, verbose=False, make_results_folder=True):
         edges,
         _,
         _,
-    ) = configSimulation(config_filename, verbose, make_results_folder)
+    ) = config_simulation(config_filename, verbose, make_results_folder_bool)
 
+    starting_time = 0
     if verbose:
         starting_time = time.time_ns()
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
-    sim_dat, t, P = block_until_ready(
-        sim_loop_old_jit(
-            N,
-            B,
-            J,
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+    sim_dat, t, p = block_until_ready(
+        sim_loop_old_jit(  # pylint: disable=E1102
+            n,
+            b,
+            j,
             sim_dat,
             sim_dat_aux,
             sim_dat_const,
             sim_dat_const_aux,
             timepoints,
-            conv_tol,
-            Ccfl,
+            float(conv_tol),
+            ccfl,
             input_data,
             rho,
             masks,
@@ -474,4 +579,4 @@ def runSimulation(config_filename, verbose=False, make_results_folder=True):
         ending_time = (time.time_ns() - starting_time) / 1.0e9
         print(f"elapsed time = {ending_time} seconds")
 
-    return sim_dat, t, P
+    return sim_dat, t, p

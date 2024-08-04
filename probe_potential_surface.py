@@ -1,4 +1,4 @@
-from src.model import configSimulation, simulationLoopUnsafe
+from src.model import config_simulation, simulation_loop_unsafe
 from jax.tree_util import Partial
 from numpyro.infer.reparam import TransformReparam
 import os
@@ -51,10 +51,10 @@ verbose = True
  sim_dat_const, sim_dat_const_aux, 
  timepoints, conv_tol, Ccfl, edges, input_data, rho, 
  masks, strides, edges,
- vessel_names, cardiac_T) = configSimulation(config_filename, verbose)
+ vessel_names, cardiac_T) = config_simulation(config_filename, verbose)
 
 num_iterations = 1000
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulationLoopUnsafe)
+sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
                                       sim_dat, sim_dat_aux, 
                                       sim_dat_const, sim_dat_const_aux, 

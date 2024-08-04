@@ -1,4 +1,4 @@
-from src.model import configSimulation, simulationLoop
+from src.model import config_simulation, simulation_loop
 import jax
 import sys
 import time
@@ -45,7 +45,6 @@ verbose = True
     timepoints,
     conv_tol,
     Ccfl,
-    edges,
     input_data,
     rho,
     masks,
@@ -53,11 +52,11 @@ verbose = True
     edges,
     vessel_names,
     cardiac_T,
-) = configSimulation(config_filename, verbose)
+) = config_simulation(config_filename, verbose)
 
 if verbose:
     starting_time = time.time_ns()
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulationLoop)
+sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
 sim_dat, t, P = block_until_ready(
     sim_loop_old_jit(
         N,
@@ -68,7 +67,7 @@ sim_dat, t, P = block_until_ready(
         sim_dat_const,
         sim_dat_const_aux,
         timepoints,
-        conv_tol,
+        float(conv_tol),
         Ccfl,
         input_data,
         rho,

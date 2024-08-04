@@ -66,7 +66,7 @@ def compute_conv_error(
 
 
 @jaxtyped(typechecker=typechecker)
-def print_conf_error(err: Float[Array, ""]):
+def print_conv_error(err: Float[Array, ""]):
     """
     Prints the convergence error in mmHg.
 

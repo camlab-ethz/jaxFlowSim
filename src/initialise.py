@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 import yaml
 from jaxtyping import Array, jaxtyped
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from typeguard import typechecked as typechecker
 
 from src.components import Blood
@@ -311,17 +311,17 @@ def build_blood(blood_data: dict) -> Blood:
 
 @jaxtyped(typechecker=typechecker)
 def build_arterial_network(network: list[dict], blood: Blood) -> tuple[
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
-    ArrayLike,
+    NDArray,
+    NDArray,
+    NDArray,
+    NDArray,
+    int,
+    int,
+    NDArray,
+    NDArray,
+    NDArray,
+    list[str],
+    NDArray,
 ]:
     """
     Builds the arterial network from the provided configuration data.
