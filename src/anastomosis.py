@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
 from typeguard import typechecked as typechecker
 
-from src.newton import newtonRaphson
+from src.newton import newton_raphson
 from src.utils import pressure, wave_speed
 
 
@@ -55,7 +55,7 @@ def solve_anastomosis(
     k = jnp.sqrt(1.5 * gammas)
 
     j = calculate_jacobian_anastomosis(u0, k, a0s, betas)  # pylint: disable=E1111
-    u = newtonRaphson(
+    u = newton_raphson(
         calculate_f_anastomosis,
         j,
         u0,

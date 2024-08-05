@@ -17,13 +17,13 @@ from typeguard import typechecked as typechecker
 
 
 @jaxtyped(typechecker=typechecker)
-def newtonRaphson(
+def newton_raphson(
     fun_f: Callable,
-    j: Float[Array, ["..."]],
-    u: Float[Array, ["..."]],
-    a0s: Float[Array, ["..."]],
-    betas: Float[Array, ["..."]],
-) -> Float[Array, ["..."]]:
+    j: Float[Array, "..."],
+    u: Float[Array, "..."],
+    a0s: Float[Array, "..."],
+    betas: Float[Array, "..."],
+) -> Float[Array, "..."]:
     """
     Solves a system of nonlinear equations using the Newton-Raphson method.
 

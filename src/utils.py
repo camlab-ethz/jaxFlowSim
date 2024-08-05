@@ -43,7 +43,7 @@ def pressure(
 @jaxtyped(typechecker=typechecker)
 def pressure_sa(
     s_a_over_a0: Float[Array, "..."] | NDArray,
-    beta: Float[Array, "..."],
+    beta: Float[Array, "..."] | NDArray,
     p_ext: Float[Array, "..."] | float,
 ) -> Float[Array, "..."] | NDArray:
     """
@@ -62,7 +62,7 @@ def pressure_sa(
 
 @jaxtyped(typechecker=typechecker)
 def wave_speed(
-    a: Float[Array, "..."] | NDArray, gamma: Float[Array, "..."]
+    a: Float[Array, "..."] | NDArray, gamma: Float[Array, "..."] | NDArray
 ) -> Float[Array, "..."]:
     """
     Calculates the wave speed in a vessel given the cross-sectional area and admittance coefficient.

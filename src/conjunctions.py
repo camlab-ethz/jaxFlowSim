@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
 from typeguard import typechecked as typechecker
 
-from src.newton import newtonRaphson
+from src.newton import newton_raphson
 from src.utils import pressure, wave_speed
 
 
@@ -52,7 +52,7 @@ def solve_conjunction(
     k = jnp.append(jnp.sqrt(1.5 * gammas), rho)
 
     j = calculate_jacobian_conjunction(u0, k, a0s, betas)
-    u = newtonRaphson(calculate_f_conjunction, j, u0, a0s, betas)
+    u = newton_raphson(calculate_f_conjunction, j, u0, a0s, betas)
 
     return update_conjunction(u, a0s, betas, gammas, p_exts)
 

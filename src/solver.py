@@ -1,13 +1,16 @@
 import jax.numpy as jnp
 from functools import partial
-from jax import lax, vmap, jit, debug
+from jax import lax, vmap, jit
 from src.anastomosis import solve_anastomosis
 from src.conjunctions import solve_conjunction
 from src.bifurcations import solve_bifurcation
 from src.boundary_conditions import set_inlet_bc, set_outlet_bc
 from src.utils import pressure_sa, wave_speed_sa
+from jaxtyping import Array, Float, jaxtyped
+from typeguard import typechecked as typechecker
 
 
+@jaxtyped(typechecker=typechecker)
 def computeDt(Ccfl, u, c, dx):
     Smax = vmap(lambda a, b: jnp.abs(a + b))(u, c)
     vessel_dt = vmap(lambda a, b: a * Ccfl / b)(dx, Smax)
@@ -16,6 +19,7 @@ def computeDt(Ccfl, u, c, dx):
 
 
 @partial(jit, static_argnums=(0, 1))
+@jaxtyped(typechecker=typechecker)
 def solveModel(
     N,
     B,
@@ -422,6 +426,7 @@ def solveModel(
     return sim_dat, sim_dat_aux
 
 
+@jaxtyped(typechecker=typechecker)
 def muscl(dt, Q, A, A0, beta, gamma, wallE, dx, Pext, viscT, masks):
     K = len(Q) + 2
 
@@ -549,26 +554,32 @@ def muscl(dt, Q, A, A0, beta, gamma, wallE, dx, Pext, viscT, masks):
     return jnp.stack((u, Q, A, c, P))
 
 
+@jaxtyped(typechecker=typechecker)
 def computeFlux(gamma_ghost, A, Q):
     return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
 
 
+@jaxtyped(typechecker=typechecker)
 def computeFlux_par(gamma_ghost, A, Q):
     return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
 
 
+@jaxtyped(typechecker=typechecker)
 def maxMod(a, b):
     return jnp.where(a > b, a, b)
 
 
+@jaxtyped(typechecker=typechecker)
 def minMod(a, b):
     return jnp.where((a <= 0.0) | (b <= 0.0), 0.0, jnp.where(a < b, a, b))
 
 
+@jaxtyped(typechecker=typechecker)
 def superBee(dU):
     return maxMod(minMod(dU[0, :], 2 * dU[1, :]), minMod(2 * dU[0, :], dU[1, :]))
 
 
+@jaxtyped(typechecker=typechecker)
 def computeLimiter(U, invDx):
     dU = vmap(lambda a, b: a * b)(jnp.diff(U), invDx)
     return superBee(
@@ -581,6 +592,7 @@ def computeLimiter(U, invDx):
     )
 
 
+@jaxtyped(typechecker=typechecker)
 def computeLimiterIdx(U, idx, invDx):
     dU = vmap(lambda a, b: a * b)(jnp.diff(U[idx, :]), invDx)
     return superBee(

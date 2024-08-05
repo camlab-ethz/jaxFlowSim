@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
 from typeguard import typechecked as typechecker
 
-from src.newton import newtonRaphson
+from src.newton import newton_raphson
 from src.utils import pressure, wave_speed
 
 
@@ -50,7 +50,7 @@ def solve_bifurcation(
     k = jnp.sqrt(1.5 * gammas)
 
     j = calculate_jacobian_bifurcation(u0, k, a0s, betas)  # pylint: disable=E1111
-    u = newtonRaphson(calculate_f_bifurcation, j, u0, a0s, betas)
+    u = newton_raphson(calculate_f_bifurcation, j, u0, a0s, betas)
 
     return update_bifurcation(u, a0s, betas, gammas, p_exts)
 
