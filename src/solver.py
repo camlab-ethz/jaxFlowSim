@@ -1,88 +1,146 @@
-import jax.numpy as jnp
+"""
+This module provides functionality for simulating blood flow in vascular networks.
+
+It includes functions to:
+- Compute the time step size based on the Courant–Friedrichs–Lewy (CFL) condition (`compute_dt`).
+- Solve the model equations for the vascular network (`solve_model`).
+- Apply the Monotonic Upstream-centered Scheme for Conservation Laws (MUSCL) method for numerical flux calculation (`muscl`).
+- Compute fluxes (`compute_flux`).
+- Apply the superbee flux limiter (`super_bee`).
+- Compute limiters for numerical fluxes (`compute_limiter` and `compute_limiter_idx`).
+
+The module makes use of the following imported utilities:
+- `jax.numpy` for numerical operations and array handling.
+- `jax` for just-in-time compilation and loop constructs.
+- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- Various utility functions and solvers for boundary conditions and flow solutions from the `src` package.
+"""
+
 from functools import partial
-from jax import lax, vmap, jit
+
+import jax.numpy as jnp
+from jax import jit, lax, vmap
+from jaxtyping import Array, Float, jaxtyped, Integer
+from typeguard import typechecked as typechecker
+
 from src.anastomosis import solve_anastomosis
-from src.conjunctions import solve_conjunction
 from src.bifurcations import solve_bifurcation
 from src.boundary_conditions import set_inlet_bc, set_outlet_bc
+from src.conjunctions import solve_conjunction
 from src.utils import pressure_sa, wave_speed_sa
-from jaxtyping import Array, Float, jaxtyped
-from typeguard import typechecked as typechecker
 
 
 @jaxtyped(typechecker=typechecker)
-def computeDt(Ccfl, u, c, dx):
-    Smax = vmap(lambda a, b: jnp.abs(a + b))(u, c)
-    vessel_dt = vmap(lambda a, b: a * Ccfl / b)(dx, Smax)
+def compute_dt(
+    ccfl: Float[Array, ""],
+    u: Float[Array, "..."],
+    c: Float[Array, "..."],
+    dx: Float[Array, "..."],
+) -> Float[Array, ""]:
+    """
+    Computes the time step size based on the Courant–Friedrichs–Lewy (CFL) condition.
+
+    Parameters:
+    ccfl (Float[Array, ""]): CFL number.
+    u (Float[Array, "..."]): Velocity array.
+    c (Float[Array, "..."]): Wave speed array.
+    dx (Float[Array, "..."]): Spatial step size array.
+
+    Returns:
+    Float[Array, ""]: Computed time step size.
+    """
+    smax = vmap(lambda a, b: jnp.abs(a + b))(u, c)
+    vessel_dt = vmap(lambda a, b: a * ccfl / b)(dx, smax)
     dt = jnp.min(vessel_dt)
     return dt
 
 
 @partial(jit, static_argnums=(0, 1))
 @jaxtyped(typechecker=typechecker)
-def solveModel(
-    N,
-    B,
-    t,
-    dt,
-    input_data,
-    rho,
-    sim_dat,
-    sim_dat_aux,
-    sim_dat_const,
-    sim_dat_const_aux,
-    masks,
-    strides,
-    edges,
-):
+def solve_model(
+    n: int,
+    b: int,
+    t: Float[Array, ""],
+    dt: Float[Array, ""],
+    input_data: Float[Array, "..."],
+    rho: Float[Array, ""],
+    sim_dat: Float[Array, "..."],
+    sim_dat_aux: Float[Array, "..."],
+    sim_dat_const: Float[Array, "..."],
+    sim_dat_const_aux: Float[Array, "..."],
+    masks: Integer[Array, "..."],
+    strides: Integer[Array, "..."],
+    edges: Integer[Array, "..."],
+) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Solves the model equations for the vascular network.
+
+    Parameters:
+    n (int): Number of vessels.
+    b (int): Boundary size.
+    t (Float[Array, ""]): Current time.
+    dt (Float[Array, ""]): Time step size.
+    input_data (Float[Array, "..."]): Input data array.
+    rho (Float[Array, ""]): Blood density.
+    sim_dat (Float[Array, "..."]): Simulation data array.
+    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
+    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
+    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
+    masks (Integer[Array, "..."]): Masks for boundary conditions.
+    strides (Integer[Array, "..."]): Strides array.
+    edges (Integer[Array, "..."]): Edges array.
+
+    Returns:
+    tuple[Float[Array, "..."], Float[Array, "..."]]: Updated simulation data and auxiliary simulation data.
+    """
 
     inlet = sim_dat_const_aux[0, 1]
-    us = jnp.array([sim_dat[0, B], sim_dat[0, B + 1]])
-    A0 = sim_dat[2, B]
-    cs = jnp.array([sim_dat[3, B], sim_dat[3, B + 1]])
-    cardiac_T = sim_dat_const_aux[0, 0]
-    dx = sim_dat_const[-1, B]
-    A00 = sim_dat_const[0, B]
-    beta0 = sim_dat_const[1, B]
-    Pext = sim_dat_const[4, B]
+    us = jnp.array([sim_dat[0, b], sim_dat[0, b + 1]])
+    a0 = sim_dat[2, b]
+    cs = jnp.array([sim_dat[3, b], sim_dat[3, b + 1]])
+    cardiac_t = sim_dat_const_aux[0, 0]
+    dx = sim_dat_const[-1, b]
+    a00 = sim_dat_const[0, b]
+    beta0 = sim_dat_const[1, b]
+    p_ext = sim_dat_const[4, b]
 
-    sim_dat = sim_dat.at[1:3, 0 : B + 1].set(
+    sim_dat = sim_dat.at[1:3, 0 : b + 1].set(
         jnp.array(
             set_inlet_bc(
                 inlet,
                 us,
-                A0,
+                a0,
                 cs,
                 t,
                 dt,
                 input_data,
-                cardiac_T,
+                cardiac_t,
                 1 / dx,
-                A00,
+                a00,
                 beta0,
-                Pext,
+                p_ext,
             )
         )[:, jnp.newaxis]
-        * jnp.ones(B + 1)[jnp.newaxis, :]
+        * jnp.ones(b + 1)[jnp.newaxis, :]
     )
 
-    sim_dat = sim_dat.at[:, B:-B].set(
+    sim_dat = sim_dat.at[:, b:-b].set(
         muscl(
             dt,
-            sim_dat[1, B:-B],
-            sim_dat[2, B:-B],
-            sim_dat_const[0, B:-B],
-            sim_dat_const[1, B:-B],
-            sim_dat_const[2, B:-B],
-            sim_dat_const[3, B:-B],
-            sim_dat_const[-1, B:-B],
-            sim_dat_const[4, B:-B],
-            sim_dat_const[5, B:-B],
+            sim_dat[1, b:-b],
+            sim_dat[2, b:-b],
+            sim_dat_const[0, b:-b],
+            sim_dat_const[1, b:-b],
+            sim_dat_const[2, b:-b],
+            sim_dat_const[3, b:-b],
+            sim_dat_const[-1, b:-b],
+            sim_dat_const[4, b:-b],
+            sim_dat_const[5, b:-b],
             masks,
         )
     )
 
-    def bodyFun(j, dat):
+    def set_outlet_or_junction(j, dat):
         (
             sim_dat,
             sim_dat_aux,
@@ -94,15 +152,15 @@ def solveModel(
         ) = dat
         end = strides[j, 1]
 
-        def setOutletBCWrapper(sim_dat, sim_dat_aux):
+        def set_outlet_bc_wrapper(sim_dat, sim_dat_aux):
             us = jnp.array([sim_dat[0, end - 1], sim_dat[0, end - 2]])
-            Q1 = sim_dat[1, end - 1]
-            A1 = sim_dat[2, end - 1]
+            q1 = sim_dat[1, end - 1]
+            a1 = sim_dat[2, end - 1]
             cs = jnp.array([sim_dat[3, end - 1], sim_dat[3, end - 2]])
             ps = jnp.array(
                 [sim_dat[4, end - 1], sim_dat[4, end - 2], sim_dat[4, end - 3]]
             )
-            Pc = sim_dat_aux[j, 2]
+            pc = sim_dat_aux[j, 2]
             wks = jnp.array(
                 [
                     sim_dat_const[6, end - 1],
@@ -111,14 +169,14 @@ def solveModel(
                     sim_dat_const[9, end - 1],
                 ]
             )
-            u, Q, A, c, P1, Pc = set_outlet_bc(
+            u, q, a, c, pl, pc = set_outlet_bc(
                 dt,
                 us,
-                Q1,
-                A1,
+                q1,
+                a1,
                 cs,
                 ps,
-                Pc,
+                pc,
                 sim_dat_aux[j, :2],
                 sim_dat_const[0, end - 1],
                 sim_dat_const[1, end - 1],
@@ -128,24 +186,24 @@ def solveModel(
                 sim_dat_const_aux[j, 2],
                 wks,
             )
-            temp = jnp.array((u, Q, A, c, P1))
+            temp = jnp.array((u, q, a, c, pl))
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
+                temp[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, end - 1),
             )
-            sim_dat_aux = sim_dat_aux.at[j, 2].set(Pc)
+            sim_dat_aux = sim_dat_aux.at[j, 2].set(pc)
             return sim_dat, sim_dat_aux
 
         (sim_dat, sim_dat_aux) = lax.cond(
             sim_dat_const_aux[j, 2] != 0,
-            lambda x, y: setOutletBCWrapper(x, y),
+            set_outlet_bc_wrapper,
             lambda x, y: (x, y),
             sim_dat,
             sim_dat_aux,
         )
 
-        def solveBifurcationWrapper(sim_dat):
+        def solve_bifurcation_wrapper(sim_dat):
             d1_i = edges[j, 4]
             d2_i = edges[j, 5]
             d1_i_start = strides[d1_i, 0]
@@ -188,49 +246,49 @@ def solveModel(
                 u1,
                 u2,
                 u3,
-                Q1,
-                Q2,
-                Q3,
-                A1,
-                A2,
-                A3,
+                q1,
+                q2,
+                q3,
+                a1,
+                a2,
+                a3,
                 c1,
                 c2,
                 c3,
-                P1,
-                P2,
-                P3,
+                p1,
+                p2,
+                p3,
             ) = solve_bifurcation(  # pylint: disable=E1111
                 us, a, a0s, betas, gammas, p_exts
             )  # pylint: disable=E1111  # pylint: disable=E1111
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
-            temp3 = jnp.array((u3, Q3, A3, c3, P3))
+            temp1 = jnp.array((u1, q1, a1, c1, p1))
+            temp2 = jnp.array((u2, q2, a2, c2, p2))
+            temp3 = jnp.array((u3, q3, a3, c3, p3))
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp1[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
+                temp1[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, end - 1),
             )
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp2[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
-                (0, d1_i_start - B),
+                temp2[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
+                (0, d1_i_start - b),
             )
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp3[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
-                (0, d2_i_start - B),
+                temp3[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
+                (0, d2_i_start - b),
             )
             return sim_dat
 
         sim_dat = lax.cond(
             (sim_dat_const_aux[j, 2] == 0) * (edges[j, 3] == 2),
-            lambda x: solveBifurcationWrapper(x),
+            solve_bifurcation_wrapper,
             lambda x: x,
             sim_dat,
         )
 
-        def solveConjunctionWrapper(sim_dat, rho):
+        def solve_conjunction_wrapper(sim_dat, rho):
             d_i = edges[j, 7]
             d_i_start = strides[d_i, 0]
             us = jnp.array([sim_dat[0, end - 1], sim_dat[0, d_i_start]])
@@ -259,7 +317,7 @@ def solveModel(
                     sim_dat_const[4, d_i_start],
                 ]
             )
-            (u1, u2, Q1, Q2, A1, A2, c1, c2, P1, P2) = solve_conjunction(
+            (u1, u2, q1, q2, a1, a2, c1, c2, p1, p2) = solve_conjunction(
                 us,
                 a,
                 a0s,
@@ -268,29 +326,29 @@ def solveModel(
                 p_exts,
                 rho,
             )
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
+            temp1 = jnp.array((u1, q1, a1, c1, p1))
+            temp2 = jnp.array((u2, q2, a2, c2, p2))
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp1[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
+                temp1[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, end - 1),
             )
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp2[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
-                (0, d_i_start - B),
+                temp2[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
+                (0, d_i_start - b),
             )
             return sim_dat
 
         sim_dat = lax.cond(
             (sim_dat_const_aux[j, 2] == 0) * (edges[j, 3] != 2) * (edges[j, 6] == 1),
-            lambda x, y: solveConjunctionWrapper(x, y),
+            solve_conjunction_wrapper,
             lambda x, y: x,
             sim_dat,
             rho,
         )
 
-        def solveAnastomosisWrapper(sim_dat):
+        def solve_anastomosis_wrapper(sim_dat):
             p1_i = edges[j, 7]
             p2_i = edges[j, 8]
             d = edges[j, 9]
@@ -359,7 +417,7 @@ def solveModel(
                     sim_dat_const[4, d_start],
                 ]
             )
-            u1, u2, u3, Q1, Q2, Q3, A1, A2, A3, c1, c2, c3, P1, P2, P3 = lax.cond(
+            u1, u2, u3, q1, q2, q3, a1, a2, a3, c1, c2, c3, p1, p2, p3 = lax.cond(
                 jnp.maximum(p1_i, p2_i) == j,
                 lambda: solve_anastomosis(
                     us,
@@ -379,29 +437,29 @@ def solveModel(
                     ]
                 ),
             )
-            temp1 = jnp.array((u1, Q1, A1, c1, P1))
-            temp2 = jnp.array((u2, Q2, A2, c2, P2))
-            temp3 = jnp.array((u3, Q3, A3, c3, P3))
+            temp1 = jnp.array((u1, q1, a1, c1, p1))
+            temp2 = jnp.array((u2, q2, a2, c2, p2))
+            temp3 = jnp.array((u3, q3, a3, c3, p3))
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp1[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
+                temp1[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, end - 1),
             )
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp2[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
+                temp2[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, p1_i_end - 1),
             )
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
-                temp3[:, jnp.newaxis] * jnp.ones(B + 1)[jnp.newaxis, :],
-                (0, d_start - B),
+                temp3[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
+                (0, d_start - b),
             )
             return sim_dat
 
         sim_dat = lax.cond(
             (sim_dat_const_aux[j, 2] == 0) * (edges[j, 3] != 2) * (edges[j, 6] == 2),
-            lambda x: solveAnastomosisWrapper(x),
+            solve_anastomosis_wrapper,
             lambda x: x,
             sim_dat,
         )
@@ -418,8 +476,8 @@ def solveModel(
 
     (sim_dat, sim_dat_aux, _, _, _, _, _) = lax.fori_loop(
         0,
-        N,
-        bodyFun,
+        n,
+        set_outlet_or_junction,
         (sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux, edges, rho, strides),
     )
 
@@ -427,179 +485,267 @@ def solveModel(
 
 
 @jaxtyped(typechecker=typechecker)
-def muscl(dt, Q, A, A0, beta, gamma, wallE, dx, Pext, viscT, masks):
-    K = len(Q) + 2
+def muscl(
+    dt: Float[Array, ""],
+    q: Float[Array, "..."],
+    a: Float[Array, "..."],
+    a0: Float[Array, "..."],
+    beta: Float[Array, "..."],
+    gamma: Float[Array, "..."],
+    wall_e: Float[Array, "..."],
+    dx: Float[Array, "..."],
+    p_ext: Float[Array, "..."],
+    visc_t: Float[Array, "..."],
+    masks: Integer[Array, "..."],
+) -> Float[Array, "..."]:
+    """
+    Applies the Monotonic Upstream-centered Scheme for Conservation Laws (MUSCL) method for numerical flux calculation.
 
-    s_A0 = vmap(lambda a: jnp.sqrt(a))(A0)
-    s_inv_A0 = vmap(lambda a: 1 / jnp.sqrt(a))(A0)
-    halfDx = 0.5 * dx
-    invDx = 1 / dx
-    gamma_ghost = jnp.zeros(K)
+    Parameters:
+    dt (Float[Array, ""]): Time step size.
+    q (Float[Array, "..."]): Flow rate array.
+    a (Float[Array, "..."]): Cross-sectional area array.
+    a0 (Float[Array, "..."]): Reference cross-sectional area array.
+    beta (Float[Array, "..."]): Stiffness coefficient array.
+    gamma (Float[Array, "..."]): Admittance coefficient array.
+    wall_e (Float[Array, "..."]): Wall elasticity array.
+    dx (Float[Array, "..."]): Spatial step size array.
+    p_ext (Float[Array, "..."]): External pressure array.
+    visc_t (Float[Array, "..."]): Viscosity term array.
+    masks (Integer[Array, "..."]): Masks for boundary conditions.
+
+    Returns:
+    Float[Array, "..."]: Updated simulation data array.
+    """
+    k = len(q) + 2
+
+    s_a0 = vmap(jnp.sqrt)(a0)
+    s_inv_a0 = vmap(lambda a: 1 / jnp.sqrt(a))(a0)
+    half_dx = 0.5 * dx
+    inv_dx = 1 / dx
+    gamma_ghost = jnp.zeros(k)
     gamma_ghost = gamma_ghost.at[1:-1].set(gamma)
     gamma_ghost = gamma_ghost.at[0].set(gamma[0])
     gamma_ghost = gamma_ghost.at[-1].set(gamma[-1])
-    vA = jnp.empty(K)
-    vQ = jnp.empty(K)
-    vA = vA.at[0].set(A[0])
-    vA = vA.at[-1].set(A[-1])
+    va = jnp.empty(k)
+    vq = jnp.empty(k)
+    va = va.at[0].set(a[0])
+    va = va.at[-1].set(a[-1])
 
-    vQ = vQ.at[0].set(Q[0])
-    vQ = vQ.at[-1].set(Q[-1])
-    vA = vA.at[1:-1].set(A)
-    vQ = vQ.at[1:-1].set(Q)
+    vq = vq.at[0].set(q[0])
+    vq = vq.at[-1].set(q[-1])
+    va = va.at[1:-1].set(a)
+    vq = vq.at[1:-1].set(q)
 
-    invDx_temp = jnp.concatenate((invDx, jnp.array([invDx[-1]])))
-    limiterA = computeLimiter(vA, invDx_temp)
-    limiterQ = computeLimiter(vQ, invDx_temp)
-    halfDx_temp = jnp.concatenate(
-        (jnp.array([halfDx[0]]), halfDx, jnp.array([halfDx[-1]]))
+    inv_dx_temp = jnp.concatenate((inv_dx, jnp.array([inv_dx[-1]])))
+    limiter_a = compute_limiter(va, inv_dx_temp)
+    limiter_q = compute_limiter(vq, inv_dx_temp)
+    half_dx_temp = jnp.concatenate(
+        (jnp.array([half_dx[0]]), half_dx, jnp.array([half_dx[-1]]))
     )
-    slopeA_halfDx = vmap(lambda a, b: a * b)(limiterA, halfDx_temp)
-    slopeQ_halfDx = vmap(lambda a, b: a * b)(limiterQ, halfDx_temp)
+    slope_a_half_dx = vmap(lambda a, b: a * b)(limiter_a, half_dx_temp)
+    slope_q_half_dx = vmap(lambda a, b: a * b)(limiter_q, half_dx_temp)
 
-    Al = vmap(lambda a, b: a + b)(vA, slopeA_halfDx)
-    Ar = vmap(lambda a, b: a - b)(vA, slopeA_halfDx)
-    Ql = vmap(lambda a, b: a + b)(vQ, slopeQ_halfDx)
-    Qr = vmap(lambda a, b: a - b)(vQ, slopeQ_halfDx)
+    al = vmap(lambda a, b: a + b)(va, slope_a_half_dx)
+    ar = vmap(lambda a, b: a - b)(va, slope_a_half_dx)
+    ql = vmap(lambda a, b: a + b)(vq, slope_q_half_dx)
+    qr = vmap(lambda a, b: a - b)(vq, slope_q_half_dx)
 
-    Fl = jnp.array(vmap(computeFlux_par)(gamma_ghost, Al, Ql))
-    Fr = jnp.array(vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
+    fl = jnp.array(vmap(compute_flux)(gamma_ghost, al, ql))
+    fr = jnp.array(vmap(compute_flux)(gamma_ghost, ar, qr))
 
-    dxDt = dx / dt
+    dx_dt = dx / dt
 
-    invDxDt = dt / dx
+    inv_dx_dt = dt / dx
 
-    flux = jnp.empty((2, K - 1))
-    dxDt_temp = jnp.empty(K - 1)
-    dxDt_temp = dxDt_temp.at[0:-1].set(dxDt)
-    dxDt_temp = dxDt_temp.at[-1].set(dxDt[-1])
+    flux = jnp.empty((2, k - 1))
+    dx_dt_temp = jnp.empty(k - 1)
+    dx_dt_temp = dx_dt_temp.at[0:-1].set(dx_dt)
+    dx_dt_temp = dx_dt_temp.at[-1].set(dx_dt[-1])
     flux = flux.at[0, :].set(
         vmap(lambda a, b, c, d, e: 0.5 * (a + b - e * (c - d)))(
-            Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1], dxDt_temp
+            fr[0, 1:], fl[0, 0:-1], ar[1:], al[0:-1], dx_dt_temp
         )
     )
     flux = flux.at[1, :].set(
         vmap(lambda a, b, c, d, e: 0.5 * (a + b - e * (c - d)))(
-            Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1], dxDt_temp
+            fr[1, 1:], fl[1, 0:-1], qr[1:], ql[0:-1], dx_dt_temp
         )
     )
 
-    uStar = jnp.empty((2, K))
-    uStar = uStar.at[0, 1:-1].set(
+    u_star = jnp.empty((2, k))
+    u_star = u_star.at[0, 1:-1].set(
         vmap(lambda a, b, c, d: a + d * (b - c))(
-            vA[1:-1], flux[0, 0:-1], flux[0, 1:], invDxDt
+            va[1:-1], flux[0, 0:-1], flux[0, 1:], inv_dx_dt
         )
     )
-    uStar = uStar.at[1, 1:-1].set(
+    u_star = u_star.at[1, 1:-1].set(
         vmap(lambda a, b, c, d: a + d * (b - c))(
-            vQ[1:-1], flux[1, 0:-1], flux[1, 1:], invDxDt
+            vq[1:-1], flux[1, 0:-1], flux[1, 1:], inv_dx_dt
         )
     )
 
-    uStar1 = jnp.zeros((2, K + 2))
-    uStar1 = uStar1.at[:, 0:-2].set(uStar)
-    uStar2 = jnp.zeros((2, K + 2))
-    uStar2 = uStar1.at[:, 1:-1].set(uStar)
-    uStar3 = jnp.zeros((2, K + 2))
-    uStar3 = uStar1.at[:, 2:].set(uStar)
-    # for (i,index) in enumerate(masks[0,:]):
-    #    uStar2 = uStar2.at[i].set(lax.cond(index, lambda x,y: x, lambda x,y: y, uStar1[i], uStar2[i]))
-    # for (i,index) in enumerate(masks[1,:]):
-    #    uStar2 = uStar2.at[i].set(lax.cond(index, lambda x,y: x, lambda x,y: y, uStar3[i], uStar2[i]))
-    uStar2 = jnp.where(masks[0, :], uStar1, uStar2)
-    uStar2 = jnp.where(masks[1, :], uStar3, uStar2)
-    # debug.print("{x}", x=uStar2)
-    uStar = uStar2[:, 1:-1]
+    u_star1 = jnp.zeros((2, k + 2))
+    u_star1 = u_star1.at[:, 0:-2].set(u_star)
+    u_star2 = jnp.zeros((2, k + 2))
+    u_star2 = u_star1.at[:, 1:-1].set(u_star)
+    u_star3 = jnp.zeros((2, k + 2))
+    u_star3 = u_star1.at[:, 2:].set(u_star)
+    u_star2 = jnp.where(masks[0, :], u_star1, u_star2)
+    u_star2 = jnp.where(masks[1, :], u_star3, u_star2)
+    u_star = u_star2[:, 1:-1]
 
-    limiterA = computeLimiterIdx(uStar, 0, invDx_temp)
-    limiterQ = computeLimiterIdx(uStar, 1, invDx_temp)
-    slopesA = vmap(lambda a, b: a * b)(limiterA, halfDx_temp)
-    slopesQ = vmap(lambda a, b: a * b)(limiterQ, halfDx_temp)
+    limiter_a = compute_limiter_idx(u_star, 0, inv_dx_temp)
+    limiter_q = compute_limiter_idx(u_star, 1, inv_dx_temp)
+    slopes_a = vmap(lambda a, b: a * b)(limiter_a, half_dx_temp)
+    slopes_q = vmap(lambda a, b: a * b)(limiter_q, half_dx_temp)
 
-    Al = vmap(lambda a, b: a + b)(uStar[0, :], slopesA)
-    Ar = vmap(lambda a, b: a - b)(uStar[0, :], slopesA)
-    Ql = vmap(lambda a, b: a + b)(uStar[1, :], slopesQ)
-    Qr = vmap(lambda a, b: a - b)(uStar[1, :], slopesQ)
+    al = vmap(lambda a, b: a + b)(u_star[0, :], slopes_a)
+    ar = vmap(lambda a, b: a - b)(u_star[0, :], slopes_a)
+    ql = vmap(lambda a, b: a + b)(u_star[1, :], slopes_q)
+    qr = vmap(lambda a, b: a - b)(u_star[1, :], slopes_q)
 
-    Fl = jnp.array(vmap(computeFlux_par)(gamma_ghost, Al, Ql))
-    Fr = jnp.array(vmap(computeFlux_par)(gamma_ghost, Ar, Qr))
+    fl = jnp.array(vmap(compute_flux)(gamma_ghost, al, ql))
+    fr = jnp.array(vmap(compute_flux)(gamma_ghost, ar, qr))
 
-    flux = jnp.empty((2, K - 1))
+    flux = jnp.empty((2, k - 1))
     flux = flux.at[0, :].set(
         vmap(lambda a, b, c, d, e: 0.5 * (a + b - e * (c - d)))(
-            Fr[0, 1:], Fl[0, 0:-1], Ar[1:], Al[0:-1], dxDt_temp
+            fr[0, 1:], fl[0, 0:-1], ar[1:], al[0:-1], dx_dt_temp
         )
     )
     flux = flux.at[1, :].set(
         vmap(lambda a, b, c, d, e: 0.5 * (a + b - e * (c - d)))(
-            Fr[1, 1:], Fl[1, 0:-1], Qr[1:], Ql[0:-1], dxDt_temp
+            fr[1, 1:], fl[1, 0:-1], qr[1:], ql[0:-1], dx_dt_temp
         )
     )
 
-    A = vmap(lambda a, b, c, d, e: 0.5 * (a + b + e * (c - d)))(
-        A[:], uStar[0, 1:-1], flux[0, 0:-1], flux[0, 1:], invDxDt
+    a = vmap(lambda a, b, c, d, e: 0.5 * (a + b + e * (c - d)))(
+        a[:], u_star[0, 1:-1], flux[0, 0:-1], flux[0, 1:], inv_dx_dt
     )
-    Q = vmap(lambda a, b, c, d, e: 0.5 * (a + b + e * (c - d)))(
-        Q[:], uStar[1, 1:-1], flux[1, 0:-1], flux[1, 1:], invDxDt
+    q = vmap(lambda a, b, c, d, e: 0.5 * (a + b + e * (c - d)))(
+        q[:], u_star[1, 1:-1], flux[1, 0:-1], flux[1, 1:], inv_dx_dt
     )
 
-    s_A = vmap(lambda a: jnp.sqrt(a))(A)
-    Q = vmap(lambda a, b, c, d, e: a - dt * (viscT[0] * a / b + c * (d - e) * b))(
-        Q, A, wallE, s_A, s_A0
+    s_a = vmap(jnp.sqrt)(a)
+    q = vmap(lambda a, b, c, d, e: a - dt * (visc_t[0] * a / b + c * (d - e) * b))(
+        q, a, wall_e, s_a, s_a0
     )
-    P = vmap(lambda a, b, c, d: pressure_sa(a * b, c, d))(s_A, s_inv_A0, beta, Pext)
-    c = vmap(wave_speed_sa)(s_A, gamma)
-    u = vmap(lambda a, b: a / b)(Q, A)
+    p = vmap(lambda a, b, c, d: pressure_sa(a * b, c, d))(s_a, s_inv_a0, beta, p_ext)
+    c = vmap(wave_speed_sa)(s_a, gamma)
+    u = vmap(lambda a, b: a / b)(q, a)
 
-    return jnp.stack((u, Q, A, c, P))
+    return jnp.stack((u, q, a, c, p))
 
 
 @jaxtyped(typechecker=typechecker)
-def computeFlux(gamma_ghost, A, Q):
-    return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
+def compute_flux(
+    gamma_ghost: Float[Array, "..."], a: Float[Array, "..."], q: Float[Array, "..."]
+) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+    """
+    Computes the fluxes.
+
+    Parameters:
+    gamma_ghost (Float[Array, "..."]): Ghost cell admittance coefficient.
+    a (Float[Array, "..."]): Cross-sectional area array.
+    q (Float[Array, "..."]): Flow rate array.
+
+    Returns:
+    tuple[Float[Array, "..."], Float[Array, "..."]]: Computed fluxes.
+    """
+    return q, q * q / a + gamma_ghost * a * jnp.sqrt(a)
 
 
 @jaxtyped(typechecker=typechecker)
-def computeFlux_par(gamma_ghost, A, Q):
-    return Q, Q * Q / A + gamma_ghost * A * jnp.sqrt(A)
+def max_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "..."]:
+    """
+    Applies the max mod function.
 
+    Parameters:
+    a (Float[Array, "..."]): First array.
+    b (Float[Array, "..."]): Second array.
 
-@jaxtyped(typechecker=typechecker)
-def maxMod(a, b):
+    Returns:
+    Float[Array, "..."]: Result of the max mod function.
+    """
     return jnp.where(a > b, a, b)
 
 
 @jaxtyped(typechecker=typechecker)
-def minMod(a, b):
+def min_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "..."]:
+    """
+    Applies the min mod function.
+
+    Parameters:
+    a (Float[Array, "..."]): First array.
+    b (Float[Array, "..."]): Second array.
+
+    Returns:
+    Float[Array, "..."]: Result of the min mod function.
+    """
     return jnp.where((a <= 0.0) | (b <= 0.0), 0.0, jnp.where(a < b, a, b))
 
 
 @jaxtyped(typechecker=typechecker)
-def superBee(dU):
-    return maxMod(minMod(dU[0, :], 2 * dU[1, :]), minMod(2 * dU[0, :], dU[1, :]))
+def super_bee(du: Float[Array, "..."]):
+    """
+    Applies the superbee flux limiter.
+
+    Parameters:
+    du (Float[Array, "..."]): Array of differences.
+
+    Returns:
+    Float[Array, "..."]: Result of the superbee flux limiter.
+    """
+    return max_mod(min_mod(du[0, :], 2 * du[1, :]), min_mod(2 * du[0, :], du[1, :]))
 
 
 @jaxtyped(typechecker=typechecker)
-def computeLimiter(U, invDx):
-    dU = vmap(lambda a, b: a * b)(jnp.diff(U), invDx)
-    return superBee(
+def compute_limiter(
+    u: Float[Array, "..."], inv_dx: Float[Array, "..."]
+) -> Float[Array, "..."]:
+    """
+    Computes the limiter for numerical fluxes.
+
+    Parameters:
+    u (Float[Array, "..."]): Array of values.
+    inv_dx (Float[Array, "..."]): Array of inverse spatial step sizes.
+
+    Returns:
+    Float[Array, "..."]: Computed limiter values.
+    """
+    du = vmap(lambda a, b: a * b)(jnp.diff(u), inv_dx)
+    return super_bee(
         jnp.stack(
             (
-                jnp.concatenate((jnp.array([0.0]), dU)),
-                jnp.concatenate((dU, jnp.array([0.0]))),
+                jnp.concatenate((jnp.array([0.0]), du)),
+                jnp.concatenate((du, jnp.array([0.0]))),
             )
         )
     )
 
 
 @jaxtyped(typechecker=typechecker)
-def computeLimiterIdx(U, idx, invDx):
-    dU = vmap(lambda a, b: a * b)(jnp.diff(U[idx, :]), invDx)
-    return superBee(
+def compute_limiter_idx(
+    u: Float[Array, "..."], idx: int, inv_dx: Float[Array, "..."]
+) -> Float[Array, "..."]:
+    """
+    Computes the limiter for numerical fluxes at a specified index.
+
+    Parameters:
+    u (Float[Array, "..."]): Array of values.
+    idx (int): Index for which to compute the limiter.
+    inv_dx (Float[Array, "..."]): Array of inverse spatial step sizes.
+
+    Returns:
+    Float[Array, "..."]: Computed limiter values at the specified index.
+    """
+    du = vmap(lambda a, b: a * b)(jnp.diff(u[idx, :]), inv_dx)
+    return super_bee(
         jnp.stack(
             (
-                jnp.concatenate((jnp.array([0.0]), dU)),
-                jnp.concatenate((dU, jnp.array([0.0]))),
+                jnp.concatenate((jnp.array([0.0]), du)),
+                jnp.concatenate((du, jnp.array([0.0]))),
             )
         )
     )

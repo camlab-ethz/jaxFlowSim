@@ -33,7 +33,7 @@ from src.initialise import (
     make_results_folder,
 )
 from src.IOutils import save_temp_data
-from src.solver import computeDt, solveModel
+from src.solver import compute_dt, solve_model
 
 numpyro.set_platform("cpu")
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
@@ -163,8 +163,8 @@ def simulation_loop_unsafe(
             rho,
             p_t,
         ) = args
-        dt = computeDt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
-        sim_dat, sim_dat_aux = solveModel(
+        dt = compute_dt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
+        sim_dat, sim_dat_aux = solve_model(
             n,
             b,
             t,
@@ -340,8 +340,8 @@ def simulation_loop(
             input_data,
             rho,
         ) = args
-        dt = computeDt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
-        sim_dat, sim_dat_aux = solveModel(
+        dt = compute_dt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
+        sim_dat, sim_dat_aux = solve_model(
             n,
             b,
             t,
