@@ -15,6 +15,7 @@ The module makes use of the following imported utilities:
 import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
 from typeguard import typechecked as typechecker
+from numpy.typing import NDArray
 
 
 @jaxtyped(typechecker=typechecker)
@@ -41,10 +42,10 @@ def pressure(
 
 @jaxtyped(typechecker=typechecker)
 def pressure_sa(
-    s_a_over_a0: Float[Array, "..."],
+    s_a_over_a0: Float[Array, "..."] | NDArray,
     beta: Float[Array, "..."],
-    p_ext: Float[Array, "..."],
-) -> Float[Array, "..."]:
+    p_ext: Float[Array, "..."] | float,
+) -> Float[Array, "..."] | NDArray:
     """
     Computes the pressure in a vessel given the square root of the area ratio, stiffness coefficient, and external pressure.
 
@@ -61,7 +62,7 @@ def pressure_sa(
 
 @jaxtyped(typechecker=typechecker)
 def wave_speed(
-    a: Float[Array, "..."], gamma: Float[Array, "..."]
+    a: Float[Array, "..."] | NDArray, gamma: Float[Array, "..."]
 ) -> Float[Array, "..."]:
     """
     Calculates the wave speed in a vessel given the cross-sectional area and admittance coefficient.
