@@ -19,7 +19,7 @@ from jaxtyping import Array, Float, jaxtyped
 from typeguard import typechecked as typechecker
 
 from src.newton import newtonRaphson
-from src.utils import pressure, waveSpeed
+from src.utils import pressure, wave_speed
 
 
 @jaxtyped(typechecker=typechecker)
@@ -189,7 +189,7 @@ def update_anastomosis(
 
     qs = u[:3] * a
 
-    cs = waveSpeed(a, gammas)
+    cs = wave_speed(a, gammas)
 
     ps = pressure(a, a0s, betas, p_exts)
 

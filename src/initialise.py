@@ -25,7 +25,7 @@ from numpy.typing import NDArray
 from typeguard import typechecked as typechecker
 
 from src.components import Blood
-from src.utils import pressureSA, waveSpeed
+from src.utils import pressure_sa, wave_speed
 
 
 @jaxtyped(typechecker=typechecker)
@@ -534,9 +534,9 @@ def build_vessel(
     a = a_0
     beta = 1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared
     gamma = beta * one_over_rho_s_p / r_0
-    c = waveSpeed(a, gamma)
+    c = wave_speed(a, gamma)
     wall_e = 3.0 * beta * radius_slope * 1 / a_0 * s_pi * blood.rho_inv
-    p = pressureSA(np.ones(m, np.float64), beta, p_ext)
+    p = pressure_sa(np.ones(m, np.float64), beta, p_ext)
 
     if outlet == "wk2":
         r1, r2 = compute_windkessel_inlet_impedance(r2, blood, a_0, gamma)
@@ -789,7 +789,7 @@ def compute_windkessel_inlet_impedance(
     Returns:
     tuple[float, float]: Updated Windkessel resistances.
     """
-    r1 = blood.rho * waveSpeed(a0[-1], gamma[-1]) / a0[-1]
+    r1 = blood.rho * wave_speed(a0[-1], gamma[-1]) / a0[-1]
     r2 -= r1
 
     return r1, r2

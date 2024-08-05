@@ -5,7 +5,7 @@ from src.anastomosis import solve_anastomosis
 from src.conjunctions import solve_conjunction
 from src.bifurcations import solve_bifurcation
 from src.boundary_conditions import set_inlet_bc, set_outlet_bc
-from src.utils import pressureSA, waveSpeedSA
+from src.utils import pressure_sa, wave_speed_sa
 
 
 def computeDt(Ccfl, u, c, dx):
@@ -542,8 +542,8 @@ def muscl(dt, Q, A, A0, beta, gamma, wallE, dx, Pext, viscT, masks):
     Q = vmap(lambda a, b, c, d, e: a - dt * (viscT[0] * a / b + c * (d - e) * b))(
         Q, A, wallE, s_A, s_A0
     )
-    P = vmap(lambda a, b, c, d: pressureSA(a * b, c, d))(s_A, s_inv_A0, beta, Pext)
-    c = vmap(waveSpeedSA)(s_A, gamma)
+    P = vmap(lambda a, b, c, d: pressure_sa(a * b, c, d))(s_A, s_inv_A0, beta, Pext)
+    c = vmap(wave_speed_sa)(s_A, gamma)
     u = vmap(lambda a, b: a / b)(Q, A)
 
     return jnp.stack((u, Q, A, c, P))
