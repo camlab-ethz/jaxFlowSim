@@ -1,5 +1,5 @@
 """
-This module sets up and runs simulations for vascular networks with different configurations, 
+This module sets up and runs simulations for vascular networks with different configurations,
 compares the results, and generates plots for the pressure data.
 
 Functions included:
@@ -25,6 +25,7 @@ from src.model import config_simulation, simulation_loop
 
 # Change the current working directory to the directory of this script
 os.chdir(os.path.dirname(__file__))
+
 # Enable 64-bit precision for JAX
 jax.config.update("jax_enable_x64", True)
 
