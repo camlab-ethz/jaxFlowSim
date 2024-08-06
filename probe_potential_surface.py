@@ -1,188 +1,320 @@
-from src.model import config_simulation, simulation_loop_unsafe
-from jax.tree_util import Partial
-from numpyro.infer.reparam import TransformReparam
+"""
+This script configures and runs a JAX-based simulation of bifurcation, evaluates the results,
+and computes gradients for potential surface analysis.
+
+The script performs the following steps:
+1. Sets up the simulation environment and loads the configuration.
+2. Runs the simulation for a specified number of iterations.
+3. Defines and runs a wrapper for the simulation loop to evaluate and compute gradients.
+4. Saves the results and gradients to a file.
+
+Constants:
+- `CONFIG_FILENAME`: Path to the configuration file for the simulation.
+- `RESULTS_FOLDER`: Directory to store the results.
+- `RESULTS_FILE`: File to store the results.
+- `NUM_ITERATIONS`: Number of iterations for the simulation.
+- `TOTAL_NUM_POINTS`: Total number of points for potential surface analysis.
+
+Functions:
+- `config_simulation`: Configures the simulation environment.
+- `simulation_loop_unsafe`: Runs the simulation loop.
+- `sim_loop_wrapper`: Wrapper for the simulation loop to evaluate results.
+- `sin_loop_wrapper1`: Alternate wrapper for the simulation loop.
+- `check_grads`: Checks the gradients for correctness.
+- `partial`: Partially applies arguments to a function.
+- `jit`: Compiles a function using Just-In-Time compilation.
+- `jacfwd`: Computes forward-mode Jacobian of a function.
+
+"""
+
 import os
 import sys
-import time
 from functools import partial
-from jax import jit, lax
-import numpyro.distributions as dist
-import jax.numpy as jnp
+
 import jax
-import numpyro
-from numpyro.infer import MCMC
+import jax.numpy as jnp
 import numpy as np
-import itertools
-from jax import jit, grad, jacfwd, value_and_grad
+import numpyro  # type: ignore
+from jax import jit, lax, jacfwd
 from jax.test_util import check_grads
+from jax.tree_util import Partial
+
+from src.model import config_simulation, simulation_loop_unsafe
 
 os.chdir(os.path.dirname(__file__))
 jax.config.update("jax_enable_x64", True)
 
 numpyro.set_host_device_count(1)
 
-config_filename = ""
-if len(sys.argv) == 1:
-
-    # base cases
-    #modelname = "single-artery"
-    #modelname = "tapering"
-    #modelname = "conjunction"
-    #modelname = "bifurcation"
-    #modelname = "aspirator"
-
-    # openBF-hub 
-    modelname = "test/adan56/adan56.yml"
-
-    # vascularmodels.com
-    #modelname = "0007_H_AO_H"
-    #modelname = "0029_H_ABAO_H"
-    #modelname = "0053_H_CERE_H"
-    input_filename = "test/" + modelname + "/" + modelname + ".yml"
-
-else:
-    config_filename = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
 
 
+VERBOSE = True
+(
+    N,
+    B,
+    J,
+    sim_dat,
+    sim_dat_aux,
+    sim_dat_const,
+    sim_dat_const_aux,
+    timepoints,
+    conv_tol,
+    Ccfl,
+    input_data,
+    rho,
+    masks,
+    strides,
+    edges,
+    vessel_names,
+    cardiac_T,
+) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-verbose = True
-(N, B, J, 
- sim_dat, sim_dat_aux, 
- sim_dat_const, sim_dat_const_aux, 
- timepoints, conv_tol, Ccfl, edges, input_data, rho, 
- masks, strides, edges,
- vessel_names, cardiac_T) = config_simulation(config_filename, verbose)
-
-num_iterations = 1000
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
-sim_dat_obs, t_obs, P_obs = sim_loop_old_jit(N, B,
-                                      sim_dat, sim_dat_aux, 
-                                      sim_dat_const, sim_dat_const_aux, 
-                                      0.5, input_data, rho, 
-                                      masks, strides, edges,
-                                      num_iterations)
-
-
-
+NUM_ITERATIONS = 1000
+SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
+    N,
+    B,
+    sim_dat,
+    sim_dat_aux,
+    sim_dat_const,
+    sim_dat_const_aux,
+    0.5,
+    input_data,
+    rho,
+    masks,
+    strides,
+    edges,
+    NUM_ITERATIONS,
+)
 
 
-R_index = 1
-var_index = 7
-R1 = sim_dat_const[var_index,strides[R_index,1]]
-#R_scales = np.linspace(1.1*R1, 2*R1, 16)
-total_num_points = 1e3
-R_scales = np.linspace(0.1, 10, int(total_num_points))
-def simLoopWrapper(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          Ccfl, input_data, rho, 
-                                          masks, strides, edges):
-    R=R*R1
-    ones = jnp.ones(M)
-    
-    #sim_dat_const_new = sim_dat_const_new.at[var_index, start:end].set(R*ones)
-    sim_dat_const_new = lax.dynamic_update_slice(sim_dat_const,
-                                                 ((R*ones)[:,jnp.newaxis]*jnp.ones(1)[jnp.newaxis,:]).transpose(),
-                                                 (var_index, start))
-    _, _, P = sim_loop_old_jit(N, B,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const_new, sim_dat_const_aux, 
-                                          0.5, input_data, rho, 
-                                          masks, strides, edges,
-                                          120000)
-    return jnp.sqrt(jnp.sum(jnp.square((P-P_obs))))/jnp.sqrt(jnp.sum(jnp.square((P_obs))))
-def simLoopWrapper1(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          Ccfl, input_data, rho, 
-                                          masks, strides, edges):
-    sim_dat, _, P = sim_loop_old_jit(N, B,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          Ccfl, input_data, rho, 
-                                          masks, strides, edges,
-                                          120000)
-                                          120000)
-    return sim_dat
+R_INDEX = 1
+VAR_INDEX = 7
+R1 = sim_dat_const[VAR_INDEX, strides[R_INDEX, 1]]
+TOTAL_NUM_POINTS = 1e3
+R_scales = np.linspace(0.1, 10, int(TOTAL_NUM_POINTS))
 
-sim_loop_wrapper_jit = partial(jit, static_argnums=(1, 2))(simLoopWrapper)
-#sim_loop_wrapper_grad_jit = partial(jit, static_argnums=(2, 6, 7, 8, 9, 10))(jacfwd(simLoopWrapper,14))
-#sim_loop_wrapper_grad_jit1 = partial(jit, static_argnums=(1, 5, 6, 7, 8, 9))(value_and_grad(simLoopWrapper1,14))
-#sim_loop_wrapper_grad_jit = jit(jacfwd(simLoopWrapper, 0))
 
-results_folder = "results/potential_surface"
-if not os.path.isdir(results_folder):
-    os.makedirs(results_folder, mode = 0o777)
+def sim_loop_wrapper(
+    r,
+    r1,
+    var_index,
+    p_obs,
+    n,
+    b,
+    m,
+    start_in,
+    sim_dat_in,
+    sim_dat_aux_in,
+    sim_dat_const_in,
+    sim_dat_const_aux_in,
+    input_data_in,
+    rho_in,
+    masks_in,
+    strides_in,
+    edges_in,
+):
+    """
+    Wrapper for the simulation loop to evaluate the results.
 
-slices = int(total_num_points/int(sys.argv[3]))
+    Args:
+        r: Scaling factor for the variable.
+        r1: Initial value of the variable.
+        var_index: Index of the variable in the simulation data.
+        p_obs: Observed pressure data.
+        n, b, m: Simulation parameters.
+        start_in, sim_dat_in, sim_dat_aux_in, sim_dat_const_in, sim_dat_const_aux_in, input_data_in, rho_in, masks_in, strides_in, edges_in: Simulation inputs.
+
+    Returns:
+        Normalized root mean square error of the pressure data.
+    """
+    r = r * r1
+    ones = jnp.ones(m)
+
+    sim_dat_const_new = lax.dynamic_update_slice(
+        sim_dat_const_in,
+        ((r * ones)[:, jnp.newaxis] * jnp.ones(1)[jnp.newaxis, :]).transpose(),
+        (var_index, start_in),
+    )
+    _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+        n,
+        b,
+        sim_dat_in,
+        sim_dat_aux_in,
+        sim_dat_const_new,
+        sim_dat_const_aux_in,
+        0.5,
+        input_data_in,
+        rho_in,
+        masks_in,
+        strides_in,
+        edges_in,
+        120000,
+    )
+    return jnp.sqrt(jnp.sum(jnp.square((p - p_obs)))) / jnp.sqrt(
+        jnp.sum(jnp.square((p_obs)))
+    )
+
+
+def sin_loop_wrapper1(
+    n,
+    b,
+    sim_dat_in,
+    sim_dat_aux_in,
+    sim_dat_const_in,
+    sim_dat_const_aux_in,
+    ccfl_in,
+    input_data_in,
+    rho_in,
+    masks_in,
+    strides_in,
+    edges_in,
+):
+    """
+    Alternate wrapper for the simulation loop.
+
+    Args:
+        n, b: Simulation parameters.
+        sim_dat_in, sim_dat_aux_in, sim_dat_const_in, sim_dat_const_aux_in, ccfl_in, input_data_in, rho_in, masks_in, strides_in, edges_in: Simulation inputs.
+
+    Returns:
+        Updated simulation data.
+    """
+    sim_dat_in, _, _ = SIM_LOOP_JIT(  # pylint: disable=E1102
+        n,
+        b,
+        sim_dat_in,
+        sim_dat_aux_in,
+        sim_dat_const_in,
+        sim_dat_const_aux_in,
+        ccfl_in,
+        input_data_in,
+        rho_in,
+        masks_in,
+        strides_in,
+        edges_in,
+        120000,
+    )
+    return sim_dat_in
+
+
+SIM_LOOP_WRAPPER_JIT = partial(jit, static_argnums=(1, 2))(sim_loop_wrapper)
+SIM_LOOP_WRAPPER_GRAD_JIT = partial(jit, static_argnums=(2, 6, 7, 8, 9, 10))(
+    jacfwd(sim_loop_wrapper, 14)
+)
+
+RESULTS_FOLDER = "results/potential_surface"
+if not os.path.isdir(RESULTS_FOLDER):
+    os.makedirs(RESULTS_FOLDER, mode=0o777)
+
+slices = int(TOTAL_NUM_POINTS / int(sys.argv[3]))
 gradients = np.zeros(slices)
 gradients_averaged = np.zeros(slices)
-gradient = 1
-#for i in range(1):
-#    results_file = results_folder  + "/potential_surface_new.txt"
-#    R = R_scales[100]
-#    M = strides[R_index,1]-strides[R_index,0]+4
-#    start = strides[R_index,0]-2
-#    end = strides[R_index,1]+2
-#    sim_dat = simLoopWrapper1(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-#                                          sim_dat, sim_dat_aux, 
-#                                          sim_dat_const, sim_dat_const_aux, 
-#                                          Ccfl, input_data, rho, 
-#                                          masks, strides, edges)
-#    gradient *= sim_loop_wrapper_grad_jit1(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-#                                          sim_dat, sim_dat_aux, 
-#                                          sim_dat_const, sim_dat_const_aux, 
-#                                          Ccfl, input_data, rho, 
-#                                          masks, strides, edges)
-#    #gradient *= sim_loop_wrapper_grad_jit(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-#    #                                      sim_dat, sim_dat_aux, 
-#    #                                      sim_dat_const, sim_dat_const_aux, 
-#    #                                      Ccfl, input_data, rho, 
-#    #                                      masks, strides, edges)
-#    print(gradient)
+GRADIENT = 1
 
-
-for i in range(int(sys.argv[2])*slices,(int(sys.argv[2])+1)*slices):
-    results_file = results_folder  + "/potential_surface_new.txt"
+for i in range(int(sys.argv[2]) * slices, (int(sys.argv[2]) + 1) * slices):
+    RESULTS_FILE = RESULTS_FOLDER + "/potential_surface_new.txt"
     R = R_scales[i]
-    M = strides[R_index,1]-strides[R_index,0]+4
-    start = strides[R_index,0]-2
-    end = strides[R_index,1]+2
-    loss = sim_loop_wrapper_jit(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          Ccfl, input_data, rho, 
-                                          masks, strides, edges)
-    sim_loop_wrapper_R = Partial(sim_loop_wrapper_jit, R_index=R_index, R1=R1, var_index=var_index, P_obs=P_obs, N=N, B=B, M=M, start=start, end=end,
-                                          sim_dat=sim_dat, sim_dat_aux=sim_dat_aux, 
-                                          sim_dat_const=sim_dat_const, sim_dat_const_aux=sim_dat_const_aux, 
-                                          Ccfl=Ccfl, input_data=input_data, rho=rho, 
-                                          masks=masks, strides=strides, edges=edges)
+    M = strides[R_INDEX, 1] - strides[R_INDEX, 0] + 4
+    start = strides[R_INDEX, 0] - 2
+    end = strides[R_INDEX, 1] + 2
+    loss = SIM_LOOP_WRAPPER_JIT(  # pylint: disable=E1102
+        R,
+        R_INDEX,
+        R1,
+        VAR_INDEX,
+        P_obs,
+        N,
+        B,
+        M,
+        start,
+        end,
+        sim_dat,
+        sim_dat_aux,
+        sim_dat_const,
+        sim_dat_const_aux,
+        Ccfl,
+        input_data,
+        rho,
+        masks,
+        strides,
+        edges,
+    )
+    sim_loop_wrapper_R = Partial(
+        SIM_LOOP_WRAPPER_JIT,
+        R_index=R_INDEX,
+        R1=R1,
+        var_index=VAR_INDEX,
+        P_obs=P_obs,
+        N=N,
+        B=B,
+        M=M,
+        start=start,
+        end=end,
+        sim_dat=sim_dat,
+        sim_dat_aux=sim_dat_aux,
+        sim_dat_const=sim_dat_const,
+        sim_dat_const_aux=sim_dat_const_aux,
+        Ccfl=Ccfl,
+        input_data=input_data,
+        rho=rho,
+        masks=masks,
+        strides=strides,
+        edges=edges,
+    )
 
-    M = strides[R_index,1]-strides[R_index,0]+4
-    start = strides[R_index,0]-2
-    end = strides[R_index,1]+2
-    gradients[i-int(sys.argv[2])*slices]= sim_loop_wrapper_grad_jit(R, R_index, R1, var_index, P_obs, N, B, M, start, end,
-                                          sim_dat, sim_dat_aux, 
-                                          sim_dat_const, sim_dat_const_aux, 
-                                          Ccfl, input_data, rho, 
-                                          masks, strides, edges)
-    print(loss, gradients[i-int(sys.argv[2])*slices])
-    check_grads(sim_loop_wrapper_R, (R,), order=1, atol=1e-2, rtol=1e-2, modes='fwd')
+    M = strides[R_INDEX, 1] - strides[R_INDEX, 0] + 4
+    start = strides[R_INDEX, 0] - 2
+    end = strides[R_INDEX, 1] + 2
+    gradients[i - int(sys.argv[2]) * slices] = (
+        SIM_LOOP_WRAPPER_GRAD_JIT(  # pylint: disable=E1102
+            R,
+            R_INDEX,
+            R1,
+            VAR_INDEX,
+            P_obs,
+            N,
+            B,
+            M,
+            start,
+            end,
+            sim_dat,
+            sim_dat_aux,
+            sim_dat_const,
+            sim_dat_const_aux,
+            Ccfl,
+            input_data,
+            rho,
+            masks,
+            strides,
+            edges,
+        )
+    )
+    print(loss, gradients[i - int(sys.argv[2]) * slices])
+    check_grads(sim_loop_wrapper_R, (R,), order=1, atol=1e-2, rtol=1e-2, modes="fwd")
 
-    
-    #if abs(gradients[i-int(sys.argv[2])*slices]) > 1e3:
-    #    gradients[i-int(sys.argv[2])*slices] = np.sign(gradients[i-int(sys.argv[2])*slices])*1e3
-
-
-    if i >= int(sys.argv[2])*slices + 1000:
-        gradients_averaged[i-int(sys.argv[2])*slices] = gradients[i-int(sys.argv[2])*slices-999:i-int(sys.argv[2])*slices+1].mean()
-        gradients_averaged[i-int(sys.argv[2])*slices] = gradients[i-int(sys.argv[2])*slices-999:i-int(sys.argv[2])*slices+1].mean()
+    if i >= int(sys.argv[2]) * slices + 1000:
+        gradients_averaged[i - int(sys.argv[2]) * slices] = gradients[
+            i - int(sys.argv[2]) * slices - 999 : i - int(sys.argv[2]) * slices + 1
+        ].mean()
+        gradients_averaged[i - int(sys.argv[2]) * slices] = gradients[
+            i - int(sys.argv[2]) * slices - 999 : i - int(sys.argv[2]) * slices + 1
+        ].mean()
     else:
-        gradients_averaged[i-int(sys.argv[2])*slices] = gradients[:i-int(sys.argv[2])*slices+1].mean()
+        gradients_averaged[i - int(sys.argv[2]) * slices] = gradients[
+            : i - int(sys.argv[2]) * slices + 1
+        ].mean()
 
-
-       
-    file = open(results_file, "a")  
-    file.write(str(R) + " " + str(loss) + " " + str(gradients[i-int(sys.argv[2])*slices]) + " " + str(gradients_averaged[i-int(sys.argv[2])*slices]) + "\n")
+    file = open(RESULTS_FILE, "a", encoding="utf-8")
+    file.write(
+        str(R)
+        + " "
+        + str(loss)
+        + " "
+        + str(gradients[i - int(sys.argv[2]) * slices])
+        + " "
+        + str(gradients_averaged[i - int(sys.argv[2]) * slices])
+        + "\n"
+    )
     file.close()
