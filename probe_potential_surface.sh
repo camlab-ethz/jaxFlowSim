@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Use this script to launch probe_potential_surface.py on multiple cores at once, while splitting the range to be probed over all cores
+# Use this script to launch probe_potential_surface.py on multiple cores at once, while splitting the range to be probed over all cores.
 
 # Activate the virtual environment
 source venv/bin/activate
