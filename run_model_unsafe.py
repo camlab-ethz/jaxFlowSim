@@ -1,6 +1,6 @@
 """
 This script performs a simulation of cardiovascular dynamics using JAX, and then compares the simulated
-pressure data with reference data from previously saved results. The comparison includes computing 
+pressure data with reference data from previously saved results. The comparison includes computing
 relative errors and generating plots to visualize the differences.
 
 Key functionalities include:
