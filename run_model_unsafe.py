@@ -1,39 +1,60 @@
-from src.model import config_simulation, simulation_loop_unsafe
-import jax
+"""
+This script performs a simulation of cardiovascular dynamics using JAX, and then compares the simulated
+pressure data with reference data from previously saved results. The comparison includes computing 
+relative errors and generating plots to visualize the differences.
+
+Key functionalities include:
+- Configuring and running multiple simulations with JAX's Just-In-Time (JIT) compilation for performance.
+- Identifying cycles in the simulation output to extract relevant data for comparison.
+- Comparing the simulated pressure data against reference data for specific vessels.
+- Generating and saving plots of the simulation results against reference data.
+
+Modules:
+- `os`, `sys`, `time`: Standard libraries for file handling, system operations, and timing.
+- `jax`: A library for high-performance machine learning research.
+- `jax.numpy`: JAX's version of NumPy, with support for automatic differentiation and GPU/TPU acceleration.
+- `matplotlib.pyplot`: A plotting library for creating static, animated, and interactive visualizations.
+- `numpy`: A fundamental package for scientific computing with Python.
+
+Execution:
+- The script reads command-line arguments to determine which configuration file to use.
+- It sets up a simulation environment, runs the simulation, and then compares the results with reference data.
+- Results are saved as plots in a specified directory for further analysis.
+"""
+
+import os
 import sys
 import time
-import os
 from functools import partial
-from jax import block_until_ready, jit
+
+import jax
 import matplotlib.pyplot as plt
 import numpy as np
+from jax import block_until_ready, jit
 
+from src.model import config_simulation, simulation_loop_unsafe
+
+# Change directory to the script's location
 os.chdir(os.path.dirname(__file__))
+
+# Enable 64-bit precision in JAX for higher accuracy in numerical computations
 jax.config.update("jax_enable_x64", True)
 
-config_filename = ""
+# Set the configuration filename based on command line arguments or default to a specific model
+CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
 
-    # base cases
-    # modelname = "single-artery"
-    # modelname = "tapering"
-    # modelname = "conjunction"
-    # modelname = "bifurcation"
-    # modelname = "aspirator"
+    MODELNAME = "test/adan56/adan56.yml"
 
-    # openBF-hub
-    modelname = "test/adan56/adan56.yml"
-
-    # vascularmodels.com
-    # modelname = "0007_H_AO_H"
-    # modelname = "0029_H_ABAO_H"
-    # modelname = "0053_H_CERE_H"
-    input_filename = "test/" + modelname + "/" + modelname + ".yml"
+    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
 
 else:
-    config_filename = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
 
-verbose = True
+# Set verbosity flag to control logging
+VERBOSE = True
+
+# Configure the simulation with the given configuration file
 (
     N,
     B,
@@ -52,15 +73,21 @@ verbose = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(config_filename, verbose)
+) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
+# Initialize lists to store time and pressure data for each simulation
+t_t = []
+p_t = []
+
+# Run the simulation multiple times to collect data
 for i in range(10):
-    if verbose:
+    if VERBOSE:
         starting_time = time.time_ns()
 
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
-    sim_dat, t_t, P_t = block_until_ready(
-        sim_loop_old_jit(
+    # Set up and execute the simulation loop using JIT compilation
+    SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+    sim_dat, t_t, p_t = block_until_ready(
+        SIM_LOOP_JIT(  # pylint: disable=E1102
             N,
             B,
             sim_dat,
@@ -72,19 +99,16 @@ for i in range(10):
             rho,
             masks,
             strides,
-            edges,
             upper=120000,
         )
     )
 
-    if verbose:
-        ending_time = (time.time_ns() - starting_time) / 1.0e9
-        print(f"elapsed time = {ending_time} seconds")
 
-# jnp.set_printoptions(threshold=sys.maxsize)
-filename = config_filename.split("/")[-1]
+# Extract the network name from the configuration filename
+filename = CONFIG_FILENAME.split("/")[-1]
 network_name = filename.split(".")[0]
 
+# Reference vessel names for different networks
 vessel_names_0007 = [
     "ascending aorta",
     "right subclavian artery",
@@ -137,13 +161,12 @@ vessel_names_0053 = [
     "right posterior comunicating artery",
 ]
 
-# plt.rcParams.update({'font.size': 20})
-
-# print(sim_dat)
-
+# Identify cycles in the time data to extract one complete cycle of pressure data
 indices = [i + 1 for i in range(len(t_t) - 1) if t_t[i] > t_t[i + 1]]
-P_cycle = P_t[indices[-2] : indices[-1], :]
+P_cycle = p_t[indices[-2] : indices[-1], :]  # type: ignore
 t_cycle = t_t[indices[-2] : indices[-1]]
+
+# Load reference pressure data for the first vessel
 P0_temp = np.loadtxt(
     "/home/diego/studies/uni/thesis_maths/openBF/test/"
     + network_name
@@ -155,30 +178,21 @@ P0_temp = np.loadtxt(
 )
 t0 = P0_temp[:, 0] % cardiac_T
 
-counter = 0
+# Initialize arrays to store the new interpolated time and pressure data
+COUNTER = 0
 t_new = np.zeros(len(timepoints))
 P_new = np.zeros((len(timepoints), 5 * N))
+
+# Interpolate the pressure data to match the reference time points
 for i in range(len(t_cycle) - 1):
-    if t0[counter] >= t_cycle[i] and t0[counter] <= t_cycle[i + 1]:
-        P_new[counter, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
-        counter += 1
-
-
-# even_indices = np.round(np.linspace(0, len(t) - 1, 100)).astype(int)
-# P  = P[even_indices,:]
-# t  = t[even_indices]
-
-# counter = 0
-# for i, t_temp in enumerate(t):
-#    if t_temp >= timepoints[counter]:
-#        t_new[counter] = t_temp
-#        P_new[counter:] = P[i,:]
-#        counter += 1
+    if t0[COUNTER] >= t_cycle[i] and t0[COUNTER] <= t_cycle[i + 1]:
+        P_new[COUNTER, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
+        COUNTER += 1
 
 t_new = t_new[:-1]
 P_new = P_new[:-1, :]
 
-
+# Loop through each vessel and compare the simulated pressure with the reference data
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
     P0_temp = np.loadtxt(
@@ -190,15 +204,19 @@ for i, vessel_name in enumerate(vessel_names):
         + vessel_name
         + "_P.last"
     )
-    node = 2
-    index_jl = 1 + node
-    index_jax = 5 * index_vessel_name + node
+    NODE = 2
+    INDEX_JL = 1 + NODE
+    index_jax = 5 * index_vessel_name + NODE
 
-    P0 = P0_temp[:-1, index_jl]
+    P0 = P0_temp[:-1, INDEX_JL]
     t0 = P0_temp[:-1, 0] % cardiac_T
     P1 = P_new[:, index_jax]
+
+    # Compute the relative error between the simulated and reference pressures
     res = np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
     print(res)
+
+    # Generate and save a plot comparing the simulated and reference pressures
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
@@ -218,7 +236,6 @@ for i, vessel_name in enumerate(vessel_names):
     # plt.title("vessel name: " + vessel_name)
     plt.plot(t0, P0 / 133.322)
     plt.plot(t0, P1 / 133.322)
-    # print(P)
     # plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
     # plt.plot(t0,P0/133.322)
     plt.legend(["P_JAX", "P_jl"], loc="lower right")
