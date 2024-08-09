@@ -1,47 +1,75 @@
-from src.model import config_simulation, simulation_loop_unsafe
-from numpyro.infer.reparam import TransformReparam
+"""
+This script performs probabilistic inference on a cardiovascular model using MCMC sampling in NumPyro. 
+The script configures and runs simulations, then uses Bayesian inference to estimate parameters of the model.
+
+Key functionalities include:
+- Configuring and running the simulation loop using JAX with JIT compilation for performance.
+- Defining a probabilistic model for the parameter inference.
+- Running MCMC to sample from the posterior distribution of model parameters.
+- Saving the results of the inference to files.
+
+Modules:
+- `itertools`: Provides functions to create iterators for efficient looping.
+- `os`, `sys`, `time`: Standard libraries for file handling, system operations, and timing.
+- `jax`: A library for high-performance machine learning research.
+- `jax.numpy`: JAX's version of NumPy, with support for automatic differentiation and GPU/TPU acceleration.
+- `numpy`: Fundamental package for scientific computing with Python.
+- `numpyro`: A library for probabilistic programming in JAX.
+- `src.model`: Custom module that provides functions for setting up and running cardiovascular simulations.
+
+Functions:
+- `sim_loop_wrapper`: Wraps the simulation loop to allow parameter modification.
+- `logp`: Computes the log-probability of observed data given the model parameters.
+- `model`: Defines the probabilistic model for inference using NumPyro.
+
+Execution:
+- The script reads command-line arguments to determine which configuration file to use.
+- It sets up a simulation environment, runs the simulation, and then performs MCMC inference.
+- Results are saved to a specified directory for further analysis.
+"""
+
+import itertools
 import os
 import sys
 import time
 from functools import partial
-from jax import block_until_ready, jit
-import numpyro.distributions as dist
-import jax.numpy as jnp
-import jax
-import numpyro
-from numpyro.infer import MCMC
-import numpy as np
-import itertools
 
+import jax
+import jax.numpy as jnp
+import numpy as np
+import numpyro  # type: ignore
+import numpyro.distributions as dist  # type: ignore
+from jax import block_until_ready, jit
+from numpyro.infer import MCMC  # type: ignore
+from numpyro.infer.reparam import TransformReparam  # type: ignore
+
+from src.model import config_simulation, simulation_loop_unsafe
+
+# Change directory to the script's location
 os.chdir(os.path.dirname(__file__))
+
+# Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
 
+# Set the number of devices to 1 for running the simulation
 numpyro.set_host_device_count(1)
 
-config_filename = ""
+# Set the configuration filename based on command line arguments or default to a specific model
+CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
 
-    # base cases
-    # modelname = "single-artery"
-    # modelname = "tapering"
-    # modelname = "conjunction"
-    # modelname = "bifurcation"
-    # modelname = "aspirator"
+    MODELNAME = "test/adan56/adan56.yml"
 
-    # openBF-hub
-    modelname = "test/adan56/adan56.yml"
-
-    # vascularmodels.com
-    # modelname = "0007_H_AO_H"
-    # modelname = "0029_H_ABAO_H"
-    # modelname = "0053_H_CERE_H"
-    input_filename = "test/" + modelname + "/" + modelname + ".yml"
+    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
 
 else:
-    config_filename = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
 
 
-verbose = True
+# Set verbosity flag to control logging
+VERBOSE = True
+
+# Configure the simulation with the given configuration file
 (
     N,
     B,
@@ -53,7 +81,6 @@ verbose = True
     timepoints,
     conv_tol,
     Ccfl,
-    edges,
     input_data,
     rho,
     masks,
@@ -61,14 +88,16 @@ verbose = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(config_filename, verbose)
+) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-if verbose:
+# Record the start time if verbose mode is enabled
+if VERBOSE:
     starting_time = time.time_ns()
 
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+# Set up and execute the simulation loop using JIT compilation
+SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 sim_dat_obs, t_obs, P_obs = block_until_ready(
-    sim_loop_old_jit(
+    SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
@@ -85,23 +114,35 @@ sim_dat_obs, t_obs, P_obs = block_until_ready(
     )
 )
 
-R_index = 1
-var_index = 7
-R1 = sim_dat_const[var_index, strides[R_index, 1]]
-# R_scales = np.linspace(1.1*R1, 2*R1, 16)
+# Indices for selecting specific parts of the simulation data
+R_INDEX = 1
+VAR_INDEX = 7
+
+# Extract a specific value from the simulation data constants
+R1 = sim_dat_const[VAR_INDEX, strides[R_INDEX, 1]]
+
+# Generate a range of scaled values for R to be tested
 R_scales = np.linspace(0.5 * R1, 0.9 * R1, 16)
 R_scale = R_scales[int(sys.argv[2])]
-print(R1, R_scale)
 
 
-def simLoopWrapper(R):
-    ones = jnp.ones(strides[R_index, 1] - strides[R_index, 0] + 4)
+def sim_loop_wrapper(r):
+    """
+    Wrapper function for running the simulation loop with a modified R value.
+
+    Args:
+        r (float): Scaling factor for the selected simulation constant.
+
+    Returns:
+        Array: Pressure values from the simulation with the modified R value.
+    """
+    ones = jnp.ones(strides[R_INDEX, 1] - strides[R_INDEX, 0] + 4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[
-        var_index, strides[R_index, 0] - 2 : strides[R_index, 1] + 2
-    ].set(R * ones)
-    _, _, P = block_until_ready(
-        sim_loop_old_jit(
+        VAR_INDEX, strides[R_INDEX, 0] - 2 : strides[R_INDEX, 1] + 2
+    ].set(r * ones)
+    _, _, p = block_until_ready(
+        SIM_LOOP_JIT(  # pylint: disable=E1102
             N,
             B,
             sim_dat,
@@ -117,40 +158,56 @@ def simLoopWrapper(R):
             upper=120000,
         )
     )
-    return P
+    return p
 
 
-sim_loop_wrapper_jit = jit(simLoopWrapper)
+# JIT compile the wrapper function for efficiency
+SIM_LOOP_WRAPPER_JIT = jit(sim_loop_wrapper)
 
 
-def logp(y, R, sigma):
-    y_hat = sim_loop_wrapper_jit(R)
-    L = jnp.mean(jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc=0, scale=sigma))
-    jax.debug.print("L = {x}", x=L)
-    return L
+def logp(y, r, sigma):
+    """
+    Compute the log-probability of the observed data given the model parameters.
+
+    Args:
+        y (Array): Observed pressure data.
+        r (float): Scaling factor for the selected simulation constant.
+        sigma (float): Standard deviation of the noise in the observations.
+
+    Returns:
+        float: Log-probability of the observed data given the model parameters.
+    """
+    y_hat = SIM_LOOP_WRAPPER_JIT(r)  # pylint: disable=E1102
+    logp = jnp.mean(
+        jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc=0, scale=sigma)
+    )
+    jax.debug.print("L = {x}", x=logp)
+    return logp
 
 
-def model(P_obs, sigma, scale, R_scale):
+def model(p_obs, sigma, scale, r_scale):
+    """
+    Define the probabilistic model for inference using NumPyro.
+
+    Args:
+        p_obs (Array): Observed pressure data.
+        sigma (float): Standard deviation of the noise in the observations.
+        scale (float): Scale parameter for the prior distribution.
+        r_scale (float): Initial scale value for R.
+    """
     with numpyro.handlers.reparam(config={"theta": TransformReparam()}):
-        R_dist = numpyro.sample(
+        r_dist = numpyro.sample(
             "theta",
             dist.TransformedDistribution(
-                dist.Normal(), dist.transforms.AffineTransform(0, scale * R_scale)
+                dist.Normal(), dist.transforms.AffineTransform(0, scale * r_scale)
             ),
         )
-    jax.debug.print("R_dist = {x}", x=R_dist)
-    log_density = logp(P_obs, R_dist, sigma=sigma)
+    jax.debug.print("R_dist = {x}", x=r_dist)
+    log_density = logp(p_obs, r_dist, sigma=sigma)
     numpyro.factor("custom_logp", log_density)
 
 
-# network_properties = {
-#        "sigma": [1e-1, 1e-3, 1e-5, 1e-7, 1e-9],
-#        "scale": [1, 5, 10],
-#        "num_warmup": np.arange(10, 60, 10),
-#        "num_samples": np.arange(100, 600, 100),
-#        "num_chains": [1]
-#        }
-
+# Define the hyperparameters for the network properties
 network_properties = {
     "sigma": [1e-5],
     "scale": [10],
@@ -159,20 +216,15 @@ network_properties = {
     "num_chains": [1],
 }
 
-# network_properties = {
-#        "sigma": [1e-5],
-#        "scale": [10],
-#        "num_warmup": np.arange(10, 20, 10),
-#        "num_samples": np.arange(10, 20, 10),
-#        "num_chains": [1]
-#        }
+# Create a list of all possible combinations of the network properties
+settings = list(itertools.product(*network_properties.values()))  # type: ignore
 
-settings = list(itertools.product(*network_properties.values()))
+# Define the folder to save the inference results
+RESULTS_FOLDER = "results/inference_ensemble"
+if not os.path.isdir(RESULTS_FOLDER):
+    os.makedirs(RESULTS_FOLDER, mode=0o777)
 
-results_folder = "results/inference_ensemble"
-if not os.path.isdir(results_folder):
-    os.makedirs(results_folder, mode=0o777)
-
+# Loop through each combination of settings and run MCMC inference
 for set_num, setup in enumerate(settings):
     print(
         "###################################",
@@ -186,8 +238,8 @@ for set_num, setup in enumerate(settings):
         "num_samples": setup[3],
         "num_chains": setup[4],
     }
-    results_file = (
-        results_folder
+    RESULTS_FILE = (
+        RESULTS_FOLDER
         + "/setup_"
         + str(setup_properties["sigma"])
         + "_"
@@ -216,7 +268,5 @@ for set_num, setup in enumerate(settings):
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["theta"])
 
-    # print(mcmc.get_samples())
-    file = open(results_file, "a")
-    file.write(str(R_scale) + " " + str(R) + "  " + str(R1) + "\n")
-    file.close()
+    with open(RESULTS_FILE, "a", encoding="utf-8") as file:
+        file.write(str(R_scale) + " " + str(R) + "  " + str(R1) + "\n")
