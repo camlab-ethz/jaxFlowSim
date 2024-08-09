@@ -1,7 +1,7 @@
 """
-This script performs sensitivity analysis on a cardiovascular simulation model using the SALib library 
-and JAX for efficient computation. The sensitivity analysis involves varying parameters of the model 
-within specified bounds and evaluating the effect on the output. The script supports configuration via 
+This script performs sensitivity analysis on a cardiovascular simulation model using the SALib library
+and JAX for efficient computation. The sensitivity analysis involves varying parameters of the model
+within specified bounds and evaluating the effect on the output. The script supports configuration via
 command-line arguments and runs the simulation using JIT compilation for improved performance.
 
 Key functionalities include:

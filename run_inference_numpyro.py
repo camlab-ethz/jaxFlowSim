@@ -1,5 +1,5 @@
 """
-This script performs probabilistic inference on a cardiovascular model using MCMC sampling in NumPyro. 
+This script performs probabilistic inference on a cardiovascular model using MCMC sampling in NumPyro.
 The script configures and runs simulations, then uses Bayesian inference to estimate parameters of the model.
 
 Key functionalities include:

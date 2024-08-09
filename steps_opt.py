@@ -1,39 +1,69 @@
-from src.model import config_simulation, simulation_loop_unsafe, simulation_loop
-import jax
-import sys
-import time
+"""
+This script performs a simulation of blood flow in a vascular network using JAX for Just-In-Time (JIT) compilation,
+and optimizes the simulation step size for computational efficiency and accuracy. The script loads a specified model 
+configuration, runs the simulation, calculates the residual between the simulation and reference data, and iteratively 
+adjusts the step size to optimize the simulation. Results, including the time taken and residuals for different step sizes, 
+are plotted and saved as a PDF.
+
+Steps:
+1. Set up the environment and load the simulation configuration based on the specified model.
+2. Run the simulation with an initial step size and record the timing and residual.
+3. Adjust the simulation step size in a loop, re-running the simulation for each step size and recording the time and residual.
+4. Plot the results showing the time taken and residuals against the step size.
+5. Save the results as a PDF file.
+
+Attributes:
+    CONFIG_FILENAME (str): The path to the configuration file used for the simulation.
+    VERBOSE (bool): Flag to enable or disable verbose output for timing information.
+    N, B, J (int): Network parameters for the simulation.
+    sim_dat, sim_dat_aux, sim_dat_const, sim_dat_const_aux (array): Arrays holding the simulation data.
+    timepoints (array): Timepoints used in the simulation.
+    conv_tol (float): Convergence tolerance for the simulation.
+    Ccfl (float): CFL condition value used in the simulation.
+    input_data, rho, masks, strides, edges (array): Additional arrays holding data for the simulation.
+    vessel_names (list): List of vessel names in the network.
+    cardiac_T (float): The period of the cardiac cycle used in the simulation.
+    r_folder (str): The directory where the results will be stored.
+    steps (range): Range of step sizes to test during the optimization process.
+    times (list): List of times taken for each simulation with different step sizes.
+    residuals (list): List of residuals calculated for each simulation with different step sizes.
+    RESIDUAL_BASE (float): The residual calculated for the base simulation run.
+    ENDING_TIME_BASE (float): The time taken for the base simulation run.
+"""
+
 import os
 import shutil
+import sys
+import time
 from functools import partial
-from jax import block_until_ready, jit
+
+import jax
 import matplotlib.pyplot as plt
 import numpy as np
+from jax import block_until_ready, jit
 
+from src.model import config_simulation, simulation_loop, simulation_loop_unsafe
+
+# Change the current working directory to the script's location
 os.chdir(os.path.dirname(__file__))
+
+# Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
 
-config_filename = ""
+# Set the configuration filename based on command line arguments or default to a specific model
+CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
 
-    # base cases
-    # modelname = "single-artery"
-    # modelname = "tapering"
-    # modelname = "conjunction"
-    # modelname = "bifurcation"
-    # modelname = "aspirator"
+    MODELNAME = "test/adan56/adan56.yml"
 
-    # openBF-hub
-    modelname = "test/adan56/adan56.yml"
-
-    # vascularmodels.com
-    # modelname = "0007_H_AO_H"
-    # modelname = "0029_H_ABAO_H"
-    # modelname = "0053_H_CERE_H"
-    input_filename = "test/" + modelname + "/" + modelname + ".yml"
+    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
 else:
-    config_filename = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
 
-verbose = True
+# Enable verbose output for timing information
+VERBOSE = True
+
+# Load the simulation configuration
 (
     N,
     B,
@@ -45,7 +75,6 @@ verbose = True
     timepoints,
     conv_tol,
     Ccfl,
-    edges,
     input_data,
     rho,
     masks,
@@ -53,18 +82,19 @@ verbose = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(config_filename, verbose)
+) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-# jnp.set_printoptions(threshold=sys.maxsize)
-filename = config_filename.split("/")[-1]
+# Extract the network name from the configuration filename
+filename = CONFIG_FILENAME.split("/")[-1]
 network_name = filename.split(".")[0]
+
+# Create a directory to store the results, removing any existing directory with the same name
 r_folder = "results/steps_opt_" + network_name
-# delete existing folder and results
 if os.path.isdir(r_folder):
     shutil.rmtree(r_folder)
 os.makedirs(r_folder, mode=0o777)
 
-
+# Vessel names for different networks
 vessel_names_0007 = [
     "ascending aorta",
     "right subclavian artery",
@@ -117,14 +147,15 @@ vessel_names_0053 = [
     "right posterior comunicating artery",
 ]
 
-# plt.rcParams.update({'font.size': 20})
+# Record the starting time of the simulation
+STARTING_TIME = 0.0
+if VERBOSE:
+    STARTING_TIME = time.time_ns()
 
-# print(sim_dat)
-if verbose:
-    starting_time = time.time_ns()
-sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+# Execute the simulation loop with Just-In-Time (JIT) compilation
+SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
 sim_dat_out, t_out, P_out = block_until_ready(
-    sim_loop_old_jit(
+    SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         J,
@@ -143,9 +174,13 @@ sim_dat_out, t_out, P_out = block_until_ready(
     )
 )
 
-if verbose:
-    ending_time_base = (time.time_ns() - starting_time) / 1.0e9
-    print(f"elapsed time = {ending_time_base} seconds")
+# Calculate the elapsed time for the base simulation
+ENDING_TIME_BASE = 0.0
+if VERBOSE:
+    ENDING_TIME_BASE = (time.time_ns() - STARTING_TIME) / 1.0e9
+    print(f"elapsed time = {ENDING_TIME_BASE} seconds")
+
+# Load reference pressure data for comparison
 P0_temp = np.loadtxt(
     "/home/diego/studies/uni/thesis_maths/openBF/test/"
     + network_name
@@ -157,17 +192,20 @@ P0_temp = np.loadtxt(
 )
 t0 = P0_temp[:, 0] % cardiac_T
 
-counter = 0
+# Interpolate the results to match the reference timepoints
+COUNTER = 0
 t_new = np.zeros(len(timepoints))
 P_new = np.zeros((len(timepoints), 5 * N))
 for i in range(len(t_out) - 1):
-    if t0[counter] >= t_out[i] and t0[counter] <= t_out[i + 1]:
-        P_new[counter, :] = (P_out[i, :] + P_out[i + 1, :]) / 2
-        counter += 1
+    if t0[COUNTER] >= t_out[i] and t0[COUNTER] <= t_out[i + 1]:
+        P_new[COUNTER, :] = (P_out[i, :] + P_out[i + 1, :]) / 2
+        COUNTER += 1
 
 t_new = t_new[:-1]
 P_new = P_new[:-1, :]
-residual_base = 0
+
+# Calculate the residual between the simulation and the reference data
+RESIDUAL_BASE = 0
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
     P0_temp = np.loadtxt(
@@ -179,26 +217,29 @@ for i, vessel_name in enumerate(vessel_names):
         + vessel_name
         + "_P.last"
     )
-    node = 2
-    index_jl = 1 + node
-    index_jax = 5 * index_vessel_name + node
+    NODE = 2
+    INDEX_JL = 1 + NODE
+    index_jax = 5 * index_vessel_name + NODE
 
-    P0 = P0_temp[:-1, index_jl]
+    P0 = P0_temp[:-1, INDEX_JL]
     t0 = P0_temp[:-1, 0] % cardiac_T
     P1 = P_new[:, index_jax]
-    residual_base += np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
+    RESIDUAL_BASE += np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
 
-residual_base = residual_base / N
+RESIDUAL_BASE = RESIDUAL_BASE / N
 
+# Loop over different step sizes to optimize simulation time and residuals
 times = []
 steps = range(50000, 210000, 10000)
 residuals = []
 for m in steps:
-    if verbose:
-        starting_time = time.time_ns()
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+    if VERBOSE:
+        STARTING_TIME = time.time_ns()
+
+    # Execute the simulation loop with a different step size
+    SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
     sim_dat_out, t_t, P_t = block_until_ready(
-        sim_loop_old_jit(
+        SIM_LOOP_JIT(  # pylint: disable=E1102
             N,
             B,
             sim_dat,
@@ -215,11 +256,13 @@ for m in steps:
         )
     )
 
-    if verbose:
-        ending_time = (time.time_ns() - starting_time) / 1.0e9
+    # Record the elapsed time for the current step size
+    if VERBOSE:
+        ending_time = (time.time_ns() - STARTING_TIME) / 1.0e9
         times.append(ending_time)
         print(f"elapsed time = {ending_time} seconds")
 
+    # Interpolate the results to match the reference timepoints
     indices = [i + 1 for i in range(len(t_t) - 1) if t_t[i] > t_t[i + 1]]
     P_cycle = P_t[indices[-2] : indices[-1], :]
     t_cycle = t_t[indices[-2] : indices[-1]]
@@ -234,18 +277,19 @@ for m in steps:
     )
     t0 = P0_temp[:, 0] % cardiac_T
 
-    counter = 0
+    COUNTER = 0
     t_new = np.zeros(len(timepoints))
     P_new = np.zeros((len(timepoints), 5 * N))
     for i in range(len(t_cycle) - 1):
-        if t0[counter] >= t_cycle[i] and t0[counter] <= t_cycle[i + 1]:
-            P_new[counter, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
-            counter += 1
+        if t0[COUNTER] >= t_cycle[i] and t0[COUNTER] <= t_cycle[i + 1]:
+            P_new[COUNTER, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
+            COUNTER += 1
 
     t_new = t_new[:-1]
     P_new = P_new[:-1, :]
 
-    residual = 0
+    # Calculate the residual for the current step size
+    RESIDUAL = 0
     for i, vessel_name in enumerate(vessel_names):
         index_vessel_name = vessel_names.index(vessel_name)
         P0_temp = np.loadtxt(
@@ -257,33 +301,36 @@ for m in steps:
             + vessel_name
             + "_P.last"
         )
-        node = 2
-        index_jl = 1 + node
-        index_jax = 5 * index_vessel_name + node
+        NODE = 2
+        INDEX_JL = 1 + NODE
+        index_jax = 5 * index_vessel_name + NODE
 
-        P0 = P0_temp[:-1, index_jl]
+        P0 = P0_temp[:-1, INDEX_JL]
         t0 = P0_temp[:-1, 0] % cardiac_T
         P1 = P_new[:, index_jax]
-        residual += np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
+        RESIDUAL += np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
 
-    residuals.append(residual / N)
+    residuals.append(RESIDUAL / N)
 
+# Plot the results: time and residuals vs. step size
 _, ax = plt.subplots()
 ax.set_xlabel("# steps")
 ax1 = ax.twinx()
 ln1 = ax.plot(steps, times, "g-", label="static t[s]")
-ln2 = ax.plot(steps, np.ones(len(steps)) * ending_time_base, "r-", label="dynamic t[s]")
-ln3 = ax1.plot(steps, residuals, "b-", label="static residual")
+ln2 = ax.plot(steps, np.ones(len(steps)) * ENDING_TIME_BASE, "r-", label="dynamic t[s]")
+ln3 = ax1.plot(steps, residuals, "b-", label="static residual")  # type: ignore
 ln4 = ax.plot(
-    steps, np.ones(len(steps)) * residual_base, "y-", label="dynamic residual"
+    steps, np.ones(len(steps)) * RESIDUAL_BASE, "y-", label="dynamic residual"
 )
 ax.set_xlabel("# steps")
 ax.set_ylabel("t[s]")
 ax1.set_ylabel("residual")
 lns = ln1 + ln2 + ln3 + ln4
-labels = [l.get_label() for l in lns]
+labels = [ln.get_label() for ln in lns]
 plt.title("network: " + network_name + ", # vessels: " + str(N))
 plt.legend(lns, labels, loc="center right")
 plt.tight_layout()
+
+# Save the plot as a PDF file
 plt.savefig(r_folder + "/steps_opt_" + network_name + ".pdf")
 plt.close()
