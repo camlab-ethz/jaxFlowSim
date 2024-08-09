@@ -178,11 +178,11 @@ def logp(y, r, sigma):
         float: Log-probability of the observed data given the model parameters.
     """
     y_hat = SIM_LOOP_WRAPPER_JIT(r)  # pylint: disable=E1102
-    logp = jnp.mean(
+    log_prob = jnp.mean(
         jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc=0, scale=sigma)
     )
-    jax.debug.print("L = {x}", x=logp)
-    return logp
+    jax.debug.print("L = {x}", x=log_prob)
+    return log_prob
 
 
 def model(p_obs, sigma, scale, r_scale):
