@@ -1,6 +1,91 @@
 # jaxFlowSim
 
-This code was written during the course of the thesis "On differentiable simulations of haemodynamic systems" and the corresponding document can be found [here](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function). It offers the ability to parse models, run models, and infer parameters.
+jaxFlowSim is a differentiable 1D-haemodynamics solver. The repo is split into demos, parsing scripts, plotting scripts, a results folder, the source code, and test scripts. Check below for more on each of these.
+
+The depencies can be installed by running
+```
+pip install -r dependencies.txt
+```
+or 
+```
+pip install -r dependencies_gpu.txt
+```
+for installing a gpu enabled JAX.
+
+This code was written during the course of the thesis "On differentiable simulations of haemodynamic systems" and the corresponding document can be found [here](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function).
+
+## Demos
+
+The subdirectory demos contains different scripts that can be used to run the differentiable solver, perform parameter inference and do other miscellaneous tasks. There are the following scripts:
+
+### compare_inference_optax.py
+
+This script compares output from different parameter inference setups that were prepared using the optax library. The script can be run by simply executing:
+
+```
+python compare_inferece_optax.py
+```
+### probe_potential_surface.py
+
+This script plots the derivative and value of the loss function used to perform inference on a resistance parameter of a single bifurcation. The script can be run by simply executing:
+```
+python probe_potential_surface.py
+```
+The bash script probe_potential_surface.sh also allows to run this script in parallel in different ranges of the resistance parameter.
+
+### run_inference_numpyro.py
+
+Infers the resistance parameter of a bifurcation using the NUTS HMC variant provided by the numpyro library. The script can be run by simply executing:
+
+```
+python run_inference_nunmpyro.py
+```
+The bash script run_inference_numpyro.sh also allows to run this script in parallel in different ranges of the resistance parameter.
+### run_inference_optax.py
+
+Infers the resistance parameter of a bifurcation using optimizers provided by the optax library. The script can be run by simply executing:
+
+```
+python run_inference_optax.py
+```
+The bash script run_inference_optax.sh also allows to run this script in parallel in different ranges of the resistance parameter.
+
+### run_model_unsafe.py
+Run a model without convergence checks. Ths script can be run by executing:
+```
+python run_model_unsafe.py <modelname>
+```
+
+### run_model.py
+Run a model with convergence checks. This script can be run by executing:
+```
+python run_model.py <modelname>
+```
+
+### run_SA_unsafe.py
+Run a sensitivity analysis on a the parameters of a bifurcation using simulations without convergence checks. This script can be run by executing:
+```
+python run_SA_unsafe.py
+```
+
+### scaling.py
+Make plots of how the runtime scales for different sizes of models. This script can be run by executing:
+```
+python scaling.py
+```
+
+### steps_opt.py
+Optimize the fixed numer of time steps to simulate for when not using convergence checks. This script can be run by executing:
+```
+python steps_opt.py
+```
+
+### varied_outlet_params.py
+Show how output varies for different output parameters of a bifurcation. This script can be run by executing:
+```
+python varied_outlet_params.py
+```
+
 
 ## Parsing
 
@@ -10,36 +95,26 @@ The parsing scripts can be found in the *parsing* folder. Models can be parsed f
 python parse_vm.py <model_name>
 ```
 
-The second format that can be parsed is the format used in the [openBF-hub repository](https://github.com/alemelis/openBF-hub). In order to parse these models the repository need to be cloned in to the *parsing* folder. Then the models can be parsed by running
-
+The second format that can be parsed is the format used in the [openBF-hub repository](https://github.com/alemelis/openBF-hub). In order to parse these models the repository need to be cloned in to the *parsing* folder. Then the models can be parsed by r unning
+ 
 ```
 python parse_bf.py <model_name> <model_sub_dir>
 ```
 
 where depending on the model the *model_sub_dir* argument might not be relevant. The parsed models are all stored in the *test* folder.
 
-## Running Models
+## Plotting
 
-The parsed models can be run by executing the following command in the base directory of the *jaxFlowSim* repository
+TODO
 
-```
-python run_model.py <model_name>
-```
+## Results
 
-The results of a successfully simulated model can be found in the folder *results/<model_name>*.
+Store outputs from model simulations.
 
-## Parameter Inference
+## Source
 
-Parameter inference can be run by executing
+Source files for the simulation code.
 
-```
-python run_inference.py <model_name>
-```
+## Test
 
-in the base directory as well. We note that the inferring of a parameter in this manner is very experimental and requires that the user hand tunes the file *src/inference.py*. However by running
-
-```
-python run_inference.py 
-```
-
-without an argument the toy problem from the last section of the results chapter in the [thesis](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function) can be computed.
+TODO

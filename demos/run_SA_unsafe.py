@@ -24,7 +24,6 @@ Execution:
 """
 
 import os
-import sys
 import time
 from functools import partial
 
@@ -41,15 +40,8 @@ os.chdir(os.path.dirname(__file__))
 # Enable 64-bit precision in JAX for higher accuracy in numerical computations
 jax.config.update("jax_enable_x64", True)
 
-# Set the configuration filename based on command line arguments or default to a specific model
-CONFIG_FILENAME = ""
-if len(sys.argv) == 1:
-
-    MODELNAME = "test/adan56/adan56.yml"
-
-    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
-else:
-    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+# Set the configuration filename
+CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
 
 
 # Set verbosity flag to control logging
