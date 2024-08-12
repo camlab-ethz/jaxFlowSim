@@ -44,10 +44,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from jax import block_until_ready, jit
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop
 
 # Change directory to the script's location
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
 
 # Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
