@@ -43,10 +43,12 @@ from jax import block_until_ready, jit
 from numpyro.infer import MCMC  # type: ignore
 from numpyro.infer.reparam import TransformReparam  # type: ignore
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
 
 # Change directory to the script's location
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
+
 
 # Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
@@ -114,7 +116,10 @@ R1 = sim_dat_const[VAR_INDEX, strides[R_INDEX, 1]]
 
 # Generate a range of scaled values for R to be tested
 R_scales = np.linspace(0.5 * R1, 0.9 * R1, 16)
-R_scale = R_scales[int(sys.argv[2])]
+if len(sys.argv) > 1:
+    R_scale = R_scales[int(sys.argv[1])]
+else:
+    R_scale = R_scales[0]
 
 
 def sim_loop_wrapper(r):

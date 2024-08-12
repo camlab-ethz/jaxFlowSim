@@ -18,7 +18,7 @@ do
 	# Start a new detached screen session for each process
     # The session is named 'inference_ensemble_numpyro' followed by the process number
     # Run the Python script 'run_inference_numpyro.py' with arguments 'bifurcation' and the process number
-	screen -dmS inference_ensemble_numpyro"$i" bash -c "source .venv/bin/activate; python run_inference_nupyro.py bifurcation $i" & 
+	screen -dmS inference_ensemble_numpyro"$i" bash -c "source .venv/bin/activate; python run_inference_nupyro.py $i" & 
 
 	# Sleep for 10 seconds to prevent race conditions or resource contention
 	sleep 10;
