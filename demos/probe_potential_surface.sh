@@ -17,7 +17,7 @@ do
 	# Start a new detached screen session for each process
     # The session is named 'probe_potential_surface' followed by the process number
     # Run the Python script 'probe_potential_surface.py' with arguments 'bifurcation', the process number, and the total number of processes
-	screen -dmS probe_potential_surface"$i" bash -c "source venv/bin/activate; python probe_potential_surface.py bifurcation $i $1" & 
+	screen -dmS probe_potential_surface"$i" bash -c "source venv/bin/activate; python probe_potential_surface.py $i $1" & 
 
     # Sleep for 10 seconds to prevent race conditions or resource contention
 	sleep 10;
