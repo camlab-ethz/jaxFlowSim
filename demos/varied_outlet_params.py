@@ -14,6 +14,7 @@ The module runs simulations for three different configurations and saves the com
 """
 
 import os
+import sys
 import shutil
 from functools import partial
 
@@ -21,10 +22,11 @@ import jax
 import matplotlib.pyplot as plt
 from jax import jit
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop
 
 # Change the current working directory to the directory of this script
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
 
 # Enable 64-bit precision for JAX
 jax.config.update("jax_enable_x64", True)
@@ -60,7 +62,7 @@ sim_dat1, t1, P1 = SIM_LOOP_JIT(  # pylint: disable=E1102
     sim_dat_const,
     sim_dat_const_aux,
     timepoints,
-    conv_tol,
+    float(conv_tol),
     Ccfl,
     input_data,
     rho,
@@ -100,7 +102,7 @@ sim_dat2, t2, P2 = SIM_LOOP_JIT(  # pylint: disable=E1102
     sim_dat_const,
     sim_dat_const_aux,
     timepoints,
-    conv_tol,
+    float(conv_tol),
     Ccfl,
     input_data,
     rho,
@@ -140,7 +142,7 @@ sim_dat3, t3, P3 = SIM_LOOP_JIT(  # pylint: disable=E1102
     sim_dat_const,
     sim_dat_const_aux,
     timepoints,
-    conv_tol,
+    float(conv_tol),
     Ccfl,
     input_data,
     rho,
