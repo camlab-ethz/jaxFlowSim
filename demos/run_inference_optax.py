@@ -39,10 +39,11 @@ import optax  # type: ignore
 from flax.training.train_state import TrainState
 from jax import jit
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
 
 # Change directory to the script's location
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
 
 # Enable 64-bit precision in JAX for higher accuracy in numerical computations
 jax.config.update("jax_enable_x64", True)
@@ -188,7 +189,11 @@ for set_num, setup in enumerate(settings):
 
     # Define the model and variables for optimization
     model = sim_loop_wrapper
-    variables = [R_scales[int(sys.argv[2])]]
+    if len(sys.argv) > 1:
+        variables = [R_scales[int(sys.argv[1])]]
+    else:
+        variables = [R_scales[0]]
+
     tx = setup[0]
     y = P_obs
     x = sim_loop_wrapper
@@ -196,7 +201,7 @@ for set_num, setup in enumerate(settings):
     # Initialize the training state with the optimizer and initial variables
     state = TrainState.create(apply_fn=model, params=variables, tx=tx(setup[1]))
 
-    def loss_fn(prediction, target):
+    def loss_fn(params, target):
         """
         Compute the loss based on the difference between predictions and target values.
 
@@ -207,6 +212,7 @@ for set_num, setup in enumerate(settings):
         Returns:
             float: Computed loss value.
         """
+        prediction = sim_loop_wrapper(params)
         loss = jnp.log(
             optax.l2_loss(predictions=prediction, targets=target).mean()
             / optax.l2_loss(predictions=np.ones_like(target), targets=target).mean()
@@ -216,16 +222,16 @@ for set_num, setup in enumerate(settings):
 
     # Run the optimization loop for the specified number of epochs
     for _ in range(setup[2]):
-        grads = jax.jacfwd(loss_fn)(x, y)
+        grads = jax.jacfwd(loss_fn)(variables, y)
         # print(grads)
         state = state.apply_gradients(grads=grads)
         # print(state)
-        print(loss_fn(x, y))
+        print(loss_fn(variables, y))
 
     # Save the results of the optimization to a file
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         file.write(
-            str(R_scales[int(sys.argv[2])])
+            str(R_scales[int(sys.argv[1])])
             + " "
             + str(state.params[0])
             + "  "
