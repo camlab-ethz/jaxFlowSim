@@ -24,6 +24,7 @@ Execution:
 """
 
 import os
+import sys
 import time
 from functools import partial
 
@@ -32,10 +33,11 @@ import numpy as np
 from jax import block_until_ready, jit
 from SALib import ProblemSpec  # type: ignore
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
 
 # Change directory to the script's location
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
 
 # Enable 64-bit precision in JAX for higher accuracy in numerical computations
 jax.config.update("jax_enable_x64", True)
