@@ -38,6 +38,7 @@ Usage:
 """
 
 import os
+import sys
 import shutil
 import time
 from functools import partial
@@ -46,10 +47,11 @@ import jax
 import matplotlib.pyplot as plt
 from jax import block_until_ready, jit
 
+sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop
 
 # Change directory to the script's location
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(__file__) + "/..")
 
 # Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
@@ -125,7 +127,7 @@ for CONFIG_FILENAME in filenames:
             sim_dat_const,
             sim_dat_const_aux,
             timepoints,
-            conv_tol,
+            float(conv_tol),
             Ccfl,
             input_data,
             rho,
