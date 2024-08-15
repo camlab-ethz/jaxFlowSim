@@ -48,8 +48,11 @@ Infers the resistance parameter of a bifurcation using optimizers provided by th
 ```
 python run_inference_optax.py
 ```
-The bash script run_inference_optax.sh also allows to run this script in parallel in different ranges of the resistance parameter.
+The bash script run_inference_optax.sh also allows to run this script in parallel in different ranges of the resistance parameter:
 
+```
+./run_inference_optax.sh <num_pprocesses>
+```
 ### run_model_unsafe.py
 Run a model without convergence checks. Ths script can be run by executing:
 ```
