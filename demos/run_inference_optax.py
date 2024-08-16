@@ -147,12 +147,6 @@ def sim_loop_wrapper(params):
     return p
 
 
-# Define the folder to save the optimization results
-RESULTS_FOLDER = "results/inference_ensemble_optax"
-if not os.path.isdir(RESULTS_FOLDER):
-    os.makedirs(RESULTS_FOLDER, mode=0o777)
-
-
 # Define the hyperparameters for the network properties
 network_properties = {
     "tx": [
@@ -190,7 +184,7 @@ network_properties = {
 settings = list(itertools.product(*network_properties.values()))
 
 # Define the folder to save the optimization results
-RESULTS_FOLDER = "results/inference_ensemble_sgd"
+RESULTS_FOLDER = "results/inference_ensemble_optax"
 if not os.path.isdir(RESULTS_FOLDER):
     os.makedirs(RESULTS_FOLDER, mode=0o777)
 
@@ -254,12 +248,7 @@ for set_num, setup in enumerate(settings):
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         if len(sys.argv) > 1:
             file.write(
-                str(R1_scales[int(sys.argv[1])])
-                + " "
-                + str(state.params[0])
-                + "  "
-                + str(R1)
-                + "\n"
+                str(R1_scales[int(sys.argv[1])]) + " " + str(state.params[0]) + "\n"
             )
         else:
             file.write(
