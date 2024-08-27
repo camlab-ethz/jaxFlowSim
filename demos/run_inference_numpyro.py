@@ -143,7 +143,7 @@ def sim_loop_wrapper(r):
             B,
             sim_dat,
             sim_dat_aux,
-            sim_dat_const,
+            sim_dat_const_new,
             sim_dat_const_aux,
             Ccfl,
             input_data,
