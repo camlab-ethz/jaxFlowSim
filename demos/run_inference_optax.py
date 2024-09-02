@@ -77,6 +77,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
+
 # Record the start time if verbose mode is enabled
 if VERBOSE:
     starting_time = time.time_ns()
@@ -100,7 +101,6 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
 )
 
 # Adjust the CCFL value for the next stage of simulation
-CCFL = 0.5
 
 # Select specific indices and scales for the optimization process
 R1_INDEX = 1
@@ -123,7 +123,8 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r = params[0] * R1
+    r = jax.nn.softplus(params[0]) * R1
+    # r = params[0] * R1
     ones = jnp.ones(strides[R1_INDEX, 1] - strides[R1_INDEX, 0] + 4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[
@@ -163,19 +164,7 @@ network_properties = {
         optax.amsgrad,
     ],
     "learning_rate": [
-        1e-5,
-        1e-4,
-        1e-3,
         1e-2,
-        1e-1,
-        1,
-        1e2,
-        1e3,
-        1e4,
-        1e5,
-        1e6,
-        1e7,
-        1e8,
     ],
     "epochs": [100, 1000, 2000],
 }
@@ -184,7 +173,7 @@ network_properties = {
 settings = list(itertools.product(*network_properties.values()))
 
 # Define the folder to save the optimization results
-RESULTS_FOLDER = "results/inference_ensemble_optax"
+RESULTS_FOLDER = "results/inference_ensemble_optax_new"
 if not os.path.isdir(RESULTS_FOLDER):
     os.makedirs(RESULTS_FOLDER, mode=0o777)
 
@@ -211,7 +200,7 @@ for set_num, setup in enumerate(settings):
     if len(sys.argv) > 1:
         variables = [R1_scales[int(sys.argv[1])]]
     else:
-        variables = [R1_scales[0]]
+        variables = [0.9]  # [R1_scales[0]]
 
     tx = setup[0]
     y = P_obs
@@ -232,17 +221,22 @@ for set_num, setup in enumerate(settings):
             float: Computed loss value.
         """
         prediction = sim_loop_wrapper(params)
-        loss = jnp.log(
-            optax.l2_loss(predictions=prediction, targets=target).mean()
-            / optax.l2_loss(predictions=np.ones_like(target), targets=target).mean()
-            + 1
+        # loss = optax.l2_loss(
+        #    predictions=prediction[-10000:], targets=target[-10000:]
+        # ).mean()
+        # jax.debug.print("{x}", x=loss)
+        return jnp.mean(
+            jnp.power(jnp.linalg.norm(prediction - target, ord=None, axis=0), 2)
+            / jnp.power(jnp.linalg.norm(target, ord=None, axis=0), 2)
         )
-        return loss
+        # return loss
 
     # Run the optimization loop for the specified number of epochs
     for _ in range(setup[2]):
-        grads = jax.jacfwd(loss_fn)(variables, y)
+        grads = jax.jacfwd(loss_fn)(state.params, y)
         state = state.apply_gradients(grads=grads)
+        jax.debug.print("{x}", x=jax.nn.softplus(state.params[0]))
+        jax.debug.print("{x}", x=grads)
 
     # Save the results of the optimization to a file
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
