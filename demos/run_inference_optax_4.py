@@ -181,8 +181,8 @@ class SimDense(Module):
     def __call__(self) -> jnp.ndarray:
         Rs = self.param(
             "Rs",
-            self.kernel_init,
-            #lambda rng, shape: 0.5*jnp.ones(shape),
+            #self.kernel_init,
+            lambda rng, shape: 0.5*jnp.ones(shape),
             (4,),
         )
 
