@@ -82,6 +82,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
+UPPER = 50000
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -102,18 +103,13 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
     masks,
     strides,
     edges,
-    upper=50000,
+    upper=UPPER,
 )
 
-# Every 10757 the time resets to 0
-
-# Adjust the CCFL value for the next stage of simulation
-CCFL = 0.9
-
 # Select specific indices and scales for the optimization process
-R1_INDEX = 1
-VAR_INDEX = 7
-R1 = sim_dat_const[VAR_INDEX, strides[R1_INDEX, 1]]
+VESSEL_INDEX_1 = 1
+VAR_INDEX_1 = 7
+R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
 
 
 @compact
@@ -127,11 +123,11 @@ def sim_loop_wrapper(params, test=False):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r = params[0] * R1
-    ones = jnp.ones(strides[R1_INDEX, 1] - strides[R1_INDEX, 0] + 4)
+    r = params[0] * R1_1
+    ones = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX, strides[R1_INDEX, 0] - 2 : strides[R1_INDEX, 1] + 2  # noqa=E203
+        VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
     ].set(r * ones)
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
@@ -146,7 +142,7 @@ def sim_loop_wrapper(params, test=False):
         masks,
         strides,
         edges,
-        upper=50000,
+        upper=UPPER,
     )
     if test:
         return p, t
@@ -161,6 +157,7 @@ if not os.path.isdir(RESULTS_FOLDER):
 
 
 class SimDense(Module):
+    features: int
     kernel_init: Callable[[jax.random.PRNGKey, tuple, jnp.dtype], jnp.ndarray] = (
         uniform(2.0)
     )
@@ -189,7 +186,7 @@ class Loss(object):
         ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
 
     def __call__(self, s, s_pred):
-        return jnp.mean(self.relative_loss(s, s_pred))
+        return jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000]))
 
 
 loss = Loss()
@@ -228,7 +225,7 @@ weight_decay = 0
 seed = 0
 epochs = 10
 
-model = SimDense()
+model = SimDense(features=4)
 
 params = model.init(random.key(2))
 
