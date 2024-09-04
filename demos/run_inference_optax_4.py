@@ -83,6 +83,7 @@ VERBOSE = True
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
 UPPER = 50000
+CCFL = 0.5
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -181,8 +182,8 @@ class SimDense(Module):
     def __call__(self) -> jnp.ndarray:
         Rs = self.param(
             "Rs",
-            #self.kernel_init,
-            lambda rng, shape: 0.5*jnp.ones(shape),
+            self.kernel_init,
+            #lambda rng, shape: 0.5*jnp.ones(shape),
             (4,),
         )
 
@@ -234,12 +235,12 @@ def train_model(state, batch, num_epochs=None):
 
 
 print("Model Initialized")
-lr = 1e-1
+lr = 1e-2
 transition_steps = 1
-decay_rate = 0.8
+decay_rate = 0.999
 weight_decay = 0
 seed = 0
-epochs = 100
+epochs = 1000
 
 model = SimDense()
 
@@ -256,7 +257,7 @@ exponential_decay_scheduler = optax.exponential_decay(
 )
 
 optimizer = optax.adamw(
-    learning_rate=exponential_decay_scheduler, weight_decay=weight_decay
+    learning_rate=lr, weight_decay=weight_decay
 )
 
 model_state = train_state.TrainState.create(
