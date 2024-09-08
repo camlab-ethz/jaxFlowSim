@@ -85,6 +85,7 @@ VERBOSE = True
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
 UPPER = 50000
+Ccfl = 0.5
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -164,7 +165,9 @@ def logp(y, r, sigma):
     """
     y_hat = sim_loop_wrapper(r)  # pylint: disable=E1102
     log_prob = jnp.mean(
-        jax.scipy.stats.norm.pdf(((y - y_hat)).flatten(), loc=0, scale=sigma)
+        jax.scipy.stats.norm.pdf(
+            ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
+        )
     )
     jax.debug.print("L = {x}", x=log_prob)
     return log_prob
@@ -194,8 +197,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": np.arange(5, 6, 10),
-    "num_samples": np.arange(10, 11, 100),
+    "num_warmup": [5],
+    "num_samples": [10],
     "num_chains": [1],
 }
 
@@ -251,6 +254,35 @@ for set_num, setup in enumerate(settings):
 
     print(R)
     y = sim_loop_wrapper(R)  # pylint: disable=E1102
+
+    class Loss(object):
+
+        def __init__(self, axis=0, order=None):
+
+            super(Loss, self).__init__()
+
+            self.axis = axis
+
+            self.order = order
+
+        def select_range(self, arr, start_idx, end_idx):
+
+            length = end_idx - start_idx
+
+            return jax.lax.dynamic_slice_in_dim(arr, start_idx, length)
+
+        def relative_loss(self, s, s_pred):
+
+            return jnp.power(
+                jnp.linalg.norm(s_pred - s, ord=None, axis=self.axis), 2
+            ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
+
+        def __call__(self, s, s_pred):
+
+            return jnp.mean(self.relative_loss(s, s_pred))
+
+    loss = Loss()
+    print(loss(P_obs, y))
 
     plt.figure()
 
