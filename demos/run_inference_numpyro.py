@@ -197,8 +197,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": [5],
-    "num_samples": [10],
+    "num_warmup": [10],
+    "num_samples": [100],
     "num_chains": [1],
 }
 
