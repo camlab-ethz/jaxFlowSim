@@ -85,6 +85,7 @@ VERBOSE = True
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
 UPPER = 50000
+CCFL = 0.5
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -111,9 +112,12 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
 # Indices for selecting specific parts of the simulation data
 VESSEL_INDEX_1 = 1
 VAR_INDEX_1 = 7
-
-# Extract a specific value from the simulation data constants
+VESSEL_INDEX_2 = 2
+VAR_INDEX_2 = 8
 R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
+R2_1 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_1, 1]]
+R1_2 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_2, 1]]
+R2_2 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_2, 1]]
 
 
 def sim_loop_wrapper(params):
@@ -126,12 +130,30 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified R value.
     """
-    r = params * 0.5 * R1_1
-    ones = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
+    r1_1 = params[0] * 0.5 * R1_1
+    r2_1 = params[1] * 0.5 * R2_1
+    r1_2 = params[2] * 0.5 * R1_2
+    r2_2 = params[3] * 0.5 * R2_2
+    ones_1 = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
+    ones_2 = jnp.ones(strides[VESSEL_INDEX_2, 1] - strides[VESSEL_INDEX_2, 0] + 4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2
-    ].set(r * ones)
+        VAR_INDEX_1,
+        strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2,  # noqa=E203
+    ].set(r1_1 * ones_1)
+    sim_dat_const_new = sim_dat_const_new.at[
+        VAR_INDEX_1,
+        strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2,  # noqa=E203
+    ].set(r1_2 * ones_2)
+    sim_dat_const_new = sim_dat_const_new.at[
+        VAR_INDEX_2,
+        strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2,  # noqa=E203
+    ].set(r2_1 * ones_1)
+    sim_dat_const_new = sim_dat_const_new.at[
+        VAR_INDEX_2,
+        strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2,  # noqa=E203
+    ].set(r2_2 * ones_2)
+
     _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
@@ -180,12 +202,12 @@ def model(p_obs, sigma):
         scale (float): Scale parameter for the prior distribution.
         r_scale (float): Initial scale value for R.
     """
-    with numpyro.handlers.reparam(config={"theta": TransformReparam()}):
-        r_dist = numpyro.sample(
-            "theta",
-            dist.LogNormal(),
-        )
-    jax.debug.print("R_dist = {x}", x=r_dist)
+    r_dist = numpyro.sample(
+        "theta",
+        dist.LogNormal(),
+        sample_shape=(4, 1),
+    )
+    jax.debug.print("test: {x}", x=r_dist)
     log_density = logp(p_obs, r_dist, sigma=sigma)
     numpyro.factor("custom_logp", log_density)
 
@@ -247,9 +269,10 @@ for set_num, setup in enumerate(settings):
         setup_properties["sigma"],
     )
     mcmc.print_summary()
-    R = jnp.mean(mcmc.get_samples()["theta"])
+    R = jnp.mean(mcmc.get_samples()["theta"], axis=1)
 
     print(R)
+    print(mcmc.get_samples()["theta"].shape)
     y = sim_loop_wrapper(R)  # pylint: disable=E1102
 
     plt.figure()
@@ -261,4 +284,4 @@ for set_num, setup in enumerate(settings):
     plt.show()
 
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
-        file.write(" " + str(R) + "  " + str(R1_1) + "\n")
+        file.write(str(R) + "  " + str(R1_1) + "\n")
