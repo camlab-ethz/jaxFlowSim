@@ -1,6 +1,15 @@
 # jaxFlowSim
 
-jaxFlowSim is a differentiable 1D-haemodynamics solver. The repo is split into demos, parsing scripts, plotting scripts, a results folder, the source code, and test scripts. Check below for more on each of these.
+jaxFlowSim is a differentiable 1D-haemodynamics solver. 
+This code was written during the course of the thesis "On differentiable simulations of haemodynamic systems" and the corresponding document can be found [here](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function).
+
+
+In order to run the code install the dependencies as described in the dependencies section below. 
+To define your own network architecture you refer to the json structure section below for an example on how to define a network strucutre in  json file.
+The repo is split into demos, parsing scripts, plotting scripts, a results folder, the source code, and test scripts. Check below for more on each of these.
+
+## Dependencies
+
 
 The depencies can be installed by running
 ```
@@ -12,7 +21,55 @@ pip install -r dependencies_gpu.txt
 ```
 for installing a gpu enabled JAX.
 
-This code was written during the course of the thesis "On differentiable simulations of haemodynamic systems" and the corresponding document can be found [here](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function).
+## JSON structure
+
+```json
+proj_name: <project_name>
+blood:
+  rho: <blood density [g/L]>
+  mu: <blood viscosity [Pa*s]>
+solver:
+  Ccfl: <courant number>
+  conv_tol: <convergence tolerance>
+network:
+  - label: <name of example input vessel>
+    sn: <start node>
+    tn: <target node>
+    L: <length [m]>
+    R0: <reference radius [m]>
+    E: <Young's modulus [Pa]>
+    inlet: 1
+    inlet file: <directory of inlet file>
+    inlet number: <inlet number>
+  - label: <name of reflection output vessel>
+    sn: <start node>
+    tn: <target node>
+    L: <length [m]>
+    R0: <reference radius [m]>
+    E: <Young's modulus [Pa]>
+    Rt: <reflection coefficient>
+  - label: <name of two element windkessel output vessel>
+    sn: <start node>
+    tn: <target node>
+    L: <length [m]>
+    R0: <reference radius [m]>
+    E: <Young's modulus [Pa]>
+    outlet: 2
+    R1: <proximal resistance>
+    Cc: <compliance [m^3/Pa]>
+  - label: <name of three element windkessel output vessel>
+    sn: <start node>
+    tn: <target node>
+    L: <length [m]>
+    R0: <reference radius [m]>
+    E: <Young's modulus [Pa]>
+    outlet: 3
+    R1: <proximal resistance>
+    R2: <distal resistance>
+    Cc: <compliance [m^3/Pa]>
+...
+```
+
 
 ## Demos
 
