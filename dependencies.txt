@@ -11,4 +11,5 @@ optax
 flax
 jaxtyping
 types-PyYAML
-
+ruamel.yaml
+beautifulsoup4
