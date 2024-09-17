@@ -5,7 +5,7 @@ This code was written during the course of the thesis "On differentiable simulat
 
 
 In order to run the code install the dependencies as described in the dependencies section below. 
-To define your own network architecture please refer to the json structure section below for an example on how to define a network strucutre in  json file.
+To define your own network architecture please refer to the yml structure section below for an example on how to define a network strucutre in yml file.
 The repo is split into demos, parsing scripts, plotting scripts, a results folder, the source code, and test scripts. Check the READMEs in the corresponding directories for more on each of these.
 
 ## Dependencies
@@ -21,9 +21,9 @@ pip install -r dependencies_gpu.txt
 ```
 for installing a gpu enabled JAX.
 
-## JSON structure
+## YML structure
 
-```json
+```yml
 proj_name: <project_name>
 blood:
   rho: <blood density [g/L]>
