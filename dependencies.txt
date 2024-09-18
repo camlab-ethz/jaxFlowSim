@@ -13,3 +13,4 @@ jaxtyping
 types-PyYAML
 ruamel.yaml
 beautifulsoup4
+lxml
