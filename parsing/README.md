@@ -6,7 +6,7 @@ The parsing scripts can be found in the *parsing* folder. Models can be parsed f
 python parse_vm.py <model_name>
 ```
 
-The second format that can be parsed is the format used in the [openBF-hub repository](https://github.com/alemelis/openBF-hub). In order to parse these models the repository need to be cloned in to the *parsing* folder. Then the models can be parsed by r unning
+The second format that can be parsed is the format used in the [openBF-hub repository](https://github.com/alemelis/openBF-hub). In order to parse these models the repository need to be cloned in to the *parsing* folder. Then the models can be parsed by running
  
 ```
 python parse_bf.py <model_name> <model_sub_dir>
