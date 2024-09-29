@@ -44,13 +44,13 @@ jax.config.update("jax_enable_x64", True)
 # Set the configuration filename based on command line arguments or default to a specific model
 CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
-
-    MODELNAME = "test/adan56/adan56.yml"
-
-    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
+    MODELNAME = "adan56"
+    CONFIG_FILENAME = f"test/{MODELNAME}/{MODELNAME}.yml"
 
 else:
-    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+    MODELNAME = sys.argv[1]
+    CONFIG_FILENAME = f"test/{MODELNAME}/{MODELNAME}.yml"
+
 
 # Set verbosity flag to control logging
 VERBOSE = True
@@ -81,7 +81,7 @@ t_t = []
 p_t = []
 
 # Run the simulation multiple times to collect data
-for i in range(10):
+for i in range(1):
     if VERBOSE:
         starting_time = time.time_ns()
 
@@ -170,13 +170,7 @@ t_cycle = t_t[indices[-2] : indices[-1]]
 
 # Load reference pressure data for the first vessel
 P0_temp = np.loadtxt(
-    "/home/diego/studies/uni/thesis_maths/openBF/test/"
-    + network_name
-    + "/"
-    + network_name
-    + "_results/"
-    + vessel_names[0]
-    + "_P.last"
+    f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names[0]}_P.last"
 )
 t0 = P0_temp[:, 0] % cardiac_T
 
@@ -198,13 +192,7 @@ P_new = P_new[:-1, :]
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
     P0_temp = np.loadtxt(
-        "/home/diego/studies/uni/thesis_maths/openBF/test/"
-        + network_name
-        + "/"
-        + network_name
-        + "_results/"
-        + vessel_name
-        + "_P.last"
+        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_name}_P.last"
     )
     NODE = 2
     INDEX_JL = 1 + NODE
@@ -216,22 +204,13 @@ for i, vessel_name in enumerate(vessel_names):
 
     # Compute the relative error between the simulated and reference pressures
     res = np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
-    print(res)
 
     # Generate and save a plot comparing the simulated and reference pressures
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
     plt.title(
-        "network: "
-        + network_name
-        + ", # vessels: "
-        + str(N)
-        + ", vessel name: "
-        + vessel_names[i]
-        + ", \n relative error = |P_JAX-P_jl|/|P_jl| = "
-        + str(res)
-        + "%"
+        f"network: {network_name} # vessels: {N}, vessel name: {vessel_names[i]}, \n relative error = |P_JAX-P_jl|/|P_jl| = {res}"
     )
     # plt.title("network: " + network_name + ", vessel name: " + vessel_names_0053[i])
     # plt.title(vessel_names_0053[i])
@@ -243,12 +222,6 @@ for i, vessel_name in enumerate(vessel_names):
     plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
-        "results/"
-        + network_name
-        + "_results/"
-        + network_name
-        + "_"
-        + vessel_names[i].replace(" ", "_")
-        + "_P.pdf"
+        f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(" ", "_")}_P.pdf"
     )
     plt.close()
