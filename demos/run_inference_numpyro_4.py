@@ -210,7 +210,7 @@ def model(p_obs, sigma):
         sample_shape=(4, 1),
     )
     jax.debug.print("test: {x}", x=r_dist)
-    log_density = logp(p_obs, r_dist, sigma=sigma)
+    log_density = -logp(p_obs, r_dist, sigma=sigma)
     numpyro.factor("custom_logp", log_density)
 
 
@@ -218,8 +218,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": [10],
-    "num_samples": [100],
+    "num_warmup": [100],
+    "num_samples": [1000],
     "num_chains": [1],
 }
 

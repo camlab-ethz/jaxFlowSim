@@ -83,6 +83,7 @@ VERBOSE = True
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
 UPPER = 50000
+CCFL = 0.5
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -109,11 +110,16 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
 # Select specific indices and scales for the optimization process
 VESSEL_INDEX_1 = 1
 VAR_INDEX_1 = 7
+VESSEL_INDEX_2 = 2
+VAR_INDEX_2 = 8
 R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
+R2_1 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_1, 1]]
+R1_2 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_2, 1]]
+R2_2 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_2, 1]]
 
 
 @compact
-def sim_loop_wrapper(params):
+def sim_loop_wrapper(r1_1,r2_1):
     """
     Wrapper function for running the simulation loop with a modified parameter value.
 
@@ -123,12 +129,25 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r = params[0] * R1_1
-    ones = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
+    r1_1 = r1_1 * R1_1
+    r2_1 = r2_1 * R2_1
+    #r1_2 = r1_2 * R1_2
+    #r2_2 = r2_2 * R2_2
+    ones_1 = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
+    #ones_2 = jnp.ones(strides[VESSEL_INDEX_2, 1] - strides[VESSEL_INDEX_2, 0] + 4)
     sim_dat_const_new = jnp.array(sim_dat_const)
     sim_dat_const_new = sim_dat_const_new.at[
         VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
-    ].set(r * ones)
+    ].set(r1_1 * ones_1)
+    #sim_dat_const_new = sim_dat_const_new.at[
+    #    VAR_INDEX_2, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
+    #].set(r1_2 * ones_1)
+    sim_dat_const_new = sim_dat_const_new.at[
+        VAR_INDEX_1, strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2  # noqa=E203
+    ].set(r2_1 * ones_2)
+    #sim_dat_const_new = sim_dat_const_new.at[
+    #    VAR_INDEX_2, strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2  # noqa=E203
+    #].set(r2_2 * ones_2)
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
@@ -154,20 +173,35 @@ if not os.path.isdir(RESULTS_FOLDER):
 
 
 class SimDense(Module):
-    features: int
+    features = 4
     kernel_init: Callable[[jax.random.PRNGKey, tuple, jnp.dtype], jnp.ndarray] = (
         uniform(2.0)
     )
 
     @compact
     def __call__(self) -> jnp.ndarray:
-        R1 = self.param(
-            "R1",
-            self.kernel_init,
+        R1_1 = self.param(
+            "R1_1",
+            lambda rng, shape: 0.5*jnp.ones(shape),
+            (1,),
+        )
+        R2_1 = self.param(
+            "R2_1",
+            lambda rng, shape: 0.5*jnp.ones(shape),
+            (1,),
+        )
+        R1_2 = self.param(
+            "R1_2",
+            lambda rng, shape: 0.5*jnp.ones(shape),
+            (1,),
+        )
+        R2_2 = self.param(
+            "R2_2",
+            lambda rng, shape: 0.5*jnp.ones(shape),
             (1,),
         )
 
-        y = sim_loop_wrapper(jax.nn.softplus(R1))
+        y = sim_loop_wrapper(jax.nn.softplus(R1_1),jax.nn.softplus(R2_1),jax.nn.softplus(R1_2),jax.nn.softplus(R2_2))
         return y
 
 
@@ -200,6 +234,7 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
+    jax.debug.print("{x}", x = grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
@@ -208,7 +243,7 @@ def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
     for _epoch in bar:
         state, loss = train_step(state, batch)
-        bar.set_description(f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}")
+        bar.set_description(f"Loss: {loss}, Parameters {state.params["params"]}")
         if loss < 1e-6:
             break
     return state
@@ -220,13 +255,13 @@ transition_steps = 1
 decay_rate = 0.8
 weight_decay = 0
 seed = 0
-epochs = 10
+epochs = 100
 
-model = SimDense(features=4)
+model = SimDense()
 
 params = model.init(random.key(2))
 
-print("Initial Parameters: ", jax.nn.softplus(params["params"]["R1"]))
+print("Initial Parameters: ", params["params"])
 
 exponential_decay_scheduler = optax.exponential_decay(
     init_value=lr,
@@ -248,7 +283,7 @@ trained_model_state = train_model(model_state, P_obs, num_epochs=epochs)
 
 y = model_state.apply_fn(trained_model_state.params)
 
-print(f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["R1"])}")
+print(f"Final Loss: {loss(P_obs, y)} and Parameters: {trained_model_state.params["params"]}")
 
 plt.figure()
 plt.plot(t_obs, P_obs, "b-", label="Baseline")

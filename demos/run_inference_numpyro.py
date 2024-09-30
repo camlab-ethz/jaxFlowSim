@@ -195,7 +195,7 @@ def model(p_obs, sigma):
 
 # Define the hyperparameters for the network properties
 network_properties = {
-    "sigma": [1e-5],
+    "sigma": [1e-2],
     "scale": [10],
     "num_warmup": [10],
     "num_samples": [100],
