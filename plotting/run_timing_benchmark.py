@@ -4,7 +4,7 @@ import time
 import os
 from functools import partial
 from jax import block_until_ready, jit
-from src.model import config_simulation, simulation_loop_unsafe
+from src.model import config_simulation, simulation_loop
 
 # os.chdir(os.path.dirname(__file__))
 jax.config.update("jax_enable_x64", True)
@@ -38,22 +38,23 @@ for network_name in network_names:
     ) = config_simulation("test/" + network_name + "/" + network_name + ".yml", verbose)
 
     # warmup step
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
     sim_dat, P_t, t_t = block_until_ready(
         sim_loop_old_jit(
             N,
             B,
+            J,
             sim_dat,
             sim_dat_aux,
             sim_dat_const,
             sim_dat_const_aux,
+            timepoints,
             Ccfl,
             input_data,
             rho,
             masks,
             strides,
             edges,
-            upper=120000,
         )
     )
 
@@ -62,24 +63,24 @@ for network_name in network_names:
         if verbose:
             starting_time = time.time_ns()
 
-        sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(
-            simulation_loop_unsafe
-        )
+        sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
         sim_dat, P_t, t_t = block_until_ready(
             sim_loop_old_jit(
                 N,
                 B,
+                J,
                 sim_dat,
                 sim_dat_aux,
                 sim_dat_const,
                 sim_dat_const_aux,
+                timepoints,
+                conv_tol,
                 Ccfl,
                 input_data,
                 rho,
                 masks,
                 strides,
                 edges,
-                upper=120000,
             )
         )
 
