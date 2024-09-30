@@ -56,10 +56,11 @@ jax.config.update("jax_enable_x64", True)
 # Determine the configuration filename based on command line arguments
 CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
-    MODELNAME = "test/adan56/adan56.yml"
-    CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
+    MODELNAME = "adan56"
+    CONFIG_FILENAME = f"test/{MODELNAME}/{MODELNAME}.yml"
 else:
-    CONFIG_FILENAME = "test/" + sys.argv[1] + "/" + sys.argv[1] + ".yml"
+    MODELNAME = sys.argv[1]
+    CONFIG_FILENAME = f"test/{MODELNAME}/{MODELNAME}.yml"
 
 # Set verbosity flag to control logging
 VERBOSE = True
@@ -176,17 +177,19 @@ vessel_names_0053 = [
     "right posterior comunicating artery",
 ]
 
+vessel_names_jl = vessel_names
+if MODELNAME == "0007_H_A0_H":
+    vessel_names = vessel_names_0007
+elif MODELNAME == "0029_H_ABAO_H":
+    vessel_names = vessel_names_0029
+elif MODELNAME == "0053_H_CERE_H":
+    vessel_names = vessel_names_0053
+
 # Loop through each vessel name and compare the simulation results with reference data
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
     P0 = np.loadtxt(
-        "/home/diego/studies/uni/thesis_maths/openBF/test/"
-        + network_name
-        + "/"
-        + network_name
-        + "_results/"
-        + vessel_name
-        + "_P.last"
+        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
     )
     NODE = 2
     INDEX_JL = 1 + NODE
@@ -197,26 +200,13 @@ for i, vessel_name in enumerate(vessel_names):
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
     plt.title(
-        "network: "
-        + network_name
-        + ", # vessels: "
-        + str(N)
-        + ", vessel name: "
-        + vessel_name
-        + ", \n relative error = |P_JAX-P_jl|/|P_jl| = "
-        + str(res)
-        + "%"
+        f"network: {network_name}, # vessels: {str(N)}, vessel name: {vessel_name} , \n relative error = |P_JAX-P_jl|/|P_jl| = {str(res)}"
     )
     plt.plot(t % cardiac_T, P[:, index_jax] / 133.322)
     plt.plot(t % cardiac_T, P0 / 133.322)
+    plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
-        "results/"
-        + network_name
-        + "_results/"
-        + network_name
-        + "_"
-        + vessel_names[i].replace(" ", "_")
-        + "_P.pdf"
+        f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(" ", "_")}_P.eps"
     )
     plt.close()

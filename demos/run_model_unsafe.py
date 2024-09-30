@@ -188,11 +188,19 @@ for i in range(len(t_cycle) - 1):
 t_new = t_new[:-1]
 P_new = P_new[:-1, :]
 
+vessel_names_jl = vessel_names
+if MODELNAME == "000/_H_A0_H":
+    vessel_names = vessel_names_0007
+elif MODELNAME == "0029_H_ABAO_H":
+    vessel_names = vessel_names_0029
+elif MODELNAME == "0053_H_CERE_H":
+    vessel_names = vessel_names_0053
+
 # Loop through each vessel and compare the simulated pressure with the reference data
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
     P0_temp = np.loadtxt(
-        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_name}_P.last"
+        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
     )
     NODE = 2
     INDEX_JL = 1 + NODE
@@ -212,13 +220,8 @@ for i, vessel_name in enumerate(vessel_names):
     plt.title(
         f"network: {network_name} # vessels: {N}, vessel name: {vessel_names[i]}, \n relative error = |P_JAX-P_jl|/|P_jl| = {res}"
     )
-    # plt.title("network: " + network_name + ", vessel name: " + vessel_names_0053[i])
-    # plt.title(vessel_names_0053[i])
-    # plt.title("vessel name: " + vessel_name)
     plt.plot(t0, P0 / 133.322)
     plt.plot(t0, P1 / 133.322)
-    # plt.plot(t%cardiac_T,P[:,index_jax]/133.322)
-    # plt.plot(t0,P0/133.322)
     plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
