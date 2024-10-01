@@ -77,7 +77,7 @@ def print_conv_error(err: Float[Array, ""]):
     None
     """
     err /= 133.332
-    debug.print("error norm = {x} mmHg", x=err)
+    # debug.print("error norm = {x} mmHg", x=err)
 
 
 @jaxtyped(typechecker=typechecker)

@@ -95,6 +95,7 @@ if VERBOSE:
 
 # Set up and execute the simulation loop using JIT compilation
 SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+
 sim_dat, t, P = block_until_ready(
     SIM_LOOP_JIT(  # pylint: disable=E1102
         N,

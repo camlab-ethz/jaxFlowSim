@@ -81,9 +81,6 @@ def config_simulation(
     cardiac_t = sim_dat_const_aux[0, 0]
     ccfl = float(data["solver"]["Ccfl"])
 
-    if verbose:
-        print("start simulation")
-
     timepoints = np.linspace(0, cardiac_t, j)
 
     return (
@@ -486,10 +483,6 @@ def run_simulation_unsafe(
         _,
     ) = config_simulation(config_filename, verbose, make_results_folder_bool)
 
-    starting_time = 0.0
-    if verbose:
-        starting_time = time.time_ns()
-
     sim_loop_unsafe_jit = partial(jit, static_argnums=(0, 1, 12))(
         simulation_loop_unsafe
     )
@@ -511,9 +504,6 @@ def run_simulation_unsafe(
         )
     )
 
-    if verbose:
-        ending_time = (time.time_ns() - starting_time) / 1.0e9
-        print(f"elapsed time = {ending_time} seconds")
     return sim_dat, t, p
 
 
@@ -551,9 +541,6 @@ def run_simulation(
         _,
     ) = config_simulation(config_filename, verbose, make_results_folder_bool)
 
-    starting_time = 0
-    if verbose:
-        starting_time = time.time_ns()
     sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
     sim_dat, t, p = block_until_ready(
         sim_loop_old_jit(  # pylint: disable=E1102
@@ -574,9 +561,5 @@ def run_simulation(
             edges,
         )
     )
-
-    if verbose:
-        ending_time = (time.time_ns() - starting_time) / 1.0e9
-        print(f"elapsed time = {ending_time} seconds")
 
     return sim_dat, t, p
