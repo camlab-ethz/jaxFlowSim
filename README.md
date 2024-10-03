@@ -21,6 +21,19 @@ pip install -r dependencies_gpu.txt
 ```
 for installing a gpu enabled JAX.
 
+## Quick Start
+
+After installing the right dependiencies for your setup you can run a simulation by either defining your own network structure as demonstrated in the YML structure below or by useing one from the test directory.
+Then pass the YML file to the script run_model.py:
+
+```
+python run_model.py path/to/YML_file.yml
+```
+or if you are feeling lucky pass it to the run_model_unsafe.py script for faster but potentially inaccurate results:
+```
+python run_model_unsafe.py path/to/YML/file.yml
+```
+.
 ## YML structure
 
 ```yml
