@@ -125,7 +125,7 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r = params * R1_1
+    r = params * R1_1 * 2
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
@@ -163,7 +163,7 @@ class SimDense(Module):
         R1 = self.param(
             "R1",
             self.kernel_init,
-            (1,),
+            (),
         )
 
         y = sim_loop_wrapper(jax.nn.softplus(R1))

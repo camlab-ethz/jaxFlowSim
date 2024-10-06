@@ -129,10 +129,10 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r1_1 = params[0] * 0.5 * R1_1
-    r2_1 = params[1] * 0.5 * R2_1
-    r1_2 = params[2] * 0.5 * R1_2
-    r2_2 = params[3] * 0.5 * R2_2
+    r1_1 = params[0] * R1_1
+    r2_1 = params[1] * R2_1
+    r1_2 = params[2] * R1_2
+    r2_2 = params[3] * R2_2
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(
         r1_1
