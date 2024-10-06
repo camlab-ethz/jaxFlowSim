@@ -367,8 +367,8 @@ def build_arterial_network(network: list[dict], blood: Blood) -> tuple[
 
     sim_dat = np.zeros((5, k), dtype=np.float64)
     sim_dat_aux = np.zeros((n, 3), dtype=np.float64)
-    sim_dat_const = np.zeros((11, k), dtype=np.float64)
-    sim_dat_const_aux = np.zeros((n, 3), dtype=np.float64)
+    sim_dat_const = np.zeros((7, k), dtype=np.float64)
+    sim_dat_const_aux = np.zeros((n, 7), dtype=np.float64)
     edges = np.zeros((n, 10), dtype=np.int64)
     input_data_temp = []
     vessel_names = []
@@ -555,14 +555,10 @@ def build_vessel(
             wall_e,
             p_ext * np.ones(m),
             visc_t * np.ones(m),
-            rt * np.ones(m),
-            r1 * np.ones(m),
-            r2 * np.ones(m),
-            cc * np.ones(m),
             length * np.ones(m),
         )
     )
-    sim_dat_const_aux = np.array([cardiac_t, inlet, outlet])
+    sim_dat_const_aux = np.array([cardiac_t, inlet, outlet, rt, r1, r2, cc])
     edges = np.array([index, s_n, t_n])
     return (
         edges,

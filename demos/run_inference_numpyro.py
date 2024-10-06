@@ -111,10 +111,10 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
 
 # Indices for selecting specific parts of the simulation data
 VESSEL_INDEX_1 = 1
-VAR_INDEX_1 = 7
+VAR_INDEX_1 = 4
 
 # Extract a specific value from the simulation data constants
-R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
+R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 
 
 def sim_loop_wrapper(params):
@@ -127,19 +127,16 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified R value.
     """
-    r = params * 0.5 * R1_1
-    ones = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
-    sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2
-    ].set(r * ones)
+    r = params * R1_1
+    sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
     _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
         sim_dat_aux,
-        sim_dat_const_new,
-        sim_dat_const_aux,
+        sim_dat_const,
+        sim_dat_const_aux_new,
         Ccfl,
         input_data,
         rho,
@@ -164,7 +161,7 @@ def logp(y, r, sigma):
         float: Log-probability of the observed data given the model parameters.
     """
     y_hat = sim_loop_wrapper(r)  # pylint: disable=E1102
-    log_prob = jnp.mean(
+    log_prob = -jnp.mean(
         jax.scipy.stats.norm.pdf(
             ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
         )
@@ -197,8 +194,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-2],
     "scale": [10],
-    "num_warmup": [10],
-    "num_samples": [100],
+    "num_warmup": [100],
+    "num_samples": [1000],
     "num_chains": [1],
 }
 

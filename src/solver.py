@@ -163,10 +163,10 @@ def solve_model(
             pc = sim_dat_aux[j, 2]
             wks = jnp.array(
                 [
-                    sim_dat_const[6, end - 1],
-                    sim_dat_const[7, end - 1],
-                    sim_dat_const[8, end - 1],
-                    sim_dat_const[9, end - 1],
+                    sim_dat_const_aux[j, 3],
+                    sim_dat_const_aux[j, 4],
+                    sim_dat_const_aux[j, 5],
+                    sim_dat_const_aux[j, 6],
                 ]
             )
             u, q, a, c, pl, pc = set_outlet_bc(

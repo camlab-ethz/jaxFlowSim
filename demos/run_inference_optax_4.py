@@ -107,15 +107,15 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
     upper=UPPER,
 )
 
-# Select specific indices and scales for the optimization process
+# Indices for selecting specific parts of the simulation data
 VESSEL_INDEX_1 = 1
-VAR_INDEX_1 = 7
+VAR_INDEX_1 = 4
 VESSEL_INDEX_2 = 2
-VAR_INDEX_2 = 8
-R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
-R2_1 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_1, 1]]
-R1_2 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_2, 1]]
-R2_2 = sim_dat_const[VAR_INDEX_2, strides[VESSEL_INDEX_2, 1]]
+VAR_INDEX_2 = 5
+R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
+R2_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_2]
+R1_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_1]
+R2_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_2]
 
 
 @compact
@@ -129,32 +129,30 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r1_1 = params[0] * R1_1
-    r2_1 = params[1] * R2_1
-    r1_2 = params[2] * R1_2
-    r2_2 = params[3] * R2_2
-    ones_1 = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
-    ones_2 = jnp.ones(strides[VESSEL_INDEX_2, 1] - strides[VESSEL_INDEX_2, 0] + 4)
-    sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
-    ].set(r1_1 * ones_1)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_1, strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2  # noqa=E203
-    ].set(r1_2 * ones_2)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_2, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
-    ].set(r2_1 * ones_1)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_2, strides[VESSEL_INDEX_2, 0] - 2 : strides[VESSEL_INDEX_2, 1] + 2  # noqa=E203
-    ].set(r2_2 * ones_2)
+    r1_1 = params[0] * 0.5 * R1_1
+    r2_1 = params[1] * 0.5 * R2_1
+    r1_2 = params[2] * 0.5 * R1_2
+    r2_2 = params[3] * 0.5 * R2_2
+    sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(
+        r1_1
+    )
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_2].set(
+        r2_1
+    )
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_2, VAR_INDEX_1].set(
+        r1_2
+    )
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_2, VAR_INDEX_2].set(
+        r2_2
+    )
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
         sim_dat_aux,
-        sim_dat_const_new,
-        sim_dat_const_aux,
+        sim_dat_const,
+        sim_dat_const_aux_new,
         CCFL,
         input_data,
         rho,

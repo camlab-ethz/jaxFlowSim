@@ -106,10 +106,12 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
     upper=UPPER,
 )
 
-# Select specific indices and scales for the optimization process
+# Indices for selecting specific parts of the simulation data
 VESSEL_INDEX_1 = 1
-VAR_INDEX_1 = 7
-R1_1 = sim_dat_const[VAR_INDEX_1, strides[VESSEL_INDEX_1, 1]]
+VAR_INDEX_1 = 4
+
+# Extract a specific value from the simulation data constants
+R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 
 
 @compact
@@ -123,19 +125,16 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r = params[0] * R1_1
-    ones = jnp.ones(strides[VESSEL_INDEX_1, 1] - strides[VESSEL_INDEX_1, 0] + 4)
-    sim_dat_const_new = jnp.array(sim_dat_const)
-    sim_dat_const_new = sim_dat_const_new.at[
-        VAR_INDEX_1, strides[VESSEL_INDEX_1, 0] - 2 : strides[VESSEL_INDEX_1, 1] + 2  # noqa=E203
-    ].set(r * ones)
+    r = params * R1_1
+    sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
         sim_dat_aux,
-        sim_dat_const_new,
-        sim_dat_const_aux,
+        sim_dat_const,
+        sim_dat_const_aux_new,
         CCFL,
         input_data,
         rho,
