@@ -34,7 +34,7 @@ or if you are feeling lucky pass it to the run_model_unsafe.py script for faster
 python run_model_unsafe.py path/to/YML/file.yml
 ```
 .
-## YML structure
+## YML Structure
 
 ```yml
 proj_name: <project_name>
