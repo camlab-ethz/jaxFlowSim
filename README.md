@@ -1,3 +1,4 @@
+![](param_inference.gif)
 # jaxFlowSim
 
 jaxFlowSim is a differentiable 1D-haemodynamics solver. 
