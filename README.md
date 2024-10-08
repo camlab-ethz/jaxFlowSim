@@ -1,7 +1,7 @@
 ![](param_inference.gif)
 # jaxFlowSim
 
-jaxFlowSim is a differentiable 1D-haemodynamics solver. 
+jaxFlowSim is a differentiable 1D-haemodynamics solver. It can infer it's own parameters from data as demonstrated in the animation above. 
 This code was written during the course of the thesis "On differentiable simulations of haemodynamic systems" and the corresponding document can be found [here](https://github.com/DiegoRenner/On-fast-simulations-of-cardiac-function).
 
 
