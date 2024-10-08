@@ -24,7 +24,7 @@ for installing a gpu enabled JAX.
 
 ## Quick Start
 
-After installing the right dependiencies for your setup you can run a simulation by either defining your own network structure as demonstrated in the YML structure below or by useing one from the test directory.
+After installing the right dependiencies for your setup you can run a simulation by either defining your own network structure as demonstrated in the YML structure below or by using one from the test directory.
 Then pass the YML file to the script run_model.py:
 
 ```
