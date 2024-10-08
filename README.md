@@ -25,14 +25,15 @@ for installing a gpu enabled JAX.
 ## Quick Start
 
 After installing the right dependiencies for your setup you can run a simulation by either defining your own network structure as demonstrated in the YML structure below or by using one from the test directory.
-Then pass the YML file to the script run_model.py:
+If you define your own YML make sure to save it as test/\<modelname\>/\<modelname\>.yml.
+Then solve the network as follows:
 
 ```
-python run_model.py path/to/YML_file.yml
+python demos/run_model.py <modelname>
 ```
 or if you are feeling lucky pass it to the run_model_unsafe.py script for faster but potentially inaccurate results:
 ```
-python run_model_unsafe.py path/to/YML/file.yml
+python demos/run_model_unsafe.py <modelname>
 ```
 .
 ## YML Structure
