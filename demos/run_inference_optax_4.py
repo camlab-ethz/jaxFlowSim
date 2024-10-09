@@ -43,6 +43,7 @@ from flax.linen.initializers import uniform
 from flax.linen.module import Module, compact
 from flax.training import train_state
 from jax import jit, random
+import shutil
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe  # noqa=E402
@@ -82,7 +83,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 50000
+UPPER = 60000
 CCFL = 0.5
 
 # Record the start time if verbose mode is enabled
@@ -161,7 +162,7 @@ def sim_loop_wrapper(params):
         edges,
         upper=UPPER,
     )
-    return p
+    return p, t
 
 
 # Define the folder to save the optimization results
@@ -201,7 +202,7 @@ class Loss(object):
         ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
 
     def __call__(self, s, s_pred):
-        return jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000]))
+        return jnp.log(jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000])))
 
 
 loss = Loss()
@@ -210,7 +211,7 @@ loss = Loss()
 def calculate_loss_train(state, params, batch):
     s = batch
     s_pred = state.apply_fn(params)
-    loss_value = loss(s, s_pred)
+    loss_value = loss(s, s_pred[0])
     return loss_value
 
 
@@ -218,24 +219,71 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
+    jax.debug.print("{x}", x = grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
 
+# Define the folder to save the results
+R_FOLDER = "results/inference_optax_4"
+
+# Delete the existing results folder if it exists, and create a new one
+if os.path.isdir(R_FOLDER):
+    shutil.rmtree(R_FOLDER)
+
+os.makedirs(R_FOLDER, mode=0o777)
 def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
-    for _epoch in bar:
+    params = jax.nn.softplus(state.params["params"]["Rs"])
+    fig = plt.figure()
+    p, t = sim_loop_wrapper(params)
+    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3]/133.322, label="baseline", s=0.1)
+    plt.scatter(t[-21000:], p[-21000:, -3]/133.322, label="predicted", s=0.1)
+    lgnd = plt.legend(loc='upper left')
+    lgnd.legend_handles[0]._sizes = [30]
+    lgnd.legend_handles[1]._sizes = [30]
+    plt.xlabel("t/T")
+    plt.ylabel("P [mmHg]")
+    plt.title(f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([30, 140])
+    plt.tight_layout()
+    plt.savefig(R_FOLDER + "/" + str(0) + ".pdf")
+    plt.savefig(R_FOLDER + "/" + str(0) + ".png")
+    plt.savefig(R_FOLDER + "/" + str(0) + ".jpeg")
+    plt.savefig(R_FOLDER + "/" + str(0) + ".eps")
+    plt.close()
+    for epoch in bar:
         state, loss = train_step(state, batch)
-        bar.set_description(f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["Rs"])}")
-        if loss < 1e-6:
-            break
+        params = jax.nn.softplus(state.params["params"]["Rs"])
+        bar.set_description(f"Loss: {loss}, Parameters {params}")
+        #if loss < 1e-6:
+        #    break
+        fig = plt.figure()
+        p, t = sim_loop_wrapper(params)
+        plt.scatter(t_obs[-21000:], P_obs[-21000:, -3]/133.322, label="baseline", s=0.1)
+        plt.scatter(t[-21000:], p[-21000:, -3]/133.322, label="predicted", s=0.1)
+        lgnd = plt.legend(loc='upper left')
+        lgnd.legend_handles[0]._sizes = [30]
+        lgnd.legend_handles[1]._sizes = [30]
+        plt.xlabel("t/T")
+        plt.ylabel("P [mmHg]")
+        plt.title(f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss}")
+        plt.xlim([0.0, 1.0])
+        plt.ylim([30, 140])
+        plt.tight_layout()
+        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".pdf")
+        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".png")
+        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".jpeg")
+        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".eps")
+        plt.close()
     return state
 
 
 print("Model Initialized")
 lr = 1e-2
 transition_steps = 1
-decay_rate = 0.999
+decay_rate = 0.9
 weight_decay = 0
 seed = 0
 epochs = 1000
@@ -264,7 +312,7 @@ model_state = train_state.TrainState.create(
 
 trained_model_state = train_model(model_state, P_obs, num_epochs=epochs)
 
-y = model_state.apply_fn(trained_model_state.params)
+y = model_state.apply_fn(trained_model_state.params)[0]
 
 print(f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["Rs"])}")
 
