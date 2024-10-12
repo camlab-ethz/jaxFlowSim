@@ -14,11 +14,11 @@ The repo is split into demos, parsing scripts, plotting scripts, a results folde
 
 The depencies can be installed by running
 ```
-pip install -r dependencies.txt
+pip install -r requirements.txt
 ```
 or 
 ```
-pip install -r dependencies_gpu.txt
+pip install -r requirements_gpu.txt
 ```
 for installing a gpu enabled JAX.
 
