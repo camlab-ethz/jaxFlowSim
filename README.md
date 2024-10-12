@@ -12,7 +12,7 @@ The repo is split into demos, parsing scripts, plotting scripts, a results folde
 ## Dependencies
 
 
-The depencies can be installed by running
+The requirements can be installed by running
 ```
 pip install -r requirements.txt
 ```
