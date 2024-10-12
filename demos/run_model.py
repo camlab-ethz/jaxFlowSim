@@ -42,11 +42,14 @@ from functools import partial
 import jax
 import matplotlib.pyplot as plt
 import numpy as np
+import scienceplots
+
 from jax import block_until_ready, jit
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop
 
+plt.style.use("science")
 # Change directory to the script's location
 os.chdir(os.path.dirname(__file__) + "/..")
 
@@ -201,11 +204,20 @@ for i, vessel_name in enumerate(vessel_names):
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
     plt.title(
-        f"network: {network_name}, # vessels: {str(N)}, vessel name: {vessel_name} , \n relative error = |P_JAX-P_jl|/|P_jl| = {str(res)}"
+        "network: "
+        + network_name
+        + r", \#vessels: "
+        + str(N)
+        + ", vessel name: "
+        + vessel_name
+        + ", \n"
+        + r" relative error $= |P_{JAX}-P_{jl}|/|P_{jl}| \approx "
+        + str(np.round(res, 6))
+        + "$",
     )
     plt.plot(t % cardiac_T, P[:, index_jax] / 133.322)
     plt.plot(t % cardiac_T, P0 / 133.322)
-    plt.legend(["P_JAX", "P_jl"], loc="lower right")
+    plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
         f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(" ", "_")}_P.eps"
