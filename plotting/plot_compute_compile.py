@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scienceplots
+
+plt.style.use("science")
 
 compile_time_fn = "timing_compile.txt"
 compute_time_fn = "timing_compute.txt"
@@ -48,7 +51,7 @@ print(averages_compute_time)
 fig, ax = plt.subplots()
 plt.scatter(N_segments_compile_time, averages_compile_time)
 plt.scatter(N_segments_compute_time, averages_compute_time)
-ax.set_xlabel("#segments")
+ax.set_xlabel(r"\#segments")
 ax.set_ylabel("t[s]")
 plt.title("average of compute vs compile time over 10 runs")
 plt.legend(["compile", "compute"], loc="upper left")
