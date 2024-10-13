@@ -3,9 +3,9 @@
 openBF_dir="/home/diego/studies/uni/thesis_maths/openBF/test"
 jaxFlowSim_dir="/home/diego/studies/uni/thesis_maths/jaxFlowSim"
 plotting_dir=$(pwd)
-openBF_timing_script=run_timing_benchmark.jl
-jaxFlowSim_timing_script=run_timing_benchmark.py
-plotting_script=plot_timing_benchmark.py
+openBF_timing_script=timing_benchmark.jl
+jaxFlowSim_timing_script=timing_benchmark.py
+plotting_script=plot_benchmark.py
 openBF_timing_file=timing_openBF.txt
 jaxFlowSim_timing_file=timing_jaxFlowSim.txt
 num_vessels_file=num_vessels_benchmark.txt
@@ -30,7 +30,7 @@ rm $openBF_timing_script
 cd $plotting_dir
 cp $jaxFlowSim_timing_script $jaxFlowSim_dir
 cd $jaxFlowSim_dir
-source venv/bin/activate
+source .venv/bin/activate
 python $jaxFlowSim_timing_script $samples $num_vessels_file $network_names | grep "elapsed time =" | awk '{print $4}' > "$plotting_dir/$jaxFlowSim_timing_file"
 rm $jaxFlowSim_timing_script
 cp $num_vessels_file $plotting_dir

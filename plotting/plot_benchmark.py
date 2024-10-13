@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import scienceplots
+
+plt.style.use("science")
 
 
 def main(openBF_timing_file, jaxFlowSim_timing_file, num_vessels_file, samples):
@@ -46,7 +49,7 @@ def main(openBF_timing_file, jaxFlowSim_timing_file, num_vessels_file, samples):
     plt.scatter(num_vessels, jaxFlowSim_timing_average)
 
     # Set axis labels and title
-    ax.set_xlabel("#segments")
+    ax.set_xlabel(r"\#segments")
     ax.set_ylabel("t[s]")
     plt.title("average compute time over 10 runs")
 
