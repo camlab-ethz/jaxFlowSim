@@ -36,16 +36,18 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import numpyro  # type: ignore
 import numpyro.distributions as dist  # type: ignore
 from jax import jit
 from numpyro.infer import MCMC  # type: ignore
 from numpyro.infer.reparam import TransformReparam  # type: ignore
 import matplotlib.pyplot as plt
+import scienceplots
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
+
+plt.style.use("science")
 
 # Change directory to the script's location
 os.chdir(os.path.dirname(__file__) + "/..")
@@ -130,7 +132,7 @@ def sim_loop_wrapper(params):
     r = params * R1_1
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
-    _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+    _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
@@ -145,7 +147,7 @@ def sim_loop_wrapper(params):
         edges,
         upper=UPPER,
     )
-    return p
+    return p, t
 
 
 def logp(y, r, sigma):
@@ -160,8 +162,8 @@ def logp(y, r, sigma):
     Returns:
         float: Log-probability of the observed data given the model parameters.
     """
-    y_hat = sim_loop_wrapper(r)  # pylint: disable=E1102
-    log_prob = -jnp.mean(
+    y_hat, _ = sim_loop_wrapper(r)  # pylint: disable=E1102
+    log_prob = jnp.mean(
         jax.scipy.stats.norm.pdf(
             ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
         )
@@ -194,8 +196,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-2],
     "scale": [10],
-    "num_warmup": [100],
-    "num_samples": [1000],
+    "num_warmup": [10],
+    "num_samples": [100],
     "num_chains": [1],
 }
 
@@ -250,7 +252,7 @@ for set_num, setup in enumerate(settings):
     R = jnp.mean(mcmc.get_samples()["theta"])
 
     print(R)
-    y = sim_loop_wrapper(R)  # pylint: disable=E1102
+    y, t = sim_loop_wrapper(R)  # pylint: disable=E1102
 
     class Loss(object):
 
@@ -279,15 +281,24 @@ for set_num, setup in enumerate(settings):
             return jnp.mean(self.relative_loss(s, s_pred))
 
     loss = Loss()
-    print(loss(P_obs, y))
-
-    plt.figure()
-
-    plt.plot(t_obs, P_obs, "b-")
-
-    plt.plot(t_obs, y, "r--")
-
-    plt.show()
+    loss_val = loss(P_obs, y)
+    print(loss_val)
+    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
+    plt.scatter(t[-21000:], y[-21000:, -3] / 133.322, label="predicted", s=0.1)
+    lgnd = plt.legend(loc="upper left")
+    lgnd.legend_handles[0]._sizes = [30]
+    lgnd.legend_handles[1]._sizes = [30]
+    plt.xlabel("t/T")
+    plt.ylabel("P [mmHg]")
+    plt.title(
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1] =\n{R},\nloss = {loss_val}"
+    )
+    plt.xlim([0.0, 1.0])
+    plt.ylim([30, 140])
+    plt.tight_layout()
+    plt.savefig(
+        f"{RESULTS_FOLDER}/{str(network_properties["num_warmup"][0])}_{str(network_properties["num_warmup"][0])}.pdf"
+    )
 
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         file.write(" " + str(R) + "  " + str(R1_1) + "\n")
