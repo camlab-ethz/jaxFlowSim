@@ -237,7 +237,7 @@ os.makedirs(RESULTS_FOLDER, mode=0o777)
 def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
     params = jax.nn.softplus(state.params["params"]["Rs"])
-    fig = plt.figure()
+    plt.figure()
     p, t = sim_loop_wrapper(params)
     plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
     plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
@@ -252,10 +252,10 @@ def train_model(state, batch, num_epochs=None):
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
     plt.tight_layout()
-    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".pdf")
-    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".png")
-    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".jpeg")
-    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".eps")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.pdf")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.png")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.jpeg")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.eps")
     plt.close()
     for epoch in bar:
         state, loss = train_step(state, batch)
@@ -263,7 +263,7 @@ def train_model(state, batch, num_epochs=None):
         bar.set_description(f"Loss: {loss}, Parameters {params}")
         # if loss < 1e-6:
         #    break
-        fig = plt.figure()
+        plt.figure()
         p, t = sim_loop_wrapper(params)
         plt.scatter(
             t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1
@@ -280,10 +280,10 @@ def train_model(state, batch, num_epochs=None):
         plt.xlim([0.0, 1.0])
         plt.ylim([30, 140])
         plt.tight_layout()
-        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".pdf")
-        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".png")
-        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".jpeg")
-        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".eps")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.pdf")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.png")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.jpeg")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.eps")
         plt.close()
     return state
 
