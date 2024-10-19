@@ -44,10 +44,12 @@ from flax.linen.module import Module, compact
 from flax.training import train_state
 from jax import jit, random
 import shutil
+import scienceplots
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe  # noqa=E402
 
+plt.style.use("science")
 # Change directory to the script's location
 os.chdir(os.path.dirname(__file__) + "/..")
 
