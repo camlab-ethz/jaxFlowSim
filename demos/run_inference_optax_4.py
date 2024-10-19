@@ -182,7 +182,7 @@ class SimDense(Module):
         Rs = self.param(
             "Rs",
             self.kernel_init,
-            #lambda rng, shape: 0.5*jnp.ones(shape),
+            # lambda rng, shape: 0.5*jnp.ones(shape),
             (4,),
         )
 
@@ -219,63 +219,71 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
-    jax.debug.print("{x}", x = grads)
+    jax.debug.print("{x}", x=grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
 
 # Define the folder to save the results
-R_FOLDER = "results/inference_optax_4"
+RESULTS_FOLDER = "results/inference_optax_4"
 
 # Delete the existing results folder if it exists, and create a new one
-if os.path.isdir(R_FOLDER):
-    shutil.rmtree(R_FOLDER)
+if os.path.isdir(RESULTS_FOLDER):
+    shutil.rmtree(RESULTS_FOLDER)
 
-os.makedirs(R_FOLDER, mode=0o777)
+os.makedirs(RESULTS_FOLDER, mode=0o777)
+
+
 def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
     params = jax.nn.softplus(state.params["params"]["Rs"])
     fig = plt.figure()
     p, t = sim_loop_wrapper(params)
-    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3]/133.322, label="baseline", s=0.1)
-    plt.scatter(t[-21000:], p[-21000:, -3]/133.322, label="predicted", s=0.1)
-    lgnd = plt.legend(loc='upper left')
+    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
+    plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+    lgnd = plt.legend(loc="upper left")
     lgnd.legend_handles[0]._sizes = [30]
     lgnd.legend_handles[1]._sizes = [30]
     plt.xlabel("t/T")
     plt.ylabel("P [mmHg]")
-    plt.title(f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}")
+    plt.title(
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}"
+    )
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
     plt.tight_layout()
-    plt.savefig(R_FOLDER + "/" + str(0) + ".pdf")
-    plt.savefig(R_FOLDER + "/" + str(0) + ".png")
-    plt.savefig(R_FOLDER + "/" + str(0) + ".jpeg")
-    plt.savefig(R_FOLDER + "/" + str(0) + ".eps")
+    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".pdf")
+    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".png")
+    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".jpeg")
+    plt.savefig(RESULTS_FOLDER + "/" + str(0) + ".eps")
     plt.close()
     for epoch in bar:
         state, loss = train_step(state, batch)
         params = jax.nn.softplus(state.params["params"]["Rs"])
         bar.set_description(f"Loss: {loss}, Parameters {params}")
-        #if loss < 1e-6:
+        # if loss < 1e-6:
         #    break
         fig = plt.figure()
         p, t = sim_loop_wrapper(params)
-        plt.scatter(t_obs[-21000:], P_obs[-21000:, -3]/133.322, label="baseline", s=0.1)
-        plt.scatter(t[-21000:], p[-21000:, -3]/133.322, label="predicted", s=0.1)
-        lgnd = plt.legend(loc='upper left')
+        plt.scatter(
+            t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1
+        )
+        plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+        lgnd = plt.legend(loc="upper left")
         lgnd.legend_handles[0]._sizes = [30]
         lgnd.legend_handles[1]._sizes = [30]
         plt.xlabel("t/T")
         plt.ylabel("P [mmHg]")
-        plt.title(f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss}")
+        plt.title(
+            f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss}"
+        )
         plt.xlim([0.0, 1.0])
         plt.ylim([30, 140])
         plt.tight_layout()
-        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".pdf")
-        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".png")
-        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".jpeg")
-        plt.savefig(R_FOLDER + "/" + str(epoch+1) + ".eps")
+        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".pdf")
+        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".png")
+        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".jpeg")
+        plt.savefig(RESULTS_FOLDER + "/" + str(epoch + 1) + ".eps")
         plt.close()
     return state
 
@@ -302,9 +310,7 @@ exponential_decay_scheduler = optax.exponential_decay(
     staircase=False,
 )
 
-optimizer = optax.adamw(
-    learning_rate=lr, weight_decay=weight_decay
-)
+optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
 
 model_state = train_state.TrainState.create(
     apply_fn=model.apply, params=params, tx=optimizer
@@ -314,7 +320,9 @@ trained_model_state = train_model(model_state, P_obs, num_epochs=epochs)
 
 y = model_state.apply_fn(trained_model_state.params)[0]
 
-print(f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["Rs"])}")
+print(
+    f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["Rs"])}"
+)
 
 plt.figure()
 plt.plot(t_obs, P_obs, "b-", label="Baseline")
