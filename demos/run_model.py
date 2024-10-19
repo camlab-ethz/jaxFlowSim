@@ -190,8 +190,7 @@ elif MODELNAME == "0053_H_CERE_H":
     vessel_names = vessel_names_0053
 
 # Loop through each vessel name and compare the simulation results with reference data
-for i, vessel_name in enumerate(vessel_names):
-    index_vessel_name = vessel_names.index(vessel_name)
+for index_vessel_name, vessel_name in enumerate(vessel_names):
     P0 = np.loadtxt(
         f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
     )
@@ -220,6 +219,6 @@ for i, vessel_name in enumerate(vessel_names):
     plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
-        f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(" ", "_")}_P.eps"
+        f"results/{network_name}_results/{network_name}_{vessel_names[index_vessel_name].replace(" ", "_")}_P.eps"
     )
     plt.close()
