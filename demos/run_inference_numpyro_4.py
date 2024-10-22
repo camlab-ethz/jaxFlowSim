@@ -148,7 +148,7 @@ def sim_loop_wrapper(params):
         r2_2
     )
 
-    _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+    _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
@@ -163,7 +163,7 @@ def sim_loop_wrapper(params):
         edges,
         upper=UPPER,
     )
-    return p
+    return p, t
 
 
 def logp(y, r, sigma):
@@ -178,7 +178,7 @@ def logp(y, r, sigma):
     Returns:
         float: Log-probability of the observed data given the model parameters.
     """
-    y_hat = sim_loop_wrapper(r)  # pylint: disable=E1102
+    y_hat, _ = sim_loop_wrapper(r)  # pylint: disable=E1102
     log_prob = jnp.mean(
         jax.scipy.stats.norm.pdf(
             ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
@@ -212,8 +212,8 @@ def model(p_obs, sigma):
 network_properties = {
     "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": [100],
-    "num_samples": [1000],
+    "num_warmup": [10, 20, 50, 100],
+    "num_samples": [100, 200, 500, 1000],
     "num_chains": [1],
 }
 
@@ -259,11 +259,13 @@ for set_num, setup in enumerate(settings):
         num_warmup=setup_properties["num_warmup"],
         num_chains=setup_properties["num_chains"],
     )
+    starting_time = time.time_ns()
     mcmc.run(
         jax.random.PRNGKey(3450),
         P_obs,
         setup_properties["sigma"],
     )
+    total_time = (time.time_ns() - starting_time) / 1.0e9
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["theta"], axis=0).flatten()
 
@@ -297,16 +299,26 @@ for set_num, setup in enumerate(settings):
 
     print(R)
     print(mcmc.get_samples()["theta"].shape)
-    y = sim_loop_wrapper(R)  # pylint: disable=E1102
-    print(loss(P_obs, y))
-
-    plt.figure()
-
-    plt.plot(t_obs, P_obs, "b-")
-
-    plt.plot(t_obs, y, "r--")
-
-    plt.show()
+    y, t = sim_loop_wrapper(R)  # pylint: disable=E1102
+    loss_val = loss(P_obs, y)
+    print(loss_val)
+    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
+    plt.scatter(t[-21000:], y[-21000:, -3] / 133.322, label="predicted", s=0.1)
+    lgnd = plt.legend(loc="upper left")
+    lgnd.legend_handles[0]._sizes = [30]
+    lgnd.legend_handles[1]._sizes = [30]
+    plt.xlabel("t/T")
+    plt.ylabel("P [mmHg]")
+    plt.title(
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {R},\nlog-likelihood = {loss_val}, \nwallclock time = {total_time}"
+    )
+    plt.xlim([0.0, 1.0])
+    plt.ylim([30, 140])
+    plt.tight_layout()
+    plt.savefig(
+        f"{RESULTS_FOLDER}/numpyro_4_{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.pdf"
+    )
+    plt.close()
 
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         file.write(str(R) + "  " + str(R1_1) + "\n")
