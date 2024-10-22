@@ -89,9 +89,6 @@ VERBOSE = True
 UPPER = 50000
 Ccfl = 0.5
 
-# Record the start time if verbose mode is enabled
-if VERBOSE:
-    starting_time = time.time_ns()
 
 # Set up and execute the simulation loop using JIT compilation
 SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
@@ -194,10 +191,10 @@ def model(p_obs, sigma):
 
 # Define the hyperparameters for the network properties
 network_properties = {
-    "sigma": [1e-2],
+    "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": [10],
-    "num_samples": [100],
+    "num_warmup": [4, 10, 20, 50, 100],
+    "num_samples": [4, 100, 200, 500, 1000],
     "num_chains": [1],
 }
 
@@ -243,11 +240,14 @@ for set_num, setup in enumerate(settings):
         num_warmup=setup_properties["num_warmup"],
         num_chains=setup_properties["num_chains"],
     )
+    # Record the start time if verbose mode is enabled
+    starting_time = time.time_ns()
     mcmc.run(
         jax.random.PRNGKey(3450),
         P_obs,
         setup_properties["sigma"],
     )
+    total_time = (time.time_ns() - starting_time) / 1.0e9
     mcmc.print_summary()
     R = jnp.mean(mcmc.get_samples()["theta"])
 
@@ -291,14 +291,15 @@ for set_num, setup in enumerate(settings):
     plt.xlabel("t/T")
     plt.ylabel("P [mmHg]")
     plt.title(
-        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1] =\n{R},\nloss = {loss_val}"
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\nR1_1 = {R},\nlog-likelihood = {loss_val}, \nwallclock time = {total_time}"
     )
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
     plt.tight_layout()
     plt.savefig(
-        f"{RESULTS_FOLDER}/{str(network_properties["num_warmup"][0])}_{str(network_properties["num_warmup"][0])}.pdf"
+        f"{RESULTS_FOLDER}/numpyro_1_{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.pdf"
     )
+    plt.close()
 
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         file.write(" " + str(R) + "  " + str(R1_1) + "\n")
