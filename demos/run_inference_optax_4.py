@@ -168,7 +168,7 @@ def sim_loop_wrapper(params):
 
 
 # Define the folder to save the optimization results
-RESULTS_FOLDER = "results/inference_ensemble_optax"
+RESULTS_FOLDER = "results/inference_optax_4"
 if not os.path.isdir(RESULTS_FOLDER):
     os.makedirs(RESULTS_FOLDER, mode=0o777)
 
@@ -225,9 +225,6 @@ def train_step(state, batch):
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
-
-# Define the folder to save the results
-RESULTS_FOLDER = "results/inference_optax_4"
 
 # Delete the existing results folder if it exists, and create a new one
 if os.path.isdir(RESULTS_FOLDER):
