@@ -82,7 +82,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 50000
+UPPER = 60000
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -143,11 +143,11 @@ def sim_loop_wrapper(params):
         edges,
         upper=UPPER,
     )
-    return p
+    return p, t
 
 
 # Define the folder to save the optimization results
-RESULTS_FOLDER = "results/inference_ensemble_optax"
+RESULTS_FOLDER = "results/inference_optax_1"
 if not os.path.isdir(RESULTS_FOLDER):
     os.makedirs(RESULTS_FOLDER, mode=0o777)
 
@@ -166,7 +166,7 @@ class SimDense(Module):
             (),
         )
 
-        y = sim_loop_wrapper(jax.nn.softplus(R1))
+        y, _ = sim_loop_wrapper(jax.nn.softplus(R1))
         return y
 
 
@@ -182,7 +182,7 @@ class Loss(object):
         ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
 
     def __call__(self, s, s_pred):
-        return jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000]))
+        return jnp.log(jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000])))
 
 
 loss = Loss()
@@ -199,18 +199,63 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
-    jax.debug.print("grads={x}", x = grads)
+    jax.debug.print("grads={x}", x=grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
 
 def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
-    for _epoch in bar:
+    params = jax.nn.softplus(state.params["params"]["R1"])
+    plt.figure()
+    p, t = sim_loop_wrapper(params)
+    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
+    plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+    lgnd = plt.legend(loc="upper left")
+    lgnd.legend_handles[0]._sizes = [30]
+    lgnd.legend_handles[1]._sizes = [30]
+    plt.xlabel("t/T")
+    plt.ylabel("P [mmHg]")
+    plt.title(
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}"
+    )
+    plt.xlim([0.0, 1.0])
+    plt.ylim([30, 140])
+    plt.tight_layout()
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.pdf")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.png")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.jpeg")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.eps")
+    plt.close()
+    for epoch in bar:
         state, loss = train_step(state, batch)
-        bar.set_description(f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}")
+        bar.set_description(
+            f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}"
+        )
         if loss < 1e-6:
             break
+        plt.figure()
+        p, t = sim_loop_wrapper(params)
+        plt.scatter(
+            t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1
+        )
+        plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+        lgnd = plt.legend(loc="upper left")
+        lgnd.legend_handles[0]._sizes = [30]
+        lgnd.legend_handles[1]._sizes = [30]
+        plt.xlabel("t/T")
+        plt.ylabel("P [mmHg]")
+        plt.title(
+            f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss}"
+        )
+        plt.xlim([0.0, 1.0])
+        plt.ylim([30, 140])
+        plt.tight_layout()
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.pdf")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.png")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.jpeg")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.eps")
+        plt.close()
     return state
 
 
@@ -248,7 +293,9 @@ trained_model_state = train_model(model_state, P_obs, num_epochs=epochs)
 
 y = model_state.apply_fn(trained_model_state.params)
 
-print(f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["R1"])}")
+print(
+    f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["R1"])}"
+)
 
 plt.figure()
 plt.plot(t_obs, P_obs, "b-", label="Baseline")
