@@ -188,7 +188,7 @@ class SimDense(Module):
             (4,),
         )
 
-        y = sim_loop_wrapper(jax.nn.softplus(Rs))
+        y, _ = sim_loop_wrapper(jax.nn.softplus(Rs))
         return y
 
 
@@ -213,7 +213,7 @@ loss = Loss()
 def calculate_loss_train(state, params, batch):
     s = batch
     s_pred = state.apply_fn(params)
-    loss_value = loss(s, s_pred[0])
+    loss_value = loss(s, s_pred)
     return loss_value
 
 
@@ -221,7 +221,6 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
-    jax.debug.print("{x}", x=grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 

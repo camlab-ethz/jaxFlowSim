@@ -82,7 +82,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 60000
+UPPER = 56550
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:
@@ -199,7 +199,6 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
-    jax.debug.print("grads={x}", x=grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
@@ -209,15 +208,15 @@ def train_model(state, batch, num_epochs=None):
     params = jax.nn.softplus(state.params["params"]["R1"])
     plt.figure()
     p, t = sim_loop_wrapper(params)
-    plt.scatter(t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1)
-    plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+    plt.scatter(t_obs[-12000:], P_obs[-12000:, -3] / 133.322, label="baseline", s=0.1)
+    plt.scatter(t[-12000:], p[-12000:, -3] / 133.322, label="predicted", s=0.1)
     lgnd = plt.legend(loc="upper left")
     lgnd.legend_handles[0]._sizes = [30]
     lgnd.legend_handles[1]._sizes = [30]
     plt.xlabel("t/T")
     plt.ylabel("P [mmHg]")
     plt.title(
-        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}"
+        f"learning scaled Windkessel resistance parameter of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}"
     )
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
@@ -229,24 +228,25 @@ def train_model(state, batch, num_epochs=None):
     plt.close()
     for epoch in bar:
         state, loss = train_step(state, batch)
+        params = jax.nn.softplus(state.params["params"]["R1"])
         bar.set_description(
             f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}"
         )
-        if loss < 1e-6:
-            break
+        # if loss < 1e-6:
+        #     break
         plt.figure()
         p, t = sim_loop_wrapper(params)
         plt.scatter(
-            t_obs[-21000:], P_obs[-21000:, -3] / 133.322, label="baseline", s=0.1
+            t_obs[-12000:], P_obs[-12000:, -3] / 133.322, label="baseline", s=0.1
         )
-        plt.scatter(t[-21000:], p[-21000:, -3] / 133.322, label="predicted", s=0.1)
+        plt.scatter(t[-12000:], p[-12000:, -3] / 133.322, label="predicted", s=0.1)
         lgnd = plt.legend(loc="upper left")
         lgnd.legend_handles[0]._sizes = [30]
         lgnd.legend_handles[1]._sizes = [30]
         plt.xlabel("t/T")
         plt.ylabel("P [mmHg]")
         plt.title(
-            f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss}"
+            f"learning scaled Windkessel resistance parameters of a bifurcation:\nR1 = {params},\nloss = {loss}"
         )
         plt.xlim([0.0, 1.0])
         plt.ylim([30, 140])
@@ -262,10 +262,10 @@ def train_model(state, batch, num_epochs=None):
 print("Model Initialized")
 lr = 1e-1
 transition_steps = 1
-decay_rate = 0.8
+decay_rate = 0.9
 weight_decay = 0
 seed = 0
-epochs = 10
+epochs = 1000
 
 model = SimDense(features=4)
 
