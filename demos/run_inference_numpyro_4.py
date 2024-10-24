@@ -84,7 +84,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 50000
+UPPER = 60000
 Ccfl = 0.5
 
 # Record the start time if verbose mode is enabled
@@ -221,7 +221,7 @@ network_properties = {
 settings = list(itertools.product(*network_properties.values()))  # type: ignore
 
 # Define the folder to save the inference results
-RESULTS_FOLDER = "results/inference_ensemble"
+RESULTS_FOLDER = "results/inference_numpyro_4"
 if not os.path.isdir(RESULTS_FOLDER):
     os.makedirs(RESULTS_FOLDER, mode=0o777)
 
@@ -310,7 +310,7 @@ for set_num, setup in enumerate(settings):
     plt.xlabel("t/T")
     plt.ylabel("P [mmHg]")
     plt.title(
-        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {R},\nlog-likelihood = {loss_val}, \nwallclock time = {total_time}"
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {R},\nloss = {loss_val}, \nwallclock time = {total_time}"
     )
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
