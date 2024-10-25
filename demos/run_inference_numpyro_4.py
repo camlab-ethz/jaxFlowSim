@@ -181,10 +181,11 @@ def logp(y, r, sigma):
     y_hat, _ = sim_loop_wrapper(r)  # pylint: disable=E1102
     log_prob = jnp.mean(
         jax.scipy.stats.norm.pdf(
-            ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
+            ((y[-10000:] - y_hat[-10000:])).flatten() / y.mean(), loc=0, scale=sigma
         )
     )
-    jax.debug.print("L = {x}", x=log_prob)
+    # jax.debug.print("L = {x}", x=y[-10000:] - y_hat[-10000:] / y.mean())
+    jax.debug.print("L: {x}", x=log_prob)
     return log_prob
 
 
@@ -201,16 +202,16 @@ def model(p_obs, sigma):
     r_dist = numpyro.sample(
         "theta",
         dist.LogNormal(),
-        sample_shape=(4, 1),
+        sample_shape=(4,),
     )
     jax.debug.print("test: {x}", x=r_dist)
-    log_density = -logp(p_obs, r_dist, sigma=sigma)
+    log_density = logp(p_obs, r_dist, sigma=sigma)
     numpyro.factor("custom_logp", log_density)
 
 
 # Define the hyperparameters for the network properties
 network_properties = {
-    "sigma": [1e-5],
+    "sigma": [1],
     "scale": [10],
     "num_warmup": [10, 20, 50, 100],
     "num_samples": [100, 200, 500, 1000],
