@@ -71,6 +71,7 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
+Ccfl = 0.5
 NUM_ITERATIONS = 1000
 SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
@@ -80,88 +81,73 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
     sim_dat_aux,
     sim_dat_const,
     sim_dat_const_aux,
-    0.5,
+    Ccfl,
     input_data,
     rho,
     masks,
     strides,
     edges,
-    120000,
+    50000,
 )
 
+# Indices for selecting specific parts of the simulation data
+VESSEL_INDEX_1 = 1
+VAR_INDEX_1 = 4
+R_INDEX = 4
 
-R_INDEX = 1
-VAR_INDEX = 7
-R1 = sim_dat_const[VAR_INDEX, strides[R_INDEX, 1]]
-TOTAL_NUM_POINTS = int(1e3)
-R_scales = np.linspace(0.1, 10, int(TOTAL_NUM_POINTS))
+# Extract a specific value from the simulation data constants
+R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 
 
-def sim_loop_wrapper(
-    r,
-    var_index,
-    r1,
-    p_obs,
-    n,
-    b,
-    m,
-    start_in,
-    sim_dat_in,
-    sim_dat_aux_in,
-    sim_dat_const_in,
-    sim_dat_const_aux_in,
-    input_data_in,
-    rho_in,
-    masks_in,
-    strides_in,
-    edges_in,
-):
+def sim_loop_wrapper(params):
     """
-    Wrapper for the simulation loop to evaluate the results.
+    Wrapper function for running the simulation loop with a modified R value.
 
     Args:
-        r: Scaling factor for the variable.
-        r1: Initial value of the variable.
-        var_index: Index of the variable in the simulation data.
-        p_obs: Observed pressure data.
-        n, b, m: Simulation parameters.
-        start_in, sim_dat_in, sim_dat_aux_in, sim_dat_const_in, sim_dat_const_aux_in, input_data_in, rho_in, masks_in, strides_in, edges_in: Simulation inputs.
+        r (float): Scaling factor for the selected simulation constant.
 
     Returns:
-        Normalized root mean square error of the pressure data.
+        Array: Pressure values from the simulation with the modified R value.
     """
-    r = r * r1
-    ones = jnp.ones(m)
-
-    sim_dat_const_new = lax.dynamic_update_slice(
-        sim_dat_const_in,
-        ((r * ones)[:, jnp.newaxis] * jnp.ones(1)[jnp.newaxis, :]).transpose(),
-        (var_index, start_in),
+    r = params * R1_1
+    sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
+    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
+    _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+        N,
+        B,
+        sim_dat,
+        sim_dat_aux,
+        sim_dat_const,
+        sim_dat_const_aux_new,
+        Ccfl,
+        input_data,
+        rho,
+        masks,
+        strides,
+        edges,
+        50000,
     )
-    _, _, p = SIM_LOOP_JIT(  # pylint: disable=E1102
-        n,
-        b,
-        sim_dat_in,
-        sim_dat_aux_in,
-        sim_dat_const_new,
-        sim_dat_const_aux_in,
-        0.5,
-        input_data_in,
-        rho_in,
-        masks_in,
-        strides_in,
-        edges_in,
-        120000,
-    )
-    return jnp.sqrt(jnp.sum(jnp.square((p - p_obs)))) / jnp.sqrt(
-        jnp.sum(jnp.square((p_obs)))
+    # return jnp.sqrt(jnp.sum(jnp.square((p - P_obs)))) / jnp.sqrt(
+    #     jnp.sum(jnp.square((P_obs)))
+    # )
+
+    # mse = jnp.sqrt(jnp.mean((p - P_obs) ** 2))
+    # normalization_factor = (
+    #     jnp.sqrt(jnp.mean(P_obs**2)) + 1e-8
+    # )  # Adding epsilon for numerical stability
+    # return jnp.log(mse / normalization_factor + 1)
+    return jnp.mean(
+        jnp.power(jnp.linalg.norm(p - P_obs, ord=None, axis=0), 2)
+        / jnp.power(jnp.linalg.norm(P_obs, ord=None, axis=0), 2)
     )
 
 
-SIM_LOOP_WRAPPER_JIT = partial(jit, static_argnums=(4, 5, 6))(sim_loop_wrapper)
-SIM_LOOP_WRAPPER_GRAD_JIT = partial(jit, static_argnums=(4, 5, 6))(
-    jacfwd(sim_loop_wrapper, 0)
-)
+TOTAL_NUM_POINTS = int(1e3)
+R_scales = np.linspace(0.8, 10, int(TOTAL_NUM_POINTS))
+
+
+SIM_LOOP_WRAPPER_JIT = partial(jit)(sim_loop_wrapper)
+SIM_LOOP_WRAPPER_GRAD_JIT = partial(jit)(jacfwd(sim_loop_wrapper, 0))
 
 RESULTS_FOLDER = "results/potential_surface"
 if not os.path.isdir(RESULTS_FOLDER):
@@ -183,75 +169,30 @@ else:
 for i in RANGE:
     RESULTS_FILE = RESULTS_FOLDER + "/potential_surface_new.txt"
     R = R_scales[i]
-    M = strides[R_INDEX, 1] - strides[R_INDEX, 0] + 4
-    start = strides[R_INDEX, 0] - 2
-    end = strides[R_INDEX, 1] + 2
-    loss = SIM_LOOP_WRAPPER_JIT(  # pylint: disable=E1102
-        R,
-        VAR_INDEX,
-        R1,
-        P_obs,
-        N,
-        B,
-        M,
-        start,
-        sim_dat,
-        sim_dat_aux,
-        sim_dat_const,
-        sim_dat_const_aux,
-        input_data,
-        rho,
-        masks,
-        strides,
-        edges,
-    )
-    sim_loop_wrapper_R = Partial(
-        SIM_LOOP_WRAPPER_JIT,
-        var_index=R_INDEX,
-        r1=R1,
-        p_obs=P_obs,
-        n=N,
-        b=B,
-        m=M,
-        start_in=start,
-        sim_dat_in=sim_dat,
-        sim_dat_aux_in=sim_dat_aux,
-        sim_dat_const_in=sim_dat_const,
-        sim_dat_const_aux_in=sim_dat_const_aux,
-        input_data_in=input_data,
-        rho_in=rho,
-        masks_in=masks,
-        strides_in=strides,
-        edges_in=edges,
-    )
+    loss = SIM_LOOP_WRAPPER_JIT(R)  # pylint: disable=E1102
 
-    M = strides[R_INDEX, 1] - strides[R_INDEX, 0] + 4
-    start = strides[R_INDEX, 0] - 2
-    end = strides[R_INDEX, 1] + 2
+    def f(x):
+        return x**2
+
     if len(sys.argv) > 1:
         gradient_index = i - int(sys.argv[1]) * slices
     else:
         gradient_index = i
-    gradients[gradient_index] = SIM_LOOP_WRAPPER_GRAD_JIT(  # pylint: disable=E1102
+    # gradients[gradient_index] = SIM_LOOP_WRAPPER_GRAD_JIT(  # pylint: disable=E1102
+    gradients[gradient_index] = jax.grad(sim_loop_wrapper)(  # pylint: disable=E1102
         R,
-        VAR_INDEX,
-        R1,
-        P_obs,
-        N,
-        B,
-        M,
-        start,
-        sim_dat,
-        sim_dat_aux,
-        sim_dat_const,
-        sim_dat_const_aux,
-        input_data,
-        rho,
-        masks,
-        strides,
-        edges,
     )
-    check_grads(sim_loop_wrapper_R, (R,), order=1, atol=1e-2, rtol=1e-2, modes="fwd")
+
+    print(jax.jvp(sim_loop_wrapper, (R,), (1.0,)))
+    print(
+        sim_loop_wrapper(
+            R,
+        )
+    )
+    # print(jax.jvp(f, (R,), (1.0,)))
+    print(R, gradients[gradient_index])
+    # check_grads(sim_loop_wrapper, (R,), order=1, atol=1e-2, rtol=1e-2, modes="fwd")
+    check_grads(sim_loop_wrapper, (R,), order=1)
 
     file = open(RESULTS_FILE, "a", encoding="utf-8")
     file.write(str(R) + " " + str(loss) + " " + str(gradients[gradient_index]) + "\n")
