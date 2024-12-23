@@ -182,7 +182,7 @@ vessel_names_0053 = [
 ]
 
 vessel_names_jl = vessel_names
-if MODELNAME == "0007_H_A0_H":
+if MODELNAME == "0007_H_AO_H":
     vessel_names = vessel_names_0007
 elif MODELNAME == "0029_H_ABAO_H":
     vessel_names = vessel_names_0029
@@ -192,7 +192,7 @@ elif MODELNAME == "0053_H_CERE_H":
 # Loop through each vessel name and compare the simulation results with reference data
 for index_vessel_name, vessel_name in enumerate(vessel_names):
     P0 = np.loadtxt(
-        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
+        f"/home/diego/studies/uni/thesis_maths/openBF_bckp/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[index_vessel_name]}_P.last"
     )
     NODE = 2
     INDEX_JL = 1 + NODE
@@ -202,23 +202,23 @@ for index_vessel_name, vessel_name in enumerate(vessel_names):
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
-    plt.title(
-        "network: "
-        + network_name
-        + r", \#vessels: "
-        + str(N)
-        + ", vessel name: "
-        + vessel_name
-        + ", \n"
-        + r" relative error $= |P_{JAX}-P_{jl}|/|P_{jl}| \approx "
-        + str(np.round(res, 6))
-        + "$",
-    )
+    # plt.title(
+    #    "network: "
+    #    + network_name
+    #    + r", \#vessels: "
+    #    + str(N)
+    #    + ", vessel name: "
+    #    + vessel_name
+    #    + ", \n"
+    #    + r" relative error $= |P_{JAX}-P_{jl}|/|P_{jl}| \approx "
+    #    + str(np.round(res, 6))
+    #    + "$",
+    # )
     plt.plot(t % cardiac_T, P[:, index_jax] / 133.322)
     plt.plot(t % cardiac_T, P0 / 133.322)
-    plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="lower right")
+    plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="upper right")
     plt.tight_layout()
     plt.savefig(
-        f"results/{network_name}_results/{network_name}_{vessel_names[index_vessel_name].replace(" ", "_")}_P.eps"
+        f"results/{network_name}_results/{network_name}_{vessel_names[index_vessel_name].replace(" ", "_")}_P_nt.eps"
     )
     plt.close()
