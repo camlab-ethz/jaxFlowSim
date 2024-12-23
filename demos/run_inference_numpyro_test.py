@@ -86,7 +86,8 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 1000
+UPPER = 60000
+Ccfl = 0.5
 
 
 # Set up and execute the simulation loop using JIT compilation
@@ -125,7 +126,7 @@ def sim_loop_wrapper(params):
     Returns:
         Array: Pressure values from the simulation with the modified R value.
     """
-    r = params * R1_1 * 2.0
+    r = params * R1_1
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
     _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
@@ -147,28 +148,30 @@ def sim_loop_wrapper(params):
 
 
 class Loss(object):
+
     def __init__(self, axis=0, order=None):
+
         super(Loss, self).__init__()
+
         self.axis = axis
+
         self.order = order
 
+    def select_range(self, arr, start_idx, end_idx):
+
+        length = end_idx - start_idx
+
+        return jax.lax.dynamic_slice_in_dim(arr, start_idx, length)
+
     def relative_loss(self, s, s_pred):
-        return jnp.log(
-            jnp.mean(
-                jnp.power(
-                    jnp.linalg.norm(
-                        s_pred[:, [-1, -6]] - s[:, [-1, -6]], ord=None, axis=self.axis
-                    ),
-                    2,
-                )
-                / jnp.power(
-                    jnp.linalg.norm(s[:, [-1, -6]], ord=None, axis=self.axis), 2
-                )
-            )
-        )
+
+        return jnp.power(
+            jnp.linalg.norm(s_pred - s, ord=None, axis=self.axis), 2
+        ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
 
     def __call__(self, s, s_pred):
-        return self.relative_loss(s, s_pred)
+
+        return jnp.log(jnp.mean(self.relative_loss(s, s_pred)))
 
 
 loss = Loss()
@@ -188,9 +191,12 @@ def logp(y, r, sigma):
     """
     y_hat, _ = sim_loop_wrapper(r)  # pylint: disable=E1102
     # log_prob = jnp.mean(
-    #    jax.scipy.stats.norm.pdf((y - y_hat).flatten(), loc=0, scale=sigma)
+    #     jax.scipy.stats.norm.pdf(
+    #         ((y[-10000:] - y_hat[-10000:])).flatten(), loc=0, scale=sigma
+    #
     # )
-    log_prob = -loss(y, y_hat)
+    log_prob = -loss(y[-10000:], y_hat[-10000:])
+    jax.debug.print("L = {x}", x=log_prob)
     return log_prob
 
 
@@ -216,10 +222,10 @@ def model(p_obs, sigma):
 
 # Define the hyperparameters for the network properties
 network_properties = {
-    "sigma": [1],
+    "sigma": [1e-5],
     "scale": [10],
-    "num_warmup": [100],
-    "num_samples": [1000],
+    "num_warmup": [4, 10, 20, 50, 100],
+    "num_samples": [4, 100, 200, 500, 1000],
     "num_chains": [1],
 }
 
@@ -260,7 +266,7 @@ for set_num, setup in enumerate(settings):
         + ".txt"
     )
     mcmc = MCMC(
-        numpyro.infer.NUTS(model, forward_mode_differentiation=False),
+        numpyro.infer.NUTS(model, forward_mode_differentiation=True),
         num_samples=setup_properties["num_samples"],
         num_warmup=setup_properties["num_warmup"],
         num_chains=setup_properties["num_chains"],

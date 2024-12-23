@@ -43,6 +43,9 @@ from flax.linen.initializers import uniform
 from flax.linen.module import Module, compact
 from flax.training import train_state
 from jax import jit, random
+import scienceplots
+
+plt.style.use("science")
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe  # noqa=E402
@@ -82,29 +85,10 @@ VERBOSE = True
     cardiac_T,
 ) = config_simulation(CONFIG_FILENAME, VERBOSE)
 
-UPPER = 56550
-
-# Record the start time if verbose mode is enabled
-if VERBOSE:
-    starting_time = time.time_ns()
+UPPER = 1000
 
 # Set up and execute the simulation loop using JIT compilation
 SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
-sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
-    N,
-    B,
-    sim_dat,
-    sim_dat_aux,
-    sim_dat_const,
-    sim_dat_const_aux,
-    CCFL,
-    input_data,
-    rho,
-    masks,
-    strides,
-    edges,
-    upper=UPPER,
-)
 
 # Indices for selecting specific parts of the simulation data
 VESSEL_INDEX_1 = 1
@@ -115,7 +99,7 @@ R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 
 
 @compact
-def sim_loop_wrapper(params):
+def sim_loop_wrapper(params, upper=UPPER):
     """
     Wrapper function for running the simulation loop with a modified parameter value.
 
@@ -128,7 +112,7 @@ def sim_loop_wrapper(params):
     r = params * R1_1 * 2
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
-    _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+    sim_dat_wrapped, t_wrapped, p_wrapped = SIM_LOOP_JIT(  # pylint: disable=E1102
         N,
         B,
         sim_dat,
@@ -141,10 +125,13 @@ def sim_loop_wrapper(params):
         masks,
         strides,
         edges,
-        upper=UPPER,
+        upper=upper,
     )
-    return p, t
+    return sim_dat_wrapped, t_wrapped, p_wrapped
 
+
+sim_dat_obs, t_obs, P_obs = sim_loop_wrapper(0.5)
+sim_dat_obs_long, t_obs_long, P_obs_long = sim_loop_wrapper(0.5, 120000)
 
 # Define the folder to save the optimization results
 RESULTS_FOLDER = "results/inference_optax_1"
@@ -166,7 +153,7 @@ class SimDense(Module):
             (),
         )
 
-        y, _ = sim_loop_wrapper(jax.nn.softplus(R1))
+        _, _, y = sim_loop_wrapper(jax.nn.softplus(R1))
         return y
 
 
@@ -177,12 +164,22 @@ class Loss(object):
         self.order = order
 
     def relative_loss(self, s, s_pred):
-        return jnp.power(
-            jnp.linalg.norm(s_pred - s, ord=None, axis=self.axis), 2
-        ) / jnp.power(jnp.linalg.norm(s, ord=None, axis=self.axis), 2)
+        return jnp.log(
+            jnp.mean(
+                jnp.power(
+                    jnp.linalg.norm(
+                        s_pred[:, [-1, -6]] - s[:, [-1, -6]], ord=None, axis=self.axis
+                    ),
+                    2,
+                )
+                / jnp.power(
+                    jnp.linalg.norm(s[:, [-1, -6]], ord=None, axis=self.axis), 2
+                )
+            )
+        )
 
     def __call__(self, s, s_pred):
-        return jnp.log(jnp.mean(self.relative_loss(s[:-10000], s_pred[:-10000])))
+        return self.relative_loss(s, s_pred)
 
 
 loss = Loss()
@@ -207,50 +204,85 @@ def train_model(state, batch, num_epochs=None):
     bar = tqdm.tqdm(np.arange(num_epochs))
     params = jax.nn.softplus(state.params["params"]["R1"])
     plt.figure()
-    p, t = sim_loop_wrapper(params)
-    plt.scatter(t_obs[-12000:], P_obs[-12000:, -3] / 133.322, label="baseline", s=0.1)
-    plt.scatter(t[-12000:], p[-12000:, -3] / 133.322, label="predicted", s=0.1)
-    lgnd = plt.legend(loc="upper left")
+    _, t, p = sim_loop_wrapper(params)
+    loss_val = loss(p, P_obs)
+    _, t, p = sim_loop_wrapper(params, upper=120000)
+    sorted_indices = np.argsort(t_obs_long[-12000:])
+    plt.plot(
+        t_obs_long[-12000:][sorted_indices],
+        P_obs_long[-12000:, -8][sorted_indices] / 133.322,
+        label="ground truth",
+        linewidth=0.5,
+    )
+    sorted_indices = np.argsort(t[-12000:])
+    plt.plot(
+        t[-12000:][sorted_indices],
+        p[-12000:, -8][sorted_indices] / 133.322,
+        label="learned",
+        linewidth=0.5,
+    )
+    lgnd = plt.legend(loc="upper right")
     lgnd.legend_handles[0]._sizes = [30]
     lgnd.legend_handles[1]._sizes = [30]
     plt.xlabel("t/T")
     plt.ylabel("P [mmHg]")
-    plt.title(
-        f"learning scaled Windkessel resistance parameter of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {1.0}"
-    )
     plt.xlim([0.0, 1.0])
     plt.ylim([30, 140])
     plt.tight_layout()
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}_nt.pdf")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}_nt.png")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}_nt.jpeg")
+    plt.savefig(f"{RESULTS_FOLDER}/{str(0)}_nt.eps")
+    plt.title(
+        f"learning scaled Windkessel resistance parameter of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] =\n{params},\nloss = {loss_val}, \n wall-clock time = {0.0}"
+    )
     plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.pdf")
     plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.png")
     plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.jpeg")
     plt.savefig(f"{RESULTS_FOLDER}/{str(0)}.eps")
     plt.close()
+    total_time = 0
     for epoch in bar:
-        state, loss = train_step(state, batch)
+        starting_time = time.time_ns()
+        state, loss_val = train_step(state, batch)
+        total_time += time.time_ns() - starting_time
         params = jax.nn.softplus(state.params["params"]["R1"])
         bar.set_description(
-            f"Loss: {loss}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}"
+            f"Loss: {loss_val}, Parameters {jax.nn.softplus(state.params["params"]["R1"])}"
         )
         # if loss < 1e-6:
         #     break
         plt.figure()
-        p, t = sim_loop_wrapper(params)
-        plt.scatter(
-            t_obs[-12000:], P_obs[-12000:, -3] / 133.322, label="baseline", s=0.1
+        _, t, p = sim_loop_wrapper(params, 120000)
+        sorted_indices = np.argsort(t_obs_long[-12000:])
+        plt.plot(
+            t_obs_long[-12000:][sorted_indices],
+            P_obs_long[-12000:, -8][sorted_indices] / 133.322,
+            label="ground truth",
+            linewidth=0.5,
         )
-        plt.scatter(t[-12000:], p[-12000:, -3] / 133.322, label="predicted", s=0.1)
-        lgnd = plt.legend(loc="upper left")
+        sorted_indices = np.argsort(t[-12000:])
+        plt.plot(
+            t[-12000:][sorted_indices],
+            p[-12000:, -8][sorted_indices] / 133.322,
+            label="learned",
+            linewidth=0.5,
+        )
+        lgnd = plt.legend(loc="upper right")
         lgnd.legend_handles[0]._sizes = [30]
         lgnd.legend_handles[1]._sizes = [30]
         plt.xlabel("t/T")
         plt.ylabel("P [mmHg]")
-        plt.title(
-            f"learning scaled Windkessel resistance parameters of a bifurcation:\nR1 = {params},\nloss = {loss}"
-        )
         plt.xlim([0.0, 1.0])
         plt.ylim([30, 140])
         plt.tight_layout()
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}_nt.pdf")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}_nt.png")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}_nt.jpeg")
+        plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}_nt.eps")
+        plt.title(
+            f"learning scaled Windkessel resistance parameters of a bifurcation:\nR1 = {params},\nloss = {loss_val}, \n wall-clock time = {total_time / 1e9}"
+        )
         plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.pdf")
         plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.png")
         plt.savefig(f"{RESULTS_FOLDER}/{str(epoch + 1)}.jpeg")
@@ -265,7 +297,7 @@ transition_steps = 1
 decay_rate = 0.9
 weight_decay = 0
 seed = 0
-epochs = 1000
+epochs = 5000
 
 model = SimDense(features=4)
 
@@ -281,9 +313,7 @@ exponential_decay_scheduler = optax.exponential_decay(
     staircase=False,
 )
 
-optimizer = optax.adamw(
-    learning_rate=exponential_decay_scheduler, weight_decay=weight_decay
-)
+optimizer = optax.adafactor(lr)
 
 model_state = train_state.TrainState.create(
     apply_fn=model.apply, params=params, tx=optimizer
