@@ -51,11 +51,11 @@ def main(openBF_timing_file, jaxFlowSim_timing_file, num_vessels_file, samples):
     # Set axis labels and title
     ax.set_xlabel(r"\#segments")
     ax.set_ylabel("t[s]")
-    plt.title("average compute time over 10 runs")
+    # plt.title("average compute time over 10 runs")
 
     # Add legend and save the plot
     plt.legend(["openBF", "jaxFlowSim"], loc="upper left")
-    plt.savefig("timing_benchmark.eps")
+    plt.savefig("timing_benchmark_nt.eps")
     plt.show()
 
 
