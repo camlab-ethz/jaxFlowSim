@@ -17,6 +17,10 @@ from jax import lax, debug
 import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped, Bool
 from typeguard import typechecked as typechecker
+import os
+import jaxtyping
+
+jaxtyping.config.update("jaxtyping_disable", os.environ.get("JAXTYPING_DISABLE", "0"))
 
 
 @jaxtyped(typechecker=typechecker)
