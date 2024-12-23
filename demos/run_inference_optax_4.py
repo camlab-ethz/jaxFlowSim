@@ -101,9 +101,6 @@ R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 R2_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_2]
 R1_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_1]
 R2_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_2]
-print(R1_1, R1_2, R2_1, R2_2)
-
-jax.debug.print("{x}", x=sim_dat_const_aux)
 
 
 @compact
@@ -117,10 +114,10 @@ def sim_loop_wrapper(params, upper=UPPER):
     Returns:
         Array: Pressure values from the simulation with the modified parameter.
     """
-    r1_1 = params[0] * R1_1
-    r2_1 = params[1] * R2_1
-    r1_2 = params[2] * R1_2
-    r2_2 = params[3] * R2_2
+    r1_1 = params[0] * R1_1 * 2
+    r2_1 = params[1] * R2_1 * 2
+    r1_2 = params[2] * R1_2 * 2
+    r2_2 = params[3] * R2_2 * 2
     sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
     sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(
         r1_1
@@ -152,9 +149,9 @@ def sim_loop_wrapper(params, upper=UPPER):
     return sim_dat_wrapped, t_wrapped, p_wrapped
 
 
-sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([1.0, 1.0, 1.0, 1.0])
+sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([0.5, 0.5, 0.5, 0.5])
 sim_dat_obs_long, t_obs_long, P_obs_long = sim_loop_wrapper(
-    [1.0, 1.0, 1.0, 1.0], 120000
+    [0.5, 0.5, 0.5, 0.5], 120000
 )
 
 # Define the folder to save the optimization results
@@ -221,7 +218,6 @@ def calculate_loss_train(state, params, batch):
 def train_step(state, batch):
     grad_fn = jax.value_and_grad(calculate_loss_train, argnums=1)
     loss_value, grads = grad_fn(state, state.params, batch)
-    jax.debug.print("{x}", x=grads)
     state = state.apply_gradients(grads=grads)
     return state, loss_value
 
@@ -316,16 +312,16 @@ def train_model(state, batch, num_epochs=None):
 
 
 print("Model Initialized")
-lr = 1e-1
+lr = 1e-2
 transition_steps = 10
 decay_rate = 0.9
 weight_decay = 0
 seed = 0
-epochs = 1000
+epochs = 5000
 
 model = SimDense()
 
-params = model.init(random.key(222))
+params = model.init(random.key(21234))
 
 print("Initial Parameters: ", jax.nn.softplus(params["params"]["Rs"]))
 
@@ -339,19 +335,7 @@ exponential_decay_scheduler = optax.exponential_decay(
 
 # optimizer = optax.adamw(learning_rate=lr, weight_decay=weight_decay)
 optimizer = optax.adafactor(lr)
-# optimizer = optax.chain(
-#    optax.clip_by_global_norm(50),
-#    optax.adam(lr),
-# )
-# optimizer = optax.multi_transform(
-#    {
-#        "1": optax.adafactor(1e-2),
-#        "2": optax.adafactor(1e-1),
-#        "3": optax.adafactor(1e-2),
-#        "4": optax.adafactor(1e-1),
-#    },
-#    ("1", "2", "3", "4"),
-# )
+
 model_state = train_state.TrainState.create(
     apply_fn=model.apply, params=params, tx=optimizer
 )

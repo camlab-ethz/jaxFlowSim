@@ -43,9 +43,6 @@ from jax import jit
 from numpyro.infer import MCMC  # type: ignore
 from numpyro.infer.reparam import TransformReparam  # type: ignore
 import matplotlib.pyplot as plt
-import scienceplots
-
-plt.style.use("science")
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
@@ -105,7 +102,7 @@ SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 VESSEL_INDEX_1 = 1
 VAR_INDEX_1 = 4
 VESSEL_INDEX_2 = 2
-VAR_INDEX_2 = 6
+VAR_INDEX_2 = 5
 R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
 R2_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_2]
 R1_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_1]
@@ -158,9 +155,9 @@ def sim_loop_wrapper(params, upper=UPPER):
     return sim_dat_wrapped, t_wrapped, p_wrapped
 
 
-sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([0.5, 0.5, 0.5, 0.5])
+sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([1.0, 1.0, 1.0, 1.0])
 sim_dat_obs_long, t_obs_long, P_obs_long = sim_loop_wrapper(
-    [0.5, 0.5, 0.5, 0.5], upper=120000
+    [1.0, 1.0, 1.0, 1.0], upper=120000
 )
 
 
@@ -201,20 +198,20 @@ def logp(y, r, sigma):
         float: Log-probability of the observed data given the model parameters.
     """
     _, _, y_hat = sim_loop_wrapper(jax.nn.softplus(r))  # pylint: disable=E1102
-    # log_prob = jnp.log(
-    #    jnp.mean(
-    #        jnp.linalg.norm(
-    #            jax.scipy.stats.norm.pdf(
-    #                ((y - y_hat)) / y.mean(axis=0),
-    #                loc=0,
-    #                scale=sigma,
-    #            ),
-    #            axis=0,
-    #        )
-    #    )
-    # )
+    log_prob = jnp.log(
+        jnp.mean(
+            jnp.linalg.norm(
+                jax.scipy.stats.norm.pdf(
+                    ((y - y_hat)) / y.mean(axis=0),
+                    loc=0,
+                    scale=sigma,
+                ),
+                axis=0,
+            )
+        )
+    )
     # jax.debug.print("L = {x}", x=y - y_hat / y.mean())
-    log_prob = -loss(y, y_hat)
+    # log_prob = -loss(y, y_hat)
     # jax.debug.print("L: {x}", x=log_prob)
     return log_prob
 
@@ -229,28 +226,67 @@ def model(p_obs):
         scale (float): Scale parameter for the prior distribution.
         r_scale (float): Initial scale value for R.
     """
-    r_dist = numpyro.sample(
-        "theta",
-        dist.Normal(-0.5, 0.1),
-        sample_shape=(4,),
+    # r_dist = numpyro.sample(
+    #    "theta",
+    #    dist.Normal(),
+    #    sample_shape=(4,),
+    # )
+    r_dist1 = numpyro.sample(
+        "theta1",
+        dist.TransformedDistribution(
+            dist.Normal(0, 1), numpyro.distributions.transforms.SoftplusTransform()
+        ),
     )
+    r_dist2 = numpyro.sample(
+        "theta2",
+        dist.TransformedDistribution(
+            dist.Normal(0, 1), numpyro.distributions.transforms.SoftplusTransform()
+        ),
+    )
+    r_dist3 = numpyro.sample(
+        "theta3",
+        dist.TransformedDistribution(
+            dist.Normal(0, 1), numpyro.distributions.transforms.SoftplusTransform()
+        ),
+    )
+    r_dist4 = numpyro.sample(
+        "theta4",
+        dist.TransformedDistribution(
+            dist.Normal(0, 1), numpyro.distributions.transforms.SoftplusTransform()
+        ),
+    )
+    # sigma = numpyro.sample("sigma", dist.LogNormal(10, 1))
+
     # sigma = numpyro.sample(
     #    "sigma",
-    #    dist.LogNormal(0.5),
+    #    dist.LogNormal(),
     # )
-    # jax.debug.print("test: {x}", x=jax.nn.softplus(r_dist))
-    log_density = logp(p_obs, r_dist, sigma=1)
-    numpyro.factor("custom_logp", log_density)
+    jax.debug.print("test: {x}", x=jnp.array([r_dist1, r_dist2, r_dist3, r_dist4]))
+    # log_density = logp(p_obs, r_dist, sigma=sigma)
+    # numpyro.factor("custom_logp", log_density0)
+    numpyro.sample(
+        "obs",
+        dist.Normal(
+            (
+                sim_loop_wrapper(jnp.array([r_dist1, r_dist2, r_dist3, r_dist4]))[2]
+                - p_obs
+            )
+            / jnp.mean(p_obs),
+            1,
+        ),
+        obs=jnp.zeros(P_obs.shape),
+    )
 
 
 # Define the hyperparameters for the network properties
 network_properties = {
-    "sigma": [1],
+    "sigma": [1e-2],
     "scale": [10],
-    "num_warmup": [10, 20, 50, 100],
-    "num_samples": [10, 100, 200, 500, 1000],
+    "num_warmup": [1000],
+    "num_samples": [1000],
     "num_chains": [1],
 }
+
 
 # Create a list of all possible combinations of the network properties
 settings = list(itertools.product(*network_properties.values()))  # type: ignore
@@ -335,7 +371,6 @@ def generate_geweke_plot(
     plt.axhline(-2, color="red", linestyle="--")
     plt.axhline(2, color="red", linestyle="--")
     plt.axhline(0, color="black", linestyle="-")
-    plt.ylim(-4, 4)
     plt.xlabel("iteration")
     plt.ylabel("z-score")
     plt.legend()
@@ -403,7 +438,7 @@ for set_num, setup in enumerate(settings):
     )
     starting_time = time.time_ns()
     mcmc.run(
-        jax.random.PRNGKey(3453),
+        jax.random.PRNGKey(3450),
         P_obs,
     )
     total_time = (time.time_ns() - starting_time) / 1.0e9
@@ -420,18 +455,18 @@ for set_num, setup in enumerate(settings):
         jax.nn.softplus(R), upper=120000
     )  # pylint: disable=E1102
     indices_sorted = np.argsort(t_obs_long[-12000:])
-    plt.plot(
+    plt.scatter(
         t_obs_long[-12000:][indices_sorted],
         P_obs_long[-12000:, -8][indices_sorted] / 133.322,
         label="ground truth",
-        linewidth=0.5,
+        s=0.1,
     )
     indices_sorted = np.argsort(t[-12000:])
-    plt.plot(
+    plt.scatter(
         t[-12000:][indices_sorted],
         y[-12000:, -8][indices_sorted] / 133.322,
-        label="learned",
-        linewidth=0.5,
+        label="predicted",
+        s=0.1,
     )
     lgnd = plt.legend(loc="upper right")
     lgnd.legend_handles[0]._sizes = [30]
@@ -451,7 +486,7 @@ for set_num, setup in enumerate(settings):
         f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_nt.eps"
     )
     plt.title(
-        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {jax.nn.softplus(R)},\nloss = {loss_val}, \nwallclock time = {total_time}"
+        f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {R},\nloss = {loss_val}, \nwallclock time = {total_time}"
     )
     plt.tight_layout()
     plt.savefig(
