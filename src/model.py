@@ -23,7 +23,7 @@ import numpy as np
 import numpyro  # type: ignore
 from jax import block_until_ready, jit, lax
 from jaxtyping import Array, Float, Integer, jaxtyped
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 from src.check_conv import check_conv, compute_conv_error, print_conv_error
 from src.initialise import (

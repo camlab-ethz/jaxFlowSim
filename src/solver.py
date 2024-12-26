@@ -21,7 +21,7 @@ from functools import partial
 import jax.numpy as jnp
 from jax import jit, lax, vmap
 from jaxtyping import Array, Float, jaxtyped, Integer
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 from src.anastomosis import solve_anastomosis
 from src.bifurcations import solve_bifurcation

@@ -16,7 +16,7 @@ The module makes use of the following imported utilities:
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 from src.newton import newton_raphson
 from src.utils import pressure, wave_speed

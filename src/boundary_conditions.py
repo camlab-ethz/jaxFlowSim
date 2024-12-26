@@ -20,7 +20,7 @@ The module makes use of the following imported utilities:
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float, jaxtyped
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 from src.utils import pressure
 

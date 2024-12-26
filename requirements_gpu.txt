@@ -15,4 +15,5 @@ ruamel.yaml
 beautifulsoup4
 lxml
 SciencePlots
-typeguard
+beartype
+arviz
