@@ -38,7 +38,9 @@ import numpyro
 os.chdir(os.path.dirname(__file__) + "/..")
 sys.path.insert(0, sys.path[0] + "/..")
 
-from src.inference import param_inf_numpyro
+from src.inference import param_inf_optax
+
+# from src.inference import param_inf_numpyro
 
 # Enable 64-bit precision in JAX
 jax.config.update("jax_enable_x64", True)
@@ -59,7 +61,8 @@ def main():
     CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
 
     # Run the parameter inference using NumPyro
-    param_inf_numpyro(VESSEL_INDICES, VAR_INDICES, CONFIG_FILENAME)
+    param_inf_optax(VESSEL_INDICES, VAR_INDICES, CONFIG_FILENAME)
+    # param_inf_numpyro(VESSEL_INDICES, VAR_INDICES, CONFIG_FILENAME)
     print("Inference complete.")
 
 
