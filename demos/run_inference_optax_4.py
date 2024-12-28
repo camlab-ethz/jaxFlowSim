@@ -93,16 +93,6 @@ def param_inf_optax(vessel_indices, var_indices, CONFIG_FILENAME):
     # Set up and execute the simulation loop using JIT compilation
     SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 
-    # Indices for selecting specific parts of the simulation data
-    VESSEL_INDEX_1 = 1
-    VAR_INDEX_1 = 4
-    VESSEL_INDEX_2 = 2
-    VAR_INDEX_2 = 5
-    R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
-    R2_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_2]
-    R1_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_1]
-    R2_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_2]
-
     num_vessels = len(vessel_indices)
 
     @compact
