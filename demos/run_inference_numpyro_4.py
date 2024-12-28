@@ -468,7 +468,7 @@ def main():
     VAR_INDICES = [4, 5]
 
     # Define the configuration file for the simulation
-    CONFIG_FILENAME = "test/bifurcation/bifurcation.yaml"
+    CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
 
     # Run the parameter inference using NumPyro
     param_inf_numpyro(VESSEL_INDICES, VAR_INDICES, CONFIG_FILENAME)
