@@ -58,15 +58,9 @@ os.chdir(os.path.dirname(__file__) + "/..")
 jax.config.update("jax_enable_x64", True)
 
 
-# Set the configuration filename
-CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
-
-
-# Set verbosity flag to control logging
-VERBOSE = True
-
-
 def param_inf_optax(vessel_indices, var_indices, CONFIG_FILENAME):
+    # Set verbosity flag to control logging
+    VERBOSE = True
     # Configure the simulation with the given configuration file
     (
         N,
