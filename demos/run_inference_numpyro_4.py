@@ -464,8 +464,8 @@ def main():
     Main function for running the parameter inference using NumPyro.
     """
     # Define the indices of the vessels and variables to select for inference
-    VESSEL_INDICES = [1, 2]
-    VAR_INDICES = [4, 5]
+    VESSEL_INDICES = [1, 1, 2, 2]
+    VAR_INDICES = [4, 5, 4, 5]
 
     # Define the configuration file for the simulation
     CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
