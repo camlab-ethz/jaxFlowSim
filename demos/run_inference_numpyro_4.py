@@ -103,17 +103,6 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
     # Set up and execute the simulation loop using JIT compilation
     SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
 
-    # Indices for selecting specific parts of the simulation data
-    VESSEL_INDEX_1 = 1
-    VAR_INDEX_1 = 4
-    VESSEL_INDEX_2 = 2
-    VAR_INDEX_2 = 5
-
-    R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
-    R2_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_2]
-    R1_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_1]
-    R2_2 = sim_dat_const_aux[VESSEL_INDEX_2, VAR_INDEX_2]
-
     def sim_loop_wrapper(params, upper=UPPER):
         """
         Wrapper function for running the simulation loop with a modified R value.
@@ -147,9 +136,9 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
         )
         return sim_dat_wrapped, t_wrapped, p_wrapped
 
-    sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([1.0, 1.0, 1.0, 1.0])
+    sim_dat_obs, t_obs, P_obs = sim_loop_wrapper([0.5, 0.5, 0.5, 0.5])
     sim_dat_obs_long, t_obs_long, P_obs_long = sim_loop_wrapper(
-        [1.0, 1.0, 1.0, 1.0], upper=120000
+        [0.5, 0.5, 0.5, 0.5], upper=120000
     )
 
     class Loss(object):
@@ -360,20 +349,6 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
             "num_samples": setup[3],
             "num_chains": setup[4],
         }
-        RESULTS_FILE = (
-            RESULTS_FOLDER
-            + "/setup_"
-            + str(setup_properties["sigma"])
-            + "_"
-            + str(setup_properties["scale"])
-            + "_"
-            + str(setup_properties["num_warmup"])
-            + "_"
-            + str(setup_properties["num_samples"])
-            + "_"
-            + str(setup_properties["num_chains"])
-            + ".txt"
-        )
         mcmc = MCMC(
             numpyro.infer.NUTS(
                 model, forward_mode_differentiation=True, dense_mass=True
@@ -445,9 +420,6 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
             f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.eps"
         )
         plt.close()
-
-        with open(RESULTS_FILE, "a", encoding="utf-8") as file:
-            file.write(str(R) + "  " + str(R1_1) + "\n")
 
         # arviz_data = arviz.from_numpyro(mcmc)
         # arviz.geweke(mcmc.get_samples()["theta"])
