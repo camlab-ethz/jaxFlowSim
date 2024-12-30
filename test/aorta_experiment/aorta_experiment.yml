@@ -5,11 +5,9 @@ blood:
   mu: 3.5e-3  # dynamic viscosity [Pa⋅s]
 
 solver:
-  dt: 5.0e-5 # timestep size (s)
-  nsteps: 1.05e6 # total timesteps
-  iostep: 8.0e12 # steps between outputs
-  hisstep: 200 # steps between history recordings
-  inttype: 2 # integration type
+  Ccfl: 0.9   # Courant number
+  num_snapshots: 100   # timesteps per cycle to be saved
+  conv_tol: 1.0 # percentage value
 
 network:
   - label: Domain1
