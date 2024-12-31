@@ -1,4 +1,4 @@
-proj_name: bifurcation
+proj_name: maternal_pelvic_experiment
 
 blood:
   rho: 1060.0 # density [kg/m^3]
