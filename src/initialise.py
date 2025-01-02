@@ -507,7 +507,6 @@ def build_vessel(
     s_n = int(vessel_data["sn"])
     t_n = int(vessel_data["tn"])
     length = float(vessel_data["L"])
-    e = float(vessel_data["E"])
 
     r_p, r_d = compute_radii(vessel_data)
     p_ext = get_pext(vessel_data)
@@ -521,7 +520,6 @@ def build_vessel(
     u = np.zeros(m, dtype=np.float64)
 
     s_pi = np.sqrt(np.pi)
-    s_pi_e_over_sigma_squared = s_pi * e / 0.75
     one_over_rho_s_p = 1.0 / (3.0 * blood.rho * s_pi)
     radius_slope = compute_radius_slope(r_p, r_d, length)
 
@@ -532,7 +530,7 @@ def build_vessel(
     r_0 = radius_slope * np.arange(0, m, 1) * dx + r_p
     a_0 = np.pi * r_0 * r_0
     a = a_0
-    beta = 1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared
+    beta = compute_beta(a_0, h_0, length, vessel_data)
     gamma = beta * one_over_rho_s_p / r_0
     c = wave_speed(a, gamma)
     wall_e = 3.0 * beta * radius_slope * 1 / a_0 * s_pi * blood.rho_inv
@@ -569,6 +567,36 @@ def build_vessel(
         sim_dat_const,
         sim_dat_const_aux,
     )
+
+
+@jaxtyped(typechecker=typechecker)
+def compute_beta(a_0: NDArray, h_0: float, x: float, vessel: dict) -> NDArray:
+    """
+    Computes the beta value for the vessel.
+
+    Parameters:
+    a_0 (NDArray): Initial cross-sectional area.
+    h_0 (float): Initial thickness.
+    e (float): Young's modulus.
+
+    Returns:
+    float: Computed beta value.
+    """
+    if "beta" in vessel:
+        return [vessel["beta"]] * len(a_0)
+    elif "beta_p" and "beta_s" in vessel:
+        beta_p = vessel["beta_p"]
+        beta_s = vessel["beta_s"]
+        return np.array(beta_p + beta_s * np.arange(0, x, len(a_0)))
+
+    elif "E" in vessel:
+        e = float(vessel["E"])
+        s_pi = np.sqrt(np.pi)
+        s_pi_e_over_sigma_squared = s_pi * e / 0.75
+        return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
+    else:
+        exception_message = "Missing Young's modulus value for vessel"
+        raise ValueError(exception_message)
 
 
 @jaxtyped(typechecker=typechecker)
@@ -636,10 +664,10 @@ def get_pext(vessel: dict) -> float:
     Returns:
     float: External pressure.
     """
-    if "Pext" not in vessel:
+    if "pext" not in vessel:
         return 0.0
     else:
-        return vessel["Pext"]
+        return vessel["pext"]
 
 
 @jaxtyped(typechecker=typechecker)
