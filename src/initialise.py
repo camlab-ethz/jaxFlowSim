@@ -508,7 +508,6 @@ def build_vessel(
     t_n = int(vessel_data["tn"])
     length = float(vessel_data["L"])
 
-    r_p, r_d = compute_radii(vessel_data)
     p_ext = get_pext(vessel_data)
     dx = length / m
     h_0 = initialise_thickness(vessel_data)
@@ -521,17 +520,11 @@ def build_vessel(
 
     s_pi = np.sqrt(np.pi)
     one_over_rho_s_p = 1.0 / (3.0 * blood.rho * s_pi)
-    radius_slope = compute_radius_slope(r_p, r_d, length)
 
-    if h_0 == 0.0:
-        r_mean = 0.5 * (r_p + r_d)
-        h_0 = compute_thickness(r_mean)
-
-    r_0 = radius_slope * np.arange(0, m, 1) * dx + r_p
-    a_0 = np.pi * r_0 * r_0
+    a_0, r0, radius_slope = compute_a0(length, dx, h_0, m, vessel_data)
     a = a_0
     beta = compute_beta(a_0, h_0, length, vessel_data)
-    gamma = beta * one_over_rho_s_p / r_0
+    gamma = beta * one_over_rho_s_p / r0
     c = wave_speed(a, gamma)
     wall_e = 3.0 * beta * radius_slope * 1 / a_0 * s_pi * blood.rho_inv
     p = pressure_sa(np.ones(m, np.float64), beta, p_ext)
@@ -567,6 +560,47 @@ def build_vessel(
         sim_dat_const,
         sim_dat_const_aux,
     )
+
+
+@jaxtyped(typechecker=typechecker)
+def compute_a0(
+    length: float, dx: np.float64, h0: float, m: np.int64, vessel: dict
+) -> tuple[NDArray, NDArray, float]:
+    """
+    Computes the initial cross-sectional area of the vessel.
+
+    Parameters:
+    length (float): Length of the vessel.
+    dx (np.float64): Mesh point spacing.
+    h0 (float): Initial thickness.
+    m (np.int64): Number of mesh points.
+    vessel (dict): Vessel configuration data.
+
+    Returns:
+    NDArray: Initial cross-sectional area.
+    """
+
+    if "R0" or ("Rp" and "Rd") in vessel:
+        r_p, r_d = compute_radii(vessel)
+
+        radius_slope = compute_radius_slope(r_p, r_d, length)
+
+        if h0 == 0.0:
+            r_mean = 0.5 * (r_p + r_d)
+            h0 = compute_thickness(r_mean)
+
+        r0 = radius_slope * np.arange(0, m, 1) * dx + r_p
+        return np.pi * r0 * r0, r0, radius_slope
+
+    elif "A0" and "A_s" in vessel:
+        a0 = vessel["A0"]
+        a_s = vessel["A_s"]
+        a0_out = np.array(a0 + a_s * np.arange(0, m, 1) * dx)
+        r0 = np.sqrt(a0_out / np.pi)
+        return a0_out, r0, (r0[-1] - r0[0]) / length
+    else:
+        exception_message = "Missing radius values for vessel"
+        raise ValueError(exception_message)
 
 
 @jaxtyped(typechecker=typechecker)
