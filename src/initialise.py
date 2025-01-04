@@ -522,9 +522,15 @@ def build_vessel(
     one_over_rho_s_p = 1.0 / (3.0 * blood.rho * s_pi)
 
     a_0, r0, radius_slope = compute_a0(length, dx, h_0, m, vessel_data)
+    if h_0 == 0.0:
+        r_p = r0[0]
+        r_d = r0[-1]
+        r_mean = 0.5 * (r_p + r_d)
+        h_0 = compute_thickness(r_mean)
     a = a_0
     beta = compute_beta(a_0, h_0, length, vessel_data)
     gamma = beta * one_over_rho_s_p / r0
+
     c = wave_speed(a, gamma)
     wall_e = 3.0 * beta * radius_slope * 1 / a_0 * s_pi * blood.rho_inv
     p = pressure_sa(np.ones(m, np.float64), beta, p_ext)
