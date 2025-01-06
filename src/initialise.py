@@ -202,7 +202,7 @@ def check_vessel(i: int, vessel: dict) -> None:
     Raises:
     ValueError: If there are any issues with the vessel configuration.
     """
-    keys = ["label", "sn", "tn", "L", "E"]
+    keys = ["label", "sn", "tn", "L"]
     for key in keys:
         if key not in vessel:
             raise ValueError(f"vessel {i} is missing {key} value")
@@ -210,12 +210,12 @@ def check_vessel(i: int, vessel: dict) -> None:
     if vessel["sn"] == vessel["tn"]:
         raise ValueError(f"vessel {i} has same sn and tn")
 
-    if "R0" not in vessel:
-        if "Rp" not in vessel and "Rd" not in vessel:
-            raise ValueError(f"vessel {i} is missing lumen radius value(s)")
-    else:
-        if vessel["R0"] > 0.05:
-            print(f"{vessel['label']} radius larger than 5cm!")
+    # if "R0" not in vessel:
+    #    if "Rp" not in vessel and "Rd" not in vessel:
+    #        raise ValueError(f"vessel {i} is missing lumen radius value(s)")
+    # else:
+    #    if vessel["R0"] > 0.05:
+    #        print(f"{vessel['label']} radius larger than 5cm!")
 
     if "inlet" in vessel:
         if "inlet file" not in vessel:
@@ -528,22 +528,23 @@ def build_vessel(
         r_mean = 0.5 * (r_p + r_d)
         h_0 = compute_thickness(r_mean)
     a = a_0
-    beta = compute_beta(a_0, h_0, length, vessel_data)
+    beta = compute_beta(a_0, h_0, dx, vessel_data)
     gamma = beta * one_over_rho_s_p / r0
 
     c = wave_speed(a, gamma)
     wall_e = 3.0 * beta * radius_slope * 1 / a_0 * s_pi * blood.rho_inv
     p = pressure_sa(np.ones(m, np.float64), beta, p_ext)
 
-    if outlet == "wk2":
+    if outlet == 2:
         r1, r2 = compute_windkessel_inlet_impedance(r2, blood, a_0, gamma)
-        outlet = "wk3"
+        outlet = 3
 
     w1m0 = u[-1] - 4.0 * c[-1]
     w2m0 = u[-1] + 4.0 * c[-1]
 
     sim_dat = np.stack((u, q, a, c, p))
     sim_dat_aux = np.array([w1m0, w2m0])
+    print(beta)
     sim_dat_const = np.stack(
         (
             a_0,
@@ -555,6 +556,7 @@ def build_vessel(
             length * np.ones(m),
         )
     )
+
     sim_dat_const_aux = np.array([cardiac_t, inlet, outlet, rt, r1, r2, cc])
     edges = np.array([index, s_n, t_n])
     return (
@@ -586,7 +588,7 @@ def compute_a0(
     NDArray: Initial cross-sectional area.
     """
 
-    if "R0" or ("Rp" and "Rd") in vessel:
+    if "R0" in vessel or ("Rp" in vessel and "Rd" in vessel):
         r_p, r_d = compute_radii(vessel)
 
         radius_slope = compute_radius_slope(r_p, r_d, length)
@@ -598,8 +600,8 @@ def compute_a0(
         r0 = radius_slope * np.arange(0, m, 1) * dx + r_p
         return np.pi * r0 * r0, r0, radius_slope
 
-    elif "A0" and "A_s" in vessel:
-        a0 = vessel["A0"]
+    elif "A_p" in vessel and "A_s" in vessel:
+        a0 = vessel["A_p"]
         a_s = vessel["A_s"]
         a0_out = np.array(a0 + a_s * np.arange(0, m, 1) * dx)
         r0 = np.sqrt(a0_out / np.pi)
@@ -610,7 +612,7 @@ def compute_a0(
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_beta(a_0: NDArray, h_0: float, x: float, vessel: dict) -> NDArray:
+def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
     """
     Computes the beta value for the vessel.
 
@@ -622,12 +624,13 @@ def compute_beta(a_0: NDArray, h_0: float, x: float, vessel: dict) -> NDArray:
     Returns:
     float: Computed beta value.
     """
+    m = len(a_0)
     if "beta" in vessel:
         return [vessel["beta"]] * len(a_0)
-    elif "beta_p" and "beta_s" in vessel:
+    elif "beta_p" in vessel and "beta_s" in vessel:
         beta_p = vessel["beta_p"]
         beta_s = vessel["beta_s"]
-        return np.array(beta_p + beta_s * np.arange(0, x, len(a_0)))
+        return np.array(beta_p + beta_s * np.arange(0, m, 1) * dx)
 
     elif "E" in vessel:
         e = float(vessel["E"])
