@@ -210,6 +210,8 @@ def check_vessel(i: int, vessel: dict) -> None:
     if vessel["sn"] == vessel["tn"]:
         raise ValueError(f"vessel {i} has same sn and tn")
 
+    # TODO: check that either R0, A0, A_p and A_d, or Rp and Rd are defined
+
     # if "R0" not in vessel:
     #    if "Rp" not in vessel and "Rd" not in vessel:
     #        raise ValueError(f"vessel {i} is missing lumen radius value(s)")
@@ -544,7 +546,6 @@ def build_vessel(
 
     sim_dat = np.stack((u, q, a, c, p))
     sim_dat_aux = np.array([w1m0, w2m0])
-    print(beta)
     sim_dat_const = np.stack(
         (
             a_0,
@@ -606,6 +607,11 @@ def compute_a0(
         a0_out = np.array(a0 + a_s * np.arange(0, m, 1) * dx)
         r0 = np.sqrt(a0_out / np.pi)
         return a0_out, r0, (r0[-1] - r0[0]) / length
+
+    elif "A0" in vessel:
+        a0 = vessel["A0"]
+        r0 = np.sqrt(a0 / np.pi)
+        return np.array([a0] * m), np.array([r0] * m), 0.0
     else:
         exception_message = "Missing radius values for vessel"
         raise ValueError(exception_message)
@@ -626,7 +632,7 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
     """
     m = len(a_0)
     if "beta" in vessel:
-        return [vessel["beta"]] * len(a_0)
+        return np.array([vessel["beta"]] * len(a_0))
     elif "beta_p" in vessel and "beta_s" in vessel:
         beta_p = vessel["beta_p"]
         beta_s = vessel["beta_s"]
