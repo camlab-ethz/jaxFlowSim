@@ -1,81 +1,98 @@
-proj_name: maternal_pelvic_experiment
+proj_name: bifurcation
 
 blood:
-  rho: 1060.0 # density [kg/m^3]
+  rho: 1056.0 # density [kg/m^3]
   mu: 3.5e-3  # dynamic viscosity [Pa⋅s]
 
 solver:
-  Ccfl: 0.9   # Courant number
-  num_snapshots: 100   # timesteps per cycle to be saved
-  conv_tol: 1.0 # percentage value
+  dt: 2.1e-4     # time step size
+  nsteps: 1.0e5  # total number of time steps
+  iostep: 2.6e6  # interval for saving simulation output
+  hisstep: 20    # interval for saving history points
+  inttype: 2     # integration type
 
 network:
-  - label: Domain1
+  - label: LExtI
+    sn: 1
+    tn: 2
+    L: 1.199759e-1  # length (m)
+    R0: 4.63e-3     # proximal lumen radius (m)
+    E: 1.41e7       # Young's modulus (Pa)
 
-    sn: 1     # proximal (source) node
-    tn: 2     # distal (target) node
-
-    L: 0.074824 # length (m)
-    R0: 0.004615 # proximal lumen radius (m)
-    E: -6475805.801772764*x + 2472667.0 # Young's modulus (Pa)
-    Ao: 0.0006905096696212728*x + 0.000229382 # initial area (m^2)
-    pext: 10000.0 # external pressure (Pa)
-
-  - label: Domain2
-
+  - label: Vessel2
     sn: 2
     tn: 3
+    L: 8.398148e-2  # length (m)
+    R0: 4.48e-3     # proximal lumen radius (m)
+    E: 1.45446e7    # Young's modulus (Pa)
 
-    L: 0.036878 # length (m)
-    R0: 0.004593 # proximal lumen radius (m)
-    E: 137380225.56390977*x + 2151208.0 # Young's modulus (Pa)
-    Ao: -0.00446292537593985*x + 0.0002636589 # initial area (m^2)
-    pext: 8500.0 # external pressure (Pa)
-
-  - label: Domain3
-
+  - label: Input
     sn: 3
-    tn: 4
+    tn: 6
+    L: 1.68132e-2  # length (m)
+    R0: 6.5e-3     # proximal lumen radius (m)
+    E: 1.001378e7  # Young's modulus (Pa)
 
-    L: 0.091068 # length (m)
-    R0: 0.002314 # proximal lumen radius (m)
-    E: 7323685.991427926*x + 2151208.0 # Young's modulus (Pa)
-    Ao: -0.0005181727949469883*x + 0.0002636589 # initial area (m^2)
-    pext: 10000.0 # external pressure (Pa)
-
-  - label: Domain4
-
+  - label: LUtA
     sn: 4
-    tn: 4
+    tn: 2
+    L: 2.238458e-1  # length (m)
+    R0: 7.0e-3      # proximal lumen radius (m)
+    E: 2.812665e7   # Young's modulus (Pa)
 
-    L: 0.010863 # length (m)
-    R0: 0.007593 # proximal lumen radius (m)
-    E: -8427291.608543351*x + 2800526.0 # Young's modulus (Pa)
-    Ao: 0.0007255897578970214*x + 0.0002177177 # initial area (m^2)
-    pext: 10000.0 # external pressure (Pa)
+  - label: RExtIl
+    sn: 5
+    tn: 7
+    L: 1.234164e-1  # length (m)
+    R0: 4.2e-3      # proximal lumen radius (m)
+    E: 1.380609e7   # Young's modulus (Pa)
+
+  - label: Vessel6
+    sn: 6
+    tn: 2
+    L: 7.101328e-2  # length (m)
+    R0: 3.5e-3      # proximal lumen radius (m)
+    E: 1.530488e7   # Young's modulus (Pa)
+
+  - label: RUtA
+    sn: 7
+    tn: 5
+    L: 2.500922e-1  # length (m)
+    R0: 5.8e-3      # proximal lumen radius (m)
+    E: 1.136314e8   # Young's modulus (Pa)
 
 boundary_conditions:
-  - type: velocity
-    domain: Domain1
-    value: 0.0
-  - type: flow
-    domain: Domain1
-    expression: 1.000000*(0.000087 + 3.494511e-05*cos(6.912195*t)+1.141645e-04*sin(6.912195*t)+-7.640937e-05*cos(13.824390*t)+5.577324e-05*sin(13.824390*t)+-3.491643e-05*cos(20.736585*t)+-1.164677e-05*sin(20.736585*t)+-1.529155e-05*cos(27.648780*t)+-1.119037e-05*sin(27.648780*t)+-5.999326e-06*cos(34.560975*t)+-1.720113e-05*sin(34.560975*t)+8.800691e-06*cos(41.473170*t)+-4.795685e-06*sin(41.473170*t)+5.757015e-07*cos(48.385365*t)+2.906913e-06*sin(48.385365*t)+-1.697163e-08*cos(55.297560*t)+1.120130e-07*sin(55.297560*t)+4.942733e-07*cos(62.209756*t)+7.545712e-07*sin(62.209756*t)+-5.820455e-07*cos(69.121951*t)+7.156161e-07*sin(69.121951*t)+-3.969006e-07*cos(76.034146*t)+-1.604747e-07*sin(76.034146*t)+-2.057709e-08*cos(82.946341*t)+-8.409150e-08*sin(82.946341*t)+-7.964688e-08*cos(89.858536*t)+-4.940032e-08*sin(89.858536*t)+3.685129e-08*cos(96.770731*t)+-5.791898e-08*sin(96.770731*t)+2.348422e-08*cos(103.682926*t)+2.626202e-08*sin(103.682926*t))
   - type: bifurcation
-    nodes: [2, 3]
-  - type: bifurcation
-    nodes: [1, 3]
-    domain: Domain2
-  - type: compliance
-    value: 3.290071e-10
-  - type: resistance
-    value: 3.105394e+09
-  - type: bifurcation
-    nodes: [1, 2]
-    domain: Domain3
-  - type: junction
-    nodes: [4, 4]
-  - type: compliance
-    value: 2.336702e-08
-  - type: resistance
-    value: 1.372730e+08
+    nodes: [1, 2, 4]
+  - type: inlet
+    node: 3
+    area: 1.326546e-4
+    velocity_profile:
+      expression: "1.030536*(...)" # Add your velocity profile here
+  - type: outlet
+    node: 6
+    resistance: 4.514496e+08
+    compliance: 9.616287e-10
+
+initial_conditions:
+  - variable: a
+    value: "Ao"
+  - variable: u
+    value: "0.0"
+
+history_points:
+  points:
+    - domain: 1
+      location: 1.199759e-1
+    - domain: 2
+      location: 8.398148e-2
+    - domain: 3
+      location: 1.68132e-2
+    - domain: 4
+      location: 2.238458e-1
+    - domain: 5
+      location: 1.234164e-1
+    - domain: 6
+      location: 7.101328e-2
+    - domain: 7
+      location: 2.500922e-1
