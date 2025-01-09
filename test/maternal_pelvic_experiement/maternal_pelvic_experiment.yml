@@ -1,65 +1,67 @@
-proj_name: bifurcation
+proj_name: maternal_pelvic_experiment
 
 blood:
   rho: 1056.0 # density [kg/m^3]
-  mu: 3.5e-3  # dynamic viscosity [Pa⋅s]
+  mu: 3.5e-3 # dynamic viscosity [Pa⋅s]
 
 solver:
-  dt: 2.1e-4     # time step size
-  nsteps: 1.0e5  # total number of time steps
-  iostep: 2.6e6  # interval for saving simulation output
-  hisstep: 20    # interval for saving history points
-  inttype: 2     # integration type
+  Ccfl: 0.9 # Courant number
+  num_snapshots: 100 # timesteps per cycle to be saved
+  conv_tol: 1.0 # percentage value
 
 network:
   - label: LExtI
     sn: 1
     tn: 2
-    L: 1.199759e-1  # length (m)
-    R0: 4.63e-3     # proximal lumen radius (m)
-    E: 1.41e7       # Young's modulus (Pa)
+    L: 1.199759e-1 # length (m)
+    beta: 1.410006e+07
+    A0: 6.700018e-05
+
+    inlet: 1
+    inlet file: test/maternal_pelvic_experiment/maternal_pelvic_experiment.dat
+    inlet number: 1
 
   - label: Vessel2
     sn: 2
     tn: 3
-    L: 8.398148e-2  # length (m)
-    R0: 4.48e-3     # proximal lumen radius (m)
-    E: 1.45446e7    # Young's modulus (Pa)
+    L: 8.398148e-2 # length (m)
+    beta: 1.454460e+07
+    A0: 6.299985e-05
 
   - label: Input
     sn: 3
     tn: 6
-    L: 1.68132e-2  # length (m)
-    R0: 6.5e-3     # proximal lumen radius (m)
-    E: 1.001378e7  # Young's modulus (Pa)
+    L: 1.68132e-2 # length (m)
+    beta: 1.001378e+07
+    A0: 1.326546e-04
 
   - label: LUtA
     sn: 4
     tn: 2
-    L: 2.238458e-1  # length (m)
-    R0: 7.0e-3      # proximal lumen radius (m)
-    E: 2.812665e7   # Young's modulus (Pa)
+    L: 2.238458e-1 # length (m)
+    beta: 2.812665e+07
+    A0: 1.968921e-05
 
   - label: RExtIl
     sn: 5
     tn: 7
-    L: 1.234164e-1  # length (m)
-    R0: 4.2e-3      # proximal lumen radius (m)
-    E: 1.380609e7   # Young's modulus (Pa)
+    L: 1.234164e-1 # length (m)
+    beta: 1.380609e+07
+    A0: 6.986444e-05
 
   - label: Vessel6
     sn: 6
     tn: 2
-    L: 7.101328e-2  # length (m)
-    R0: 3.5e-3      # proximal lumen radius (m)
-    E: 1.530488e7   # Young's modulus (Pa)
+    L: 7.101328e-2 # length (m)
+    beta: 1.530488e+07
+    A0: 5.696619e-05
 
   - label: RUtA
     sn: 7
     tn: 5
-    L: 2.500922e-1  # length (m)
-    R0: 5.8e-3      # proximal lumen radius (m)
-    E: 1.136314e8   # Young's modulus (Pa)
+    L: 2.500922e-1 # length (m)
+    beta: 1.136314e+08
+    A0: 5.248108e-06
 
 boundary_conditions:
   - type: bifurcation
