@@ -21,14 +21,14 @@ network:
     inlet file: test/maternal_pelvic_experiment/maternal_pelvic_experiment.dat
     inlet number: 1
 
-  - label: Vessel2
+  - label: LComI
     sn: 2
     tn: 3
     L: 8.398148e-2 # length (m)
     beta: 1.454460e+07
     A0: 6.299985e-05
 
-  - label: Input
+  - label: DAorta
     sn: 3
     tn: 6
     L: 1.68132e-2 # length (m)
@@ -49,7 +49,7 @@ network:
     beta: 1.380609e+07
     A0: 6.986444e-05
 
-  - label: Vessel6
+  - label: RComI
     sn: 6
     tn: 2
     L: 7.101328e-2 # length (m)
