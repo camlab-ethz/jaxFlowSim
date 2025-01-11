@@ -10,12 +10,12 @@ solver:
   conv_tol: 1.0 # percentage value
 
 network:
-  - label: LExtI
+  - label: DAorta
     sn: 1
     tn: 2
-    L: 1.199759e-1 # length (m)
-    beta: 1.410006e+07
-    A0: 6.700018e-05
+    L: 1.68132e-2 # length (m)
+    beta: 1.001378e+07
+    A0: 1.326546e-04
 
     inlet: 1
     inlet file: test/maternal_pelvic_experiment/maternal_pelvic_experiment.dat
@@ -23,42 +23,42 @@ network:
 
   - label: LComI
     sn: 2
-    tn: 3
+    tn: 4
     L: 8.398148e-2 # length (m)
     beta: 1.454460e+07
     A0: 6.299985e-05
 
-  - label: DAorta
-    sn: 3
-    tn: 6
-    L: 1.68132e-2 # length (m)
-    beta: 1.001378e+07
-    A0: 1.326546e-04
+  - label: RComI
+    sn: 2
+    tn: 3
+    L: 7.101328e-2 # length (m)
+    beta: 1.530488e+07
+    A0: 5.696619e-05
+
+  - label: LExtI
+    sn: 4
+    tn: 5
+    L: 1.199759e-1 # length (m)
+    beta: 1.410006e+07
+    A0: 6.700018e-05
 
   - label: LUtA
     sn: 4
-    tn: 2
+    tn: 6
     L: 2.238458e-1 # length (m)
     beta: 2.812665e+07
     A0: 1.968921e-05
 
   - label: RExtIl
-    sn: 5
+    sn: 3
     tn: 7
     L: 1.234164e-1 # length (m)
     beta: 1.380609e+07
     A0: 6.986444e-05
 
-  - label: RComI
-    sn: 6
-    tn: 2
-    L: 7.101328e-2 # length (m)
-    beta: 1.530488e+07
-    A0: 5.696619e-05
-
   - label: RUtA
-    sn: 7
-    tn: 5
+    sn: 3
+    tn: 8
     L: 2.500922e-1 # length (m)
     beta: 1.136314e+08
     A0: 5.248108e-06
