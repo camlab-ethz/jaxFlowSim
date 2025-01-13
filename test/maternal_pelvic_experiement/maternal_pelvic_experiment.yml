@@ -17,7 +17,7 @@ network:
     beta: 1.001378e+07
     A0: 1.326546e-04
 
-    inlet: 1
+    inlet: 2
     inlet file: test/maternal_pelvic_experiment/maternal_pelvic_experiment.dat
     inlet number: 1
 
