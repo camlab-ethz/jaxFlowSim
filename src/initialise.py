@@ -210,7 +210,38 @@ def check_vessel(i: int, vessel: dict) -> None:
     if vessel["sn"] == vessel["tn"]:
         raise ValueError(f"vessel {i} has same sn and tn")
 
-    # TODO: check that either R0, A0, A_p and A_d, or Rp and Rd are defined
+    # Check that either R0, A0, A_p and A_d, or Rp and Rd are defined
+
+    # Define key combinations
+    key_combinations = [("R0",), ("A0",), ("A_p", "A_s"), ("Rp", "Rd")]
+
+    # Efficiently check combinations
+    existing_keys = set(vessel.keys())
+    fully_matched = []
+    partially_matched = []
+
+    for combination in key_combinations:
+        # Check if the entire combination is available
+        if set(combination).issubset(existing_keys):
+            fully_matched.append(combination)
+        # Check if any key in the combination is available
+        elif set(combination) & existing_keys:
+            partially_matched.append(combination)
+
+    # Logic for warnings and results
+
+    num_full_matches = len(fully_matched)
+    num_partial_matches = len(partially_matched)
+    total_num_matches = num_full_matches + num_partial_matches
+
+    if num_full_matches == 0:
+        raise ValueError(
+            f"Cross-sectional area not defined for vessel {vessel['label']} (define by providing radius or cross-sectional area)."
+        )
+    elif total_num_matches > 1:
+        raise ValueError(
+            f"Multiple definitions for cross-sectional area in vessel {vessel['label']} through {fully_matched}, {partially_matched}."
+        )
 
     # if "R0" not in vessel:
     #    if "Rp" not in vessel and "Rd" not in vessel:
@@ -312,7 +343,9 @@ def build_blood(blood_data: dict) -> Blood:
 
 
 @jaxtyped(typechecker=typechecker)
-def build_arterial_network(network: list[dict], blood: Blood) -> tuple[
+def build_arterial_network(
+    network: list[dict], blood: Blood
+) -> tuple[
     NDArray,
     NDArray,
     NDArray,
@@ -538,7 +571,7 @@ def build_vessel(
     p = pressure_sa(np.ones(m, np.float64), beta, p_ext)
 
     if outlet == 2:
-        r1, r2 = compute_windkessel_inlet_impedance(r2, blood, a_0, gamma)
+        r1, r2 = compute_windkessel_inlet_impedance(r1, blood, a_0, gamma)
         outlet = 3
 
     w1m0 = u[-1] - 4.0 * c[-1]
@@ -799,8 +832,8 @@ def add_outlet(vessel: dict) -> tuple[int, float, float, float, float]:
             c = float(vessel["Cc"])
         elif outlet == 2:  # "wk2"
             r_t = 0.0
-            r_1 = 0.0
-            r_2 = float(vessel["R1"])
+            r_1 = float(vessel["R1"])
+            r_2 = 0.0
             c = float(vessel["Cc"])
         elif outlet == 1:  # "reflection"
             r_t = float(vessel["Rt"])
@@ -848,7 +881,7 @@ def build_heart(vessel_data: dict) -> tuple[bool, float, NDArray]:
 
 @jaxtyped(typechecker=typechecker)
 def compute_windkessel_inlet_impedance(
-    r2: float, blood: Blood, a0: NDArray[np.floating[Any]], gamma: Array
+    r1: float, blood: Blood, a0: NDArray[np.floating[Any]], gamma: Array
 ) -> tuple[float, float]:
     """
     Computes the inlet impedance for the Windkessel model.
@@ -862,7 +895,8 @@ def compute_windkessel_inlet_impedance(
     Returns:
     tuple[float, float]: Updated Windkessel resistances.
     """
-    r1 = blood.rho * wave_speed(a0[-1], gamma[-1]) / a0[-1]
-    r2 -= r1
+    # r1 =
+    # r2 -= r1
+    r2 = r1 - blood.rho * wave_speed(a0[-1], gamma[-1]) / a0[-1]
 
     return r1, r2
