@@ -262,21 +262,23 @@ def check_vessel(i: int, vessel: dict) -> None:
 
     if "outlet" in vessel:
         outlet = vessel["outlet"]
-        if outlet == "wk3":
-            if "R1" not in vessel or "Cc" not in vessel:
+        if outlet == 3:
+            if "R1" not in vessel or "Cc":
                 raise ValueError(
                     f"outlet vessel {i} is missing three-element windkessel values"
                 )
-        elif outlet == "wk2":
+        elif outlet == 2:
             if "R1" not in vessel or "Cc" not in vessel:
                 raise ValueError(
                     f"outlet vessel {i} is missing two-element windkessel values"
                 )
-        elif outlet == "reflection":
+        elif outlet == 1:
             if "Rt" not in vessel:
                 raise ValueError(
                     f"outlet vessel {i} is missing reflection coefficient value"
                 )
+        else:
+            raise ValueError(f"outlet vessel {i} has invalid outlet type")
 
 
 @jaxtyped(typechecker=typechecker)
