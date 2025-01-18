@@ -211,25 +211,30 @@ def check_vessel(i: int, vessel: dict) -> None:
         raise ValueError(f"vessel {i} has same sn and tn")
 
     # Check that either R0, A0, A_p and A_d, or Rp and Rd are defined
-
     # Define key combinations
-    key_combinations = [("R0",), ("A0",), ("A_p", "A_s"), ("Rp", "Rd")]
+    key_combinations = [("R0",), ("Rp", "Rd"), ("A0",), ("A_p", "A_s")]
+    r0t = 0.05  # radius theshold
+    a0t = r0t**2 * np.pi  # cross-sectional area threshold
+
+    thresholds = [(r0t), (r0t, r0t), (a0t), (a0t, a0t)]
 
     # Efficiently check combinations
     existing_keys = set(vessel.keys())
     fully_matched = []
     partially_matched = []
 
-    for combination in key_combinations:
+    for combination, threshold in zip(key_combinations, thresholds):
         # Check if the entire combination is available
         if set(combination).issubset(existing_keys):
             fully_matched.append(combination)
+            # Check that the values are below the threshold
+            if not all(vessel[key] < threshold for key in combination):
+                print(f"Radius is larger than 5cm in vessel {vessel['label']}.")
         # Check if any key in the combination is available
         elif set(combination) & existing_keys:
             partially_matched.append(combination)
 
     # Logic for warnings and results
-
     num_full_matches = len(fully_matched)
     num_partial_matches = len(partially_matched)
     total_num_matches = num_full_matches + num_partial_matches
