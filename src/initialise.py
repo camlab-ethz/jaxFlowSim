@@ -248,13 +248,6 @@ def check_vessel(i: int, vessel: dict) -> None:
             f"Multiple definitions for cross-sectional area in vessel {vessel['label']} through {fully_matched}, {partially_matched}."
         )
 
-    # if "R0" not in vessel:
-    #    if "Rp" not in vessel and "Rd" not in vessel:
-    #        raise ValueError(f"vessel {i} is missing lumen radius value(s)")
-    # else:
-    #    if vessel["R0"] > 0.05:
-    #        print(f"{vessel['label']} radius larger than 5cm!")
-
     if "inlet" in vessel:
         if "inlet file" not in vessel:
             raise ValueError(f"inlet vessel {i} is missing the inlet file path")
