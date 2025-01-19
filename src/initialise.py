@@ -210,12 +210,13 @@ def check_vessel(i: int, vessel: dict) -> None:
     if vessel["sn"] == vessel["tn"]:
         raise ValueError(f"vessel {i} has same sn and tn")
 
-    # Check that either R0, A0, A_p and A_d, or Rp and Rd are defined
+    # Check that either R0, A0, A_p and A_d, or Rp and Rd are defined and within threshold
     # Define key combinations
     key_combinations = [("R0",), ("Rp", "Rd"), ("A0",), ("A_p", "A_s")]
+
+    # Define thresholds
     r0t = 0.05  # radius theshold
     a0t = r0t**2 * np.pi  # cross-sectional area threshold
-
     thresholds = [(r0t), (r0t, r0t), (a0t), (a0t, a0t)]
 
     # Efficiently check combinations
@@ -246,6 +247,34 @@ def check_vessel(i: int, vessel: dict) -> None:
     elif total_num_matches > 1:
         raise ValueError(
             f"Multiple definitions for cross-sectional area in vessel {vessel['label']} through {fully_matched}, {partially_matched}."
+        )
+
+    # Check that either Young's E modulus, elasticity coefficient beta, or beta_p and beta_s are defined
+    key_combinations = [("E",), ("beta",), ("beta_p", "beta_s")]
+    # Efficiently check combinations
+    fully_matched = []
+    partially_matched = []
+
+    for combination in key_combinations:
+        # Check if the entire combination is available
+        if set(combination).issubset(existing_keys):
+            fully_matched.append(combination)
+        # Check if any key in the combination is available
+        elif set(combination) & existing_keys:
+            partially_matched.append(combination)
+
+    # Logic for warnings and results
+    num_full_matches = len(fully_matched)
+    num_partial_matches = len(partially_matched)
+    total_num_matches = num_full_matches + num_partial_matches
+
+    if num_full_matches == 0:
+        raise ValueError(
+            f"Elasticity coefficient beta not defined for vessel {vessel['label']} (define by providing beta or E)."
+        )
+    elif total_num_matches > 1:
+        raise ValueError(
+            f"Multiple definitions for elasticity coefficient in vessel {vessel['label']} through {fully_matched}, {partially_matched}."
         )
 
     if "inlet" in vessel:
@@ -676,9 +705,6 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
         s_pi = np.sqrt(np.pi)
         s_pi_e_over_sigma_squared = s_pi * e / 0.75
         return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
-    else:
-        exception_message = "Missing Young's modulus value for vessel"
-        raise ValueError(exception_message)
 
 
 @jaxtyped(typechecker=typechecker)
