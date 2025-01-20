@@ -269,8 +269,8 @@ def check_vessel(i: int, vessel: dict) -> None:
     total_num_matches = num_full_matches + num_partial_matches
 
     if num_full_matches == 0:
-        raise ValueError(
-            f"Elasticity coefficient beta not defined for vessel {vessel['label']} (define by providing beta or E)."
+        print(
+            f"Elasticity coefficient beta will be approximated for vessel {vessel['label']}."
         )
     elif total_num_matches > 1:
         raise ValueError(
@@ -704,6 +704,18 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
         e = float(vessel["E"])
         s_pi = np.sqrt(np.pi)
         s_pi_e_over_sigma_squared = s_pi * e / 0.75
+        return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
+    else:
+        # Estimate E according to Ottensen et al. 2004
+        k1 = 2e6
+        k2 = -22.53e2
+        k3 = 8.65e4
+
+        r_0 = np.sqrt(a_0 / np.pi)
+        e = r_0 / h_0 * k1 * np.exp(k2 * r_0) + k3
+        s_pi = np.sqrt(np.pi)
+        s_pi_e_over_sigma_squared = s_pi * e / 0.75
+        print(e)
         return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
 
 
