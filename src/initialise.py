@@ -702,17 +702,25 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
 
     elif "E" in vessel:
         e = float(vessel["E"])
+
+        # Compute elasticity coefficient beta from Young's Wall modulus E
+        # according to Sherwin et al. (2003) with an elasticity parameter
+        # (Poisson's ratio) nu of 0.5 ( 1 - 0.5^2 = 0.75 )
         s_pi = np.sqrt(np.pi)
         s_pi_e_over_sigma_squared = s_pi * e / 0.75
         return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
     else:
-        # Estimate E according to Ottensen et al. 2004
+        # Estimate Young's wall modulus E according to Ottensen et al. (2004)
         k1 = 2e6
         k2 = -22.53e2
         k3 = 8.65e4
 
         r_0 = np.sqrt(a_0 / np.pi)
         e = r_0 / h_0 * k1 * np.exp(k2 * r_0) + k3
+
+        # Compute elasticity coefficient beta from Young's Wall modulus E
+        # according to Sherwin et al. (2003) with an elasticity parameter
+        # (Poisson's ratio) nu of 0.5 ( 1 - 0.5^2 = 0.75 )
         s_pi = np.sqrt(np.pi)
         s_pi_e_over_sigma_squared = s_pi * e / 0.75
         print(e)
