@@ -279,33 +279,39 @@ def check_vessel(i: int, vessel: dict) -> None:
 
     if "inlet" in vessel:
         if "inlet file" not in vessel:
-            raise ValueError(f"inlet vessel {i} is missing the inlet file path")
+            raise ValueError(
+                f"inlet vessel  {vessel['label']} is missing the inlet file path"
+            )
         elif not os.path.isfile(vessel["inlet file"]):
             file_path = vessel["inlet file"]
-            raise ValueError(f"vessel {i} inlet file {file_path} not found")
+            raise ValueError(
+                f"vessel  {vessel['label']} inlet file {file_path} not found"
+            )
 
         if "inlet number" not in vessel:
-            raise ValueError(f"inlet vessel {i} is missing the inlet number")
+            raise ValueError(
+                f"inlet vessel {vessel['label']} is missing the inlet number"
+            )
 
     if "outlet" in vessel:
         outlet = vessel["outlet"]
         if outlet == 3:
-            if "R1" not in vessel or "Cc":
+            if "R1" not in vessel or "Cc" not in vessel:
                 raise ValueError(
-                    f"outlet vessel {i} is missing three-element windkessel values"
+                    f"outlet vessel {vessel['label']} is missing three-element windkessel values"
                 )
         elif outlet == 2:
             if "R1" not in vessel or "Cc" not in vessel:
                 raise ValueError(
-                    f"outlet vessel {i} is missing two-element windkessel values"
+                    f"outlet vessel {vessel['label']}is missing two-element windkessel values"
                 )
         elif outlet == 1:
             if "Rt" not in vessel:
                 raise ValueError(
-                    f"outlet vessel {i} is missing reflection coefficient value"
+                    f"outlet vessel {vessel['label']} is missing reflection coefficient value"
                 )
         else:
-            raise ValueError(f"outlet vessel {i} has invalid outlet type")
+            raise ValueError(f"outlet vessel {vessel['label']} has invalid outlet type")
 
 
 @jaxtyped(typechecker=typechecker)
