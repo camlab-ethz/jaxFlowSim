@@ -217,7 +217,7 @@ def check_vessel(i: int, vessel: dict) -> None:
     # Define thresholds
     r0t = 0.05  # radius theshold
     a0t = r0t**2 * np.pi  # cross-sectional area threshold
-    thresholds = [(r0t), (r0t, r0t), (a0t), (a0t, a0t)]
+    thresholds = [(r0t,), (r0t, r0t), (a0t,), (a0t, a0t)]
 
     # Efficiently check combinations
     existing_keys = set(vessel.keys())
@@ -229,7 +229,8 @@ def check_vessel(i: int, vessel: dict) -> None:
         if set(combination).issubset(existing_keys):
             fully_matched.append(combination)
             # Check that the values are below the threshold
-            if not all(vessel[key] < threshold for key in combination):
+
+            if not all(vessel[key] < thr for key, thr in zip(combination, threshold)):
                 print(f"Radius is larger than 5cm in vessel {vessel['label']}.")
         # Check if any key in the combination is available
         elif set(combination) & existing_keys:
@@ -272,6 +273,7 @@ def check_vessel(i: int, vessel: dict) -> None:
         print(
             f"Elasticity coefficient beta will be approximated for vessel {vessel['label']}."
         )
+
     elif total_num_matches > 1:
         raise ValueError(
             f"Multiple definitions for elasticity coefficient in vessel {vessel['label']} through {fully_matched}, {partially_matched}."
@@ -726,10 +728,9 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
 
         # Compute elasticity coefficient beta from Young's Wall modulus E
         # according to Sherwin et al. (2003) with an elasticity parameter
-        # (Poisson's ratio) nu of 0.5 ( 1 - 0.5^2 = 0.75 )
+        # (Poisson's ratio) nu of 0.5 ( 1 - 0.5^2 = 0.75 ).
         s_pi = np.sqrt(np.pi)
         s_pi_e_over_sigma_squared = s_pi * e / 0.75
-        print(e)
         return np.array(1 / np.sqrt(a_0) * h_0 * s_pi_e_over_sigma_squared)
 
 
