@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 import yaml
+import warnings
 from jaxtyping import Array, jaxtyped
 from numpy.typing import NDArray
 from typeguard import typechecked as typechecker
@@ -231,7 +232,7 @@ def check_vessel(i: int, vessel: dict) -> None:
             # Check that the values are below the threshold
 
             if not all(vessel[key] < thr for key, thr in zip(combination, threshold)):
-                print(f"Radius is larger than 5cm in vessel {vessel['label']}.")
+                warnings.warn(f"Radius is larger than 5cm in vessel {vessel['label']}.")
         # Check if any key in the combination is available
         elif set(combination) & existing_keys:
             partially_matched.append(combination)
@@ -270,7 +271,7 @@ def check_vessel(i: int, vessel: dict) -> None:
     total_num_matches = num_full_matches + num_partial_matches
 
     if num_full_matches == 0:
-        print(
+        warnings.warn(
             f"Elasticity coefficient beta will be approximated for vessel {vessel['label']}."
         )
 
