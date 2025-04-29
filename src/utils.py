@@ -9,12 +9,12 @@ It includes the following functions:
 
 The module makes use of the following imported utilities:
 - `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 from numpy.typing import NDArray
 
 

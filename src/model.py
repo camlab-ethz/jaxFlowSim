@@ -12,7 +12,7 @@ The module makes use of the following imported utilities:
 - `save_temp_data` from `src.IOutils` for saving temporary data.
 - Functions from `src.solver` for time-step computation and solving the model.
 - `jax.numpy` and `jax.lax` for numerical operations and control flow.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 import time
@@ -307,10 +307,8 @@ def simulation_loop(
             (passed_cycles_i + 1 > 1)
             * (check_conv(err, conv_tol))
             * (
-                (
-                    t_i - sim_dat_const_aux[0, 0] * passed_cycles_i
-                    >= sim_dat_const_aux[0, 0]
-                )
+                t_i - sim_dat_const_aux[0, 0] * passed_cycles_i
+                >= sim_dat_const_aux[0, 0]
             ),
             print_conv_error_wrapper,
             lambda: True,

@@ -7,13 +7,13 @@ It includes a function to:
 The module makes use of the following imported utilities:
 - `jax.numpy` for numerical operations and array handling.
 - `jax.lax` for control flow operations.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Float, jaxtyped, Integer
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 
 @jaxtyped(typechecker=typechecker)

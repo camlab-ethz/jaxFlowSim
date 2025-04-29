@@ -11,7 +11,7 @@ The module makes use of the following imported utilities:
 - `Blood` from `src.components` for representing blood properties.
 - `pressureSA` and `waveSpeed` from `src.utils` for calculating pressure and wave speed in the vessels.
 - `numpy` for numerical operations and array handling.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 import os.path
@@ -23,7 +23,7 @@ import yaml
 import warnings
 from jaxtyping import Array, jaxtyped
 from numpy.typing import NDArray
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 from src.components import Blood
 from src.utils import pressure_sa, wave_speed

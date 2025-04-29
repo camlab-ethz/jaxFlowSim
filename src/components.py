@@ -5,11 +5,11 @@ It includes a class to:
 - Define the properties of blood (`Blood`).
 
 The module makes use of the following imported utilities:
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 from jaxtyping import Array, Float, jaxtyped
-from typeguard import typechecked as typechecker
+from beartype import beartype as typechecker
 
 
 @jaxtyped(typechecker=typechecker)

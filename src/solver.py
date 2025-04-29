@@ -12,7 +12,7 @@ It includes functions to:
 The module makes use of the following imported utilities:
 - `jax.numpy` for numerical operations and array handling.
 - `jax` for just-in-time compilation and loop constructs.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 - Various utility functions and solvers for boundary conditions and flow solutions from the `src` package.
 """
 

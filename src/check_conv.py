@@ -10,7 +10,7 @@ It includes functions to:
 The module makes use of the following imported utilities:
 - `jax.lax` for control flow operations.
 - `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 from jax import lax, debug

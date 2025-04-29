@@ -14,7 +14,7 @@ It includes functions to:
 The module makes use of the following imported utilities:
 - `pressure` from `src.utils` for calculating pressure in the vessels.
 - `jax.numpy` and `jax.lax` for numerical operations and control flow.
-- `jaxtyping` and `typeguard` for type checking and ensuring type safety in the functions.
+- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
 import jax.numpy as jnp
