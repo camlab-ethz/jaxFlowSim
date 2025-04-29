@@ -824,7 +824,7 @@ def get_phi(vessel: dict) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def mesh_vessel(vessel: dict, length: float) -> float:
+def mesh_vessel(vessel: dict, length: float) -> int:
     """
     Computes the number of mesh points for the vessel.
 
@@ -935,7 +935,7 @@ def build_heart(vessel_data: dict) -> tuple[bool, float, NDArray]:
 
 @jaxtyped(typechecker=typechecker)
 def compute_windkessel_inlet_impedance(
-    r1: float, blood: Blood, a0: NDArray[np.floating[Any]], gamma: Array
+    r1: float, blood: Blood, a0: NDArray, gamma: Array
 ) -> tuple[float, float]:
     """
     Computes the inlet impedance for the Windkessel model.
