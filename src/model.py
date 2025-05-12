@@ -34,6 +34,8 @@ from src.initialise import (
 )
 from src.IOutils import save_temp_data
 from src.solver import compute_dt, solve_model
+from typing import TypeAlias, Annotated, Unpack, Literal
+from numpy.typing import NDArray
 
 numpyro.set_platform("cpu")
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
@@ -41,11 +43,58 @@ numpyro.set_platform("cpu")
 # jax.devices("cpu")[0]
 # print(jax.local_device_count())
 
+SimDat: TypeAlias = Float[Array, "5 K"]  # type: ignore
+StaticSimDat: TypeAlias = np.ndarray
+SimDatAux: TypeAlias = Float[Array, "N 3"]  # type: ignore
+StaticSimDatAux: TypeAlias = np.ndarray
+SimDatConst: TypeAlias = Float[Array, "7 K"]  # type: ignore
+StaticSimDatConst: TypeAlias = np.ndarray
+SimDatConstAux: TypeAlias = Float[Array, "N 7"]  # type: ignore
+StaticSimDatConstAux: TypeAlias = np.ndarray
+Timepoints: TypeAlias = Float[Array, " J"]  # type: ignore
+StaticTimepoints: TypeAlias = np.ndarray
+ScalarFloat: TypeAlias = Float[Array, ""]  # type: ignore
+StaticScalarFloat: TypeAlias = float
+StaticScalarInt: TypeAlias = int
+InputData: TypeAlias = Float[Array, "2*N H"]  # type: ignore
+StaticInputData: TypeAlias = np.ndarray
+Masks: TypeAlias = Integer[Array, "2 K"]  # type: ignore
+StaticMasks: TypeAlias = np.ndarray
+Strides: TypeAlias = Integer[Array, "N 5"]  # type: ignore
+StaticStrides: TypeAlias = np.ndarray
+Edges: TypeAlias = Integer[Array, "N 10"]  # type: ignore
+StaticEdges: TypeAlias = np.ndarray
+TimepointsReturn: TypeAlias = Float[Array, " I"]  # type: ignore
+StaticTimepointsReturn: TypeAlias = np.ndarray
+PressureReturn: TypeAlias = Float[Array, "I 5*N"]  # type: ignore
+StaticPressureReturn: TypeAlias = np.ndarray
+String: TypeAlias = str
+Strings: TypeAlias = list[str]
+Bool: TypeAlias = bool
+
 
 @jaxtyped(typechecker=typechecker)
 def config_simulation(
-    input_filename: str, verbose: bool = False, make_results_folder_bool: bool = True
-) -> tuple:
+    input_filename: String, verbose: Bool = False, make_results_folder_bool: Bool = True
+) -> tuple[
+    StaticScalarInt,
+    StaticScalarInt,
+    StaticScalarInt,
+    StaticSimDat,
+    StaticSimDatAux,
+    StaticSimDatConst,
+    StaticSimDatConstAux,
+    StaticTimepoints,
+    StaticScalarInt,
+    StaticScalarFloat,
+    StaticInputData,
+    StaticScalarFloat,
+    StaticMasks,
+    StaticStrides,
+    StaticEdges,
+    Strings,
+    StaticScalarFloat,
+]:
     """
     Configures the simulation by loading the configuration, building the blood properties, and arterial network.
 
@@ -95,7 +144,7 @@ def config_simulation(
         1,
         ccfl,
         input_data,
-        blood.rho,
+        blood.rho,  # type: ignore
         masks,
         strides,
         edges,
@@ -106,20 +155,20 @@ def config_simulation(
 
 @jaxtyped(typechecker=typechecker)
 def simulation_loop_unsafe(
-    n: int,
-    b: int,
-    sim_dat: Float[Array, "..."],
-    sim_dat_aux: Float[Array, "..."],
-    sim_dat_const: Float[Array, "..."],
-    sim_dat_const_aux: Float[Array, "..."],
-    ccfl: Float[Array, ""],
-    input_data: Float[Array, "..."],
-    rho: Float[Array, ""],
-    masks: Integer[Array, "..."],
-    strides: Integer[Array, "..."],
-    edges: Integer[Array, "..."],
-    upper=100000,
-) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    n: StaticScalarInt,
+    b: StaticScalarInt,
+    sim_dat: SimDat,
+    sim_dat_aux: SimDatAux,
+    sim_dat_const: SimDatConst,
+    sim_dat_const_aux: SimDatConstAux,
+    ccfl: ScalarFloat,
+    input_data: InputData,
+    rho: ScalarFloat,
+    masks: Masks,
+    strides: Strides,
+    edges: Edges,
+    upper: StaticScalarInt = 100000,
+) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the simulation loop without convergence checks.
 
@@ -230,22 +279,22 @@ def simulation_loop_unsafe(
 
 @jaxtyped(typechecker=typechecker)
 def simulation_loop(
-    n: int,
-    b: int,
-    num_snapshots: int,
-    sim_dat: Float[Array, "..."],
-    sim_dat_aux: Float[Array, "..."],
-    sim_dat_const: Float[Array, "..."],
-    sim_dat_const_aux: Float[Array, "..."],
-    timepoints: Float[Array, "..."],
-    conv_tol: Float[Array, ""],
-    ccfl: Float[Array, ""],
-    input_data: Float[Array, "..."],
-    rho: Float[Array, ""],
-    masks: Integer[Array, "..."],
-    strides: Integer[Array, "..."],
-    edges: Integer[Array, "..."],
-) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    n: StaticScalarInt,
+    b: StaticScalarInt,
+    num_snapshots: StaticScalarInt,
+    sim_dat: SimDat,
+    sim_dat_aux: SimDatAux,
+    sim_dat_const: SimDatConst,
+    sim_dat_const_aux: SimDatConstAux,
+    timepoints: Timepoints,
+    conv_tol: ScalarFloat,
+    ccfl: ScalarFloat,
+    input_data: InputData,
+    rho: ScalarFloat,
+    masks: Masks,
+    strides: Strides,
+    edges: Edges,
+) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the main simulation loop with convergence checks.
 
@@ -447,8 +496,10 @@ def simulation_loop(
 
 
 def run_simulation_unsafe(
-    config_filename, verbose=False, make_results_folder_bool=True
-) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    config_filename: String,
+    verbose: Bool = False,
+    make_results_folder_bool: Bool = True,
+) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the simulation without convergence checks.
 
@@ -506,8 +557,10 @@ def run_simulation_unsafe(
 
 
 def run_simulation(
-    config_filename, verbose=False, make_results_folder_bool=True
-) -> tuple[Float[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
+    config_filename: String,
+    verbose: Bool = False,
+    make_results_folder_bool: Bool = True,
+) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the simulation with convergence checks.
 
