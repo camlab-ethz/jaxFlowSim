@@ -17,6 +17,8 @@ from jaxtyping import Array, Float, jaxtyped
 from beartype import beartype as typechecker
 from numpy.typing import NDArray
 
+from src.types import StaticScalarFloat
+
 
 @jaxtyped(typechecker=typechecker)
 def pressure(
@@ -44,7 +46,7 @@ def pressure(
 def pressure_sa(
     s_a_over_a0: Float[Array, "..."] | NDArray,
     beta: Float[Array, "..."] | NDArray,
-    p_ext: Float[Array, "..."] | float,
+    p_ext: Float[Array, "..."] | float | StaticScalarFloat,
 ) -> Float[Array, "..."] | NDArray:
     """
     Computes the pressure in a vessel given the square root of the area ratio, stiffness coefficient, and external pressure.

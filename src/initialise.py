@@ -16,21 +16,38 @@ The module makes use of the following imported utilities:
 
 import os.path
 import shutil
-from typing import Any
 
 import numpy as np
 import yaml
 import warnings
-from jaxtyping import Array, jaxtyped
-from numpy.typing import NDArray
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.components import Blood
 from src.utils import pressure_sa, wave_speed
+from src.types import (
+    Bool,
+    Dict,
+    Dicts,
+    StaticInputDataSingle,
+    StaticScalarFloat,
+    StaticScalarInt,
+    StaticSimDat,
+    StaticSimDatSingle,
+    String,
+    Strings,
+    StaticSimDatAux,
+    StaticSimDatConst,
+    StaticSimDatConstAux,
+    StaticMasks,
+    StaticStrides,
+    StaticEdges,
+    StaticInputData,
+)
 
 
 @jaxtyped(typechecker=typechecker)
-def load_config(input_filename: str) -> dict:
+def load_config(input_filename: String) -> Dict:
     """
     Loads the configuration from a YAML file and checks its validity.
 
@@ -46,7 +63,7 @@ def load_config(input_filename: str) -> dict:
 
 
 @jaxtyped(typechecker=typechecker)
-def load_yaml_file(input_filename: str) -> dict:
+def load_yaml_file(input_filename: String) -> Dict:
     """
     Loads a YAML file.
 
@@ -67,7 +84,7 @@ def load_yaml_file(input_filename: str) -> dict:
 
 
 @jaxtyped(typechecker=typechecker)
-def check_input_file(data: dict) -> None:
+def check_input_file(data: Dict) -> None:
     """
     Checks the validity of the input configuration file.
 
@@ -82,7 +99,7 @@ def check_input_file(data: dict) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def check_sections(data: dict) -> None:
+def check_sections(data: Dict) -> None:
     """
     Checks the presence of required sections in the configuration data.
 
@@ -108,7 +125,7 @@ def check_sections(data: dict) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def check_section(data: dict, section: str, keys: list[str]) -> None:
+def check_section(data: Dict, section: String, keys: Strings) -> None:
     """
     Checks the presence of required keys in a specific section of the configuration data.
 
@@ -129,7 +146,7 @@ def check_section(data: dict, section: str, keys: list[str]) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def check_network(network: list[dict]) -> None:
+def check_network(network: Dicts) -> None:
     """
     Checks the validity of the network configuration.
 
@@ -189,7 +206,7 @@ def check_network(network: list[dict]) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def check_vessel(i: int, vessel: dict) -> None:
+def check_vessel(i: StaticScalarInt, vessel: Dict) -> None:
     """
     Checks the validity of a single vessel configuration.
 
@@ -318,7 +335,7 @@ def check_vessel(i: int, vessel: dict) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def make_results_folder(data: dict, input_filename: str) -> None:
+def make_results_folder(data: Dict, input_filename: String) -> None:
     """
     Creates the results folder for the simulation and copies necessary files.
 
@@ -346,7 +363,7 @@ def make_results_folder(data: dict, input_filename: str) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def copy_inlet_files(data: dict, r_folder: str) -> None:
+def copy_inlet_files(data: Dict, r_folder: String) -> None:
     """
     Copies inlet files to the results folder.
 
@@ -363,7 +380,7 @@ def copy_inlet_files(data: dict, r_folder: str) -> None:
 
 
 @jaxtyped(typechecker=typechecker)
-def build_blood(blood_data: dict) -> Blood:
+def build_blood(blood_data: Dict) -> Blood:
     """
     Builds the Blood object from the provided data.
 
@@ -382,19 +399,19 @@ def build_blood(blood_data: dict) -> Blood:
 
 @jaxtyped(typechecker=typechecker)
 def build_arterial_network(
-    network: list[dict], blood: Blood
+    network: Dicts, blood: Blood
 ) -> tuple[
-    NDArray,
-    NDArray,
-    NDArray,
-    NDArray,
-    int,
-    int,
-    NDArray,
-    NDArray,
-    NDArray,
-    list[str],
-    NDArray,
+    StaticSimDat,
+    StaticSimDatAux,
+    StaticSimDatConst,
+    StaticSimDatConstAux,
+    StaticScalarInt,
+    StaticScalarInt,
+    StaticMasks,
+    StaticStrides,
+    StaticEdges,
+    Strings,
+    StaticInputData,
 ]:
     """
     Builds the arterial network from the provided configuration data.
@@ -562,8 +579,19 @@ def build_arterial_network(
 
 @jaxtyped(typechecker=typechecker)
 def build_vessel(
-    index: int, vessel_data: dict, blood: Blood, m: np.int64
-) -> tuple[NDArray, NDArray, NDArray, NDArray, str, NDArray, NDArray]:
+    index: StaticScalarInt,
+    vessel_data: Dict,
+    blood: Blood,
+    m: StaticScalarInt,
+) -> tuple[
+    StaticEdges,
+    StaticInputData,
+    StaticSimDat,
+    StaticSimDatAux,
+    String,
+    StaticSimDatConst,
+    StaticSimDatConstAux,
+]:
     """
     Builds the data for a single vessel.
 
@@ -644,8 +672,12 @@ def build_vessel(
 
 @jaxtyped(typechecker=typechecker)
 def compute_a0(
-    length: float, dx: np.float64, h0: float, m: np.int64, vessel: dict
-) -> tuple[NDArray, NDArray, float]:
+    length: StaticScalarFloat,
+    dx: StaticScalarFloat,
+    h0: StaticScalarFloat,
+    m: StaticScalarInt,
+    vessel: Dict,
+) -> tuple[StaticSimDatSingle, StaticSimDatSingle, StaticScalarFloat]:
     """
     Computes the initial cross-sectional area of the vessel.
 
@@ -689,7 +721,12 @@ def compute_a0(
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
+def compute_beta(
+    a_0: StaticSimDatSingle,
+    h_0: StaticScalarFloat,
+    dx: StaticScalarFloat,
+    vessel: Dict,
+) -> StaticSimDatSingle:
     """
     Computes the beta value for the vessel.
 
@@ -736,7 +773,9 @@ def compute_beta(a_0: NDArray, h_0: float, dx: float, vessel: dict) -> NDArray:
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_radius_slope(r_p: float, r_d: float, length: float) -> float:
+def compute_radius_slope(
+    r_p: StaticScalarFloat, r_d: StaticScalarFloat, length: StaticScalarFloat
+) -> StaticScalarFloat:
     """
     Computes the radius slope of the vessel.
 
@@ -752,7 +791,7 @@ def compute_radius_slope(r_p: float, r_d: float, length: float) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_thickness(r_0_i: float) -> float:
+def compute_thickness(r_0_i: StaticScalarFloat) -> StaticScalarFloat:
     """
     Computes the thickness of the vessel wall.
 
@@ -770,7 +809,7 @@ def compute_thickness(r_0_i: float) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_radii(vessel: dict) -> tuple[float, float]:
+def compute_radii(vessel: Dict) -> tuple[StaticScalarFloat, StaticScalarFloat]:
     """
     Computes the proximal and distal radii of the vessel.
 
@@ -790,7 +829,7 @@ def compute_radii(vessel: dict) -> tuple[float, float]:
 
 
 @jaxtyped(typechecker=typechecker)
-def get_pext(vessel: dict) -> float:
+def get_pext(vessel: Dict) -> StaticScalarFloat:
     """
     Gets the external pressure of the vessel.
 
@@ -807,7 +846,7 @@ def get_pext(vessel: dict) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def get_phi(vessel: dict) -> float:
+def get_phi(vessel: Dict) -> StaticScalarFloat:
     """
     Gets the phi value of the vessel.
 
@@ -824,7 +863,7 @@ def get_phi(vessel: dict) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def mesh_vessel(vessel: dict, length: float) -> int:
+def mesh_vessel(vessel: Dict, length: StaticScalarFloat) -> StaticScalarInt:
     """
     Computes the number of mesh points for the vessel.
 
@@ -845,7 +884,7 @@ def mesh_vessel(vessel: dict, length: float) -> int:
 
 
 @jaxtyped(typechecker=typechecker)
-def initialise_thickness(vessel: dict) -> float:
+def initialise_thickness(vessel: Dict) -> StaticScalarFloat:
     """
     Initializes the thickness of the vessel wall.
 
@@ -862,7 +901,15 @@ def initialise_thickness(vessel: dict) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def add_outlet(vessel: dict) -> tuple[int, float, float, float, float]:
+def add_outlet(
+    vessel: Dict,
+) -> tuple[
+    StaticScalarInt,
+    StaticScalarFloat,
+    StaticScalarFloat,
+    StaticScalarFloat,
+    StaticScalarFloat,
+]:
     """
     Adds the outlet configuration to the vessel.
 
@@ -899,7 +946,7 @@ def add_outlet(vessel: dict) -> tuple[int, float, float, float, float]:
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_viscous_term(vessel_data: dict, blood: Blood) -> float:
+def compute_viscous_term(vessel_data: Dict, blood: Blood) -> StaticScalarFloat:
     """
     Computes the viscous term for the vessel.
 
@@ -915,7 +962,9 @@ def compute_viscous_term(vessel_data: dict, blood: Blood) -> float:
 
 
 @jaxtyped(typechecker=typechecker)
-def build_heart(vessel_data: dict) -> tuple[bool, float, NDArray]:
+def build_heart(
+    vessel_data: Dict,
+) -> tuple[Bool, StaticScalarFloat, StaticInputDataSingle]:
     """
     Builds the heart data for the inlet vessel.
 
@@ -935,8 +984,11 @@ def build_heart(vessel_data: dict) -> tuple[bool, float, NDArray]:
 
 @jaxtyped(typechecker=typechecker)
 def compute_windkessel_inlet_impedance(
-    r1: float, blood: Blood, a0: NDArray, gamma: Array
-) -> tuple[float, float]:
+    r1: StaticScalarFloat,
+    blood: Blood,
+    a0: StaticSimDatSingle,
+    gamma: StaticSimDatSingle,
+) -> tuple[StaticScalarFloat, StaticScalarFloat]:
     """
     Computes the inlet impedance for the Windkessel model.
 
