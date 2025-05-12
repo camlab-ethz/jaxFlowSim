@@ -2,6 +2,7 @@ import numpy as np
 from jaxtyping import Array, Float, Integer
 from typing import TypeAlias
 
+# TODO: remove use of np.ndarray and use jax types instead or make them more concise by using NDarray and e.g. np.float64
 SimDat: TypeAlias = Float[Array, "5 K"]  # type: ignore
 StaticSimDat: TypeAlias = np.ndarray
 SimDatAux: TypeAlias = Float[Array, "N 3"]  # type: ignore
