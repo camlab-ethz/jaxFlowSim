@@ -46,7 +46,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 # Initialize timing variables
 STARTING_TIME = time.time_ns()

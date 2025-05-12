@@ -66,7 +66,7 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
         edges,
         vessel_names,
         cardiac_T,
-    ) = config_simulation(CONFIG_FILENAME, VERBOSE)
+    ) = config_simulation(CONFIG_FILENAME)
 
     UPPER = 1000
 
@@ -150,7 +150,7 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
             jnp.mean(
                 jnp.linalg.norm(
                     jax.scipy.stats.norm.pdf(
-                        ((y - y_hat)) / y.mean(axis=0),
+                        (y - y_hat) / y.mean(axis=0),
                         loc=0,
                         scale=sigma,
                     ),
@@ -280,23 +280,23 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
         plt.legend()
         # plt.grid(alpha=0.3)
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke_nt.pdf"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke_nt.pdf"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke_nt.png"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke_nt.png"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke_nt.eps"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke_nt.eps"
         )
         plt.title(f"geweke diagnostic for {var_name}")
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke.pdf"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke.pdf"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke.png"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke.png"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_geweke.eps"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_geweke.eps"
         )
         plt.close()
 
@@ -342,9 +342,7 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
         print(mcmc.get_samples()["theta"].shape)
         _, t, y = sim_loop_wrapper(jax.nn.softplus(R))  # pylint: disable=E1102
         loss_val = loss(P_obs, y)
-        _, t, y = sim_loop_wrapper(
-            jax.nn.softplus(R), upper=120000
-        )  # pylint: disable=E1102
+        _, t, y = sim_loop_wrapper(jax.nn.softplus(R), upper=120000)  # pylint: disable=E1102
         indices_sorted = np.argsort(t_obs_long[-12000:])
         plt.scatter(
             t_obs_long[-12000:][indices_sorted],
@@ -368,26 +366,26 @@ def param_inf_numpyro(vessel_indices, var_indices, CONFIG_FILENAME):
         # plt.ylim([30, 140])
         plt.tight_layout()
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_nt.pdf"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_nt.pdf"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_nt.png"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_nt.png"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}_nt.eps"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}_nt.eps"
         )
         plt.title(
             f"learning scaled Windkessel resistance parameters of a bifurcation:\n[R1_1, R2_1, R1_2, R2_2] = {R},\nloss = {loss_val}, \nwallclock time = {total_time}"
         )
         plt.tight_layout()
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.pdf"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}.pdf"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.png"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}.png"
         )
         plt.savefig(
-            f"{RESULTS_FOLDER}/{str(setup_properties["num_warmup"])}_{str(setup_properties["num_samples"])}.eps"
+            f"{RESULTS_FOLDER}/{str(setup_properties['num_warmup'])}_{str(setup_properties['num_samples'])}.eps"
         )
         plt.close()
 
@@ -423,7 +421,7 @@ def param_inf_optax(vessel_indices, var_indices, CONFIG_FILENAME):
         edges,
         vessel_names,
         cardiac_T,
-    ) = config_simulation(CONFIG_FILENAME, VERBOSE)
+    ) = config_simulation(CONFIG_FILENAME)
 
     UPPER = 1000
 
@@ -656,7 +654,7 @@ def param_inf_optax(vessel_indices, var_indices, CONFIG_FILENAME):
     y = model_state.apply_fn(trained_model_state.params)[0]
 
     print(
-        f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params["params"]["Rs"])}"
+        f"Final Loss: {loss(P_obs, y)} and Parameters: {jax.nn.softplus(trained_model_state.params['params']['Rs'])}"
     )
 
     plt.figure()

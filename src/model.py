@@ -15,14 +15,13 @@ The module makes use of the following imported utilities:
 - `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
-import time
 from functools import partial
 
 import jax.numpy as jnp
 import numpy as np
 import numpyro  # type: ignore
 from jax import block_until_ready, jit, lax
-from jaxtyping import Array, Float, Integer, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.check_conv import check_conv, compute_conv_error, print_conv_error
@@ -73,7 +72,7 @@ numpyro.set_platform("cpu")
 
 @jaxtyped(typechecker=typechecker)
 def config_simulation(
-    input_filename: String, verbose: Bool = False, make_results_folder_bool: Bool = True
+    input_filename: String, make_results_folder_bool: Bool = True
 ) -> tuple[
     StaticScalarInt,
     StaticScalarInt,
@@ -495,7 +494,6 @@ def simulation_loop(
 
 def run_simulation_unsafe(
     config_filename: String,
-    verbose: Bool = False,
     make_results_folder_bool: Bool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
@@ -528,7 +526,7 @@ def run_simulation_unsafe(
         edges,
         _,
         _,
-    ) = config_simulation(config_filename, verbose, make_results_folder_bool)
+    ) = config_simulation(config_filename, make_results_folder_bool)
 
     sim_loop_unsafe_jit = partial(jit, static_argnums=(0, 1, 12))(
         simulation_loop_unsafe
@@ -556,7 +554,6 @@ def run_simulation_unsafe(
 
 def run_simulation(
     config_filename: String,
-    verbose: Bool = False,
     make_results_folder_bool: Bool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
@@ -588,7 +585,7 @@ def run_simulation(
         edges,
         _,
         _,
-    ) = config_simulation(config_filename, verbose, make_results_folder_bool)
+    ) = config_simulation(config_filename, make_results_folder_bool)
 
     sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
     sim_dat, t, p = block_until_ready(

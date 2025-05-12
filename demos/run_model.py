@@ -87,7 +87,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 # Initialize timing variables
 STARTING_TIME = 0.0
@@ -219,6 +219,6 @@ for index_vessel_name, vessel_name in enumerate(vessel_names):
     plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="upper right")
     plt.tight_layout()
     plt.savefig(
-        f"results/{network_name}_results/{network_name}_{vessel_names[index_vessel_name].replace(" ", "_")}_P_nt.eps"
+        f"results/{network_name}_results/{network_name}_{vessel_names[index_vessel_name].replace(' ', '_')}_P_nt.eps"
     )
     plt.close()

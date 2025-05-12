@@ -74,7 +74,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 # Initialize lists to store time and pressure data for each simulation
 t_t = []
@@ -225,6 +225,6 @@ for i, vessel_name in enumerate(vessel_names):
     plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
-        f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(" ", "_")}_P.pdf"
+        f"results/{network_name}_results/{network_name}_{vessel_names[i].replace(' ', '_')}_P.pdf"
     )
     plt.close()

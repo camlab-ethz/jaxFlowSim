@@ -1,8 +1,8 @@
 """
 This script performs a simulation of blood flow in a vascular network using JAX for Just-In-Time (JIT) compilation,
-and optimizes the simulation step size for computational efficiency and accuracy. The script loads a specified model 
-configuration, runs the simulation, calculates the residual between the simulation and reference data, and iteratively 
-adjusts the step size to optimize the simulation. Results, including the time taken and residuals for different step sizes, 
+and optimizes the simulation step size for computational efficiency and accuracy. The script loads a specified model
+configuration, runs the simulation, calculates the residual between the simulation and reference data, and iteratively
+adjusts the step size to optimize the simulation. Results, including the time taken and residuals for different step sizes,
 are plotted and saved as a PDF.
 
 Steps:
@@ -54,7 +54,6 @@ jax.config.update("jax_enable_x64", True)
 # Set the configuration filename based on command line arguments or default to a specific model
 CONFIG_FILENAME = ""
 if len(sys.argv) == 1:
-
     MODELNAME = "adan56"
 
     CONFIG_FILENAME = "test/" + MODELNAME + "/" + MODELNAME + ".yml"
@@ -83,7 +82,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 # Extract the network name from the configuration filename
 filename = CONFIG_FILENAME.split("/")[-1]

@@ -68,7 +68,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 # Record the start time if verbose mode is enabled
 if VERBOSE:

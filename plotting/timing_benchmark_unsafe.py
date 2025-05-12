@@ -35,7 +35,7 @@ for network_name in network_names:
         edges,
         vessel_names,
         cardiac_T,
-    ) = config_simulation("test/" + network_name + "/" + network_name + ".yml", verbose)
+    ) = config_simulation("test/" + network_name + "/" + network_name + ".yml")
 
     # warmup step
     sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
@@ -58,7 +58,6 @@ for network_name in network_names:
     )
 
     for i in range(samples):
-
         if verbose:
             starting_time = time.time_ns()
 

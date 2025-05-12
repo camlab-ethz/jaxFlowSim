@@ -1,7 +1,6 @@
 import numpy as np
-from jaxtyping import Array, Float, Integer, jaxtyped
-from typing import TypeAlias, Annotated, Unpack, Literal
-from numpy.typing import NDArray
+from jaxtyping import Array, Float, Integer
+from typing import TypeAlias
 
 SimDat: TypeAlias = Float[Array, "5 K"]  # type: ignore
 StaticSimDat: TypeAlias = np.ndarray

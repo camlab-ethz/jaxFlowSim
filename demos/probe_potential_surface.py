@@ -69,7 +69,7 @@ VERBOSE = True
     edges,
     vessel_names,
     cardiac_T,
-) = config_simulation(CONFIG_FILENAME, VERBOSE)
+) = config_simulation(CONFIG_FILENAME)
 
 Ccfl = 0.5
 NUM_ITERATIONS = 1000
