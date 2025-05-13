@@ -5,6 +5,7 @@ from typing import TypeAlias
 # TODO: remove use of np.ndarray and use jax types instead or make them more concise by using NDarray and e.g. np.float64
 SimDat: TypeAlias = Float[Array, "5 K"]  # type: ignore
 StaticSimDat: TypeAlias = np.ndarray
+SimDatSingle: TypeAlias = Float[Array, " K"]  # type: ignore
 StaticSimDatSingle: TypeAlias = np.ndarray
 SimDatAux: TypeAlias = Float[Array, "N 3"]  # type: ignore
 StaticSimDatAux: TypeAlias = np.ndarray
@@ -14,9 +15,10 @@ SimDatConstAux: TypeAlias = Float[Array, "N 7"]  # type: ignore
 StaticSimDatConstAux: TypeAlias = np.ndarray
 Timepoints: TypeAlias = Float[Array, " J"]  # type: ignore
 StaticTimepoints: TypeAlias = np.ndarray
-ScalarFloat: TypeAlias = Float[Array, ""]  # type: ignore
+ScalarFloat: TypeAlias = Float[Array, ""]
 StaticScalarFloat: TypeAlias = float | np.floating
 StaticScalarInt: TypeAlias = int | np.int64
+ScalarInt: TypeAlias = Integer[Array, ""]
 InputData: TypeAlias = Float[Array, "2*N H"]  # type: ignore
 StaticInputData: TypeAlias = np.ndarray
 StaticInputDataSingle: TypeAlias = np.ndarray
@@ -26,12 +28,26 @@ Strides: TypeAlias = Integer[Array, "N 5"]  # type: ignore
 StaticStrides: TypeAlias = np.ndarray
 Edges: TypeAlias = Integer[Array, "N 10"]  # type: ignore
 StaticEdges: TypeAlias = np.ndarray
-TimepointsReturn: TypeAlias = Float[Array, " I"]  # type: ignore
+TimepointsReturn: TypeAlias = Float[Array, " I"]
 StaticTimepointsReturn: TypeAlias = np.ndarray
-PressureReturn: TypeAlias = Float[Array, "I 5*N"]  # type: ignore
+PressureReturn: TypeAlias = Float[Array, "I 5*N"]
 StaticPressureReturn: TypeAlias = np.ndarray
 String: TypeAlias = str
 Strings: TypeAlias = list[str]
 Bool: TypeAlias = bool
 Dict: TypeAlias = dict
 Dicts: TypeAlias = list[dict]
+
+SimulationStepArgsUnsafe: TypeAlias = tuple[
+    SimDat,
+    SimDatAux,
+    SimDatConst,
+    SimDatConstAux,
+    ScalarFloat,
+    ScalarFloat,
+    TimepointsReturn,
+    Edges,
+    InputData,
+    StaticScalarFloat,
+    PressureReturn,
+]

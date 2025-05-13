@@ -35,12 +35,14 @@ from src.IOutils import save_temp_data
 from src.solver import compute_dt, solve_model
 from src.types import (
     PressureReturn,
+    SimulationStepArgsUnsafe,
     StaticScalarInt,
     SimDat,
     SimDatAux,
     SimDatConst,
     SimDatConstAux,
     ScalarFloat,
+    ScalarInt,
     Strides,
     Edges,
     Masks,
@@ -141,7 +143,7 @@ def config_simulation(
         1,
         ccfl,
         input_data,
-        blood.rho,  # type: ignore
+        blood.rho,
         masks,
         strides,
         edges,
@@ -192,7 +194,9 @@ def simulation_loop_unsafe(
     p_t = jnp.zeros((upper, 5 * n))
     t_t = jnp.zeros(upper)
 
-    def simulation_one_step(i, args):
+    def simulation_step(
+        i: ScalarInt, args: SimulationStepArgsUnsafe
+    ) -> SimulationStepArgsUnsafe:
         (
             sim_dat,
             sim_dat_aux,
@@ -255,7 +259,7 @@ def simulation_loop_unsafe(
     ) = lax.fori_loop(
         0,
         upper,
-        simulation_one_step,
+        simulation_step,
         (
             sim_dat,
             sim_dat_aux,
@@ -318,7 +322,7 @@ def simulation_loop(
     t = 0.0
     passed_cycles = 0
     counter = 0
-    p_t = jnp.empty((num_snapshots, n * 5))
+    p_t: PressureReturn = jnp.empty((num_snapshots, n * 5))
     t_t = jnp.empty(num_snapshots)
     p_l = jnp.empty((num_snapshots, n * 5))
     dt = 0
@@ -587,9 +591,9 @@ def run_simulation(
         _,
     ) = config_simulation(config_filename, make_results_folder_bool)
 
-    sim_loop_old_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
+    simulation_loop_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
     sim_dat, t, p = block_until_ready(
-        sim_loop_old_jit(  # pylint: disable=E1102
+        simulation_loop_jit(
             n,
             b,
             j,

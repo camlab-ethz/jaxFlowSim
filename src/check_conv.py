@@ -13,17 +13,17 @@ The module makes use of the following imported utilities:
 - `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
-from jax import lax, debug
+from jax import lax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped, Bool
 from beartype import beartype as typechecker
-import os
-import jaxtyping
+
+from src.types import StaticScalarInt, ScalarFloat
 
 
 @jaxtyped(typechecker=typechecker)
 def calc_norms(
-    n: int, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
+    n: StaticScalarInt, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
 ) -> Float[Array, "..."]:
     """
     Calculates the norms between two sets of pressure data.
@@ -49,8 +49,8 @@ def calc_norms(
 
 @jaxtyped(typechecker=typechecker)
 def compute_conv_error(
-    n: int, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
-) -> Float[Array, ""]:
+    n: StaticScalarInt, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
+) -> ScalarFloat:
     """
     Computes the maximum convergence error between two sets of pressure data.
 

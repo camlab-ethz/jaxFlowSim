@@ -343,7 +343,7 @@ def solve_model(
         sim_dat = lax.cond(
             (sim_dat_const_aux[j, 2] == 0) * (edges[j, 3] != 2) * (edges[j, 6] == 1),
             solve_conjunction_wrapper,
-            lambda x, y: x,
+            lambda x, _: x,
             sim_dat,
             rho,
         )

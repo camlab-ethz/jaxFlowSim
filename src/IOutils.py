@@ -12,12 +12,14 @@ The module makes use of the following imported utilities:
 
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Float, jaxtyped, Integer
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
+
+from src.types import SimDatSingle, StaticScalarInt, Strides
 
 
 @jaxtyped(typechecker=typechecker)
-def save_temp_data(n: int, strides: Integer[Array, "..."], p: Float[Array, "..."]):
+def save_temp_data(n: StaticScalarInt, strides: Strides, p: SimDatSingle):
     """
     Saves temporary pressure data at specified strides.
 

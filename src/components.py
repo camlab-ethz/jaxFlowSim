@@ -8,8 +8,10 @@ The module makes use of the following imported utilities:
 - `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
 """
 
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
+
+from src.types import StaticScalarFloat
 
 
 @jaxtyped(typechecker=typechecker)
@@ -23,15 +25,15 @@ class Blood:
     rho_inv (Float[Array, ""]): Inverse density of blood.
     """
 
-    mu: Float[Array, ""]
-    rho: Float[Array, ""]
-    rho_inv: Float[Array, ""]
+    mu: StaticScalarFloat
+    rho: StaticScalarFloat
+    rho_inv: StaticScalarFloat
 
     def __init__(
         self,
-        mu: Float[Array, ""],
-        rho: Float[Array, ""],
-        rho_inv: Float[Array, ""],
+        mu: StaticScalarFloat,
+        rho: StaticScalarFloat,
+        rho_inv: StaticScalarFloat,
     ):
         self.mu = mu
         self.rho = rho
