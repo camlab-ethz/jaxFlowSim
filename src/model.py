@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpyro  # type: ignore
 from jax import block_until_ready, jit, lax
-from jaxtyping import jaxtyped
+from jaxtyping import Float, Integer, jaxtyped
 from beartype import beartype as typechecker
 
 from src.check_conv import check_conv, compute_conv_error, print_conv_error
@@ -35,6 +35,7 @@ from src.IOutils import save_temp_data
 from src.solver import compute_dt, solve_model
 from src.types import (
     PressureReturn,
+    SimulationStepArgs,
     SimulationStepArgsUnsafe,
     StaticScalarInt,
     SimDat,
@@ -190,7 +191,7 @@ def simulation_loop_unsafe(
     tuple: Updated simulation data, time steps, and pressure data.
     """
     t = 0.0
-    dt = 1
+    dt = 1.0
     p_t = jnp.zeros((upper, 5 * n))
     t_t = jnp.zeros(upper)
 
@@ -319,15 +320,15 @@ def simulation_loop(
     Returns:
     tuple: Updated simulation data, time steps, and pressure data.
     """
-    t = 0.0
-    passed_cycles = 0
-    counter = 0
-    p_t: PressureReturn = jnp.empty((num_snapshots, n * 5))
+    t: Float = 0.0
+    passed_cycles: Integer = 0
+    counter: Integer = 0
+    p_t = jnp.empty((num_snapshots, n * 5))
     t_t = jnp.empty(num_snapshots)
     p_l = jnp.empty((num_snapshots, n * 5))
-    dt = 0
+    dt: Float = 1.0
 
-    def conv_error_condition(args):
+    def conv_error_condition(args: SimulationStepArgs) -> Bool:
         (
             _,
             _,
@@ -365,7 +366,9 @@ def simulation_loop(
         )
         return ret
 
-    def simulation_one_step(args):
+    def simulation_step(
+        args: SimulationStepArgs,
+    ) -> SimulationStepArgs:
         (
             sim_dat,
             sim_dat_aux,
@@ -471,7 +474,7 @@ def simulation_loop(
         rho,
     ) = lax.while_loop(
         conv_error_condition,
-        simulation_one_step,
+        simulation_step,
         (
             sim_dat,
             sim_dat_aux,

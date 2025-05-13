@@ -38,6 +38,26 @@ Bool: TypeAlias = bool
 Dict: TypeAlias = dict
 Dicts: TypeAlias = list[dict]
 
+SimulationStepArgs = tuple[
+    SimDat,
+    SimDatAux,
+    SimDatConst,
+    SimDatConstAux,
+    ScalarFloat,
+    ScalarInt,
+    Timepoints,
+    ScalarInt,
+    ScalarFloat,
+    PressureReturn,
+    PressureReturn,
+    TimepointsReturn,
+    ScalarFloat,
+    ScalarFloat,
+    Edges,
+    InputData,
+    ScalarFloat,
+]
+
 SimulationStepArgsUnsafe: TypeAlias = tuple[
     SimDat,
     SimDatAux,
@@ -48,6 +68,6 @@ SimulationStepArgsUnsafe: TypeAlias = tuple[
     TimepointsReturn,
     Edges,
     InputData,
-    StaticScalarFloat,
+    ScalarFloat,
     PressureReturn,
 ]
