@@ -27,15 +27,34 @@ from src.anastomosis import solve_anastomosis
 from src.bifurcations import solve_bifurcation
 from src.boundary_conditions import set_inlet_bc, set_outlet_bc
 from src.conjunctions import solve_conjunction
+from src.types import (
+    Edges,
+    InputData,
+    Masks,
+    MasksPadded,
+    ScalarFloat,
+    ScalarInt,
+    SimDat,
+    SimDatAux,
+    SimDatConst,
+    SimDatConstAux,
+    SimDatDouble,
+    SimDatSingle,
+    SimDatSingleReduced,
+    StaticScalarFloat,
+    StaticScalarInt,
+    Strides,
+    StridesReduced,
+)
 from src.utils import pressure_sa, wave_speed_sa
 
 
 @jaxtyped(typechecker=typechecker)
 def compute_dt(
-    ccfl: Float[Array, ""],
-    u: Float[Array, "..."],
-    c: Float[Array, "..."],
-    dx: Float[Array, "..."],
+    ccfl: ScalarFloat,
+    u: SimDatSingle,
+    c: SimDatSingle,
+    dx: SimDatSingle,
 ) -> Float[Array, ""]:
     """
     Computes the time step size based on the Courant–Friedrichs–Lewy (CFL) condition.
@@ -59,18 +78,19 @@ def compute_dt(
 @jaxtyped(typechecker=typechecker)
 def solve_model(
     n: int,
-    b: int,
-    t: Float[Array, ""],
-    dt: Float[Array, ""],
+    b: StaticScalarInt,
+    t: ScalarFloat,
+    dt: ScalarFloat,
+    # TODO: correctly tpye input_data
     input_data: Float[Array, "..."],
-    rho: Float[Array, ""],
-    sim_dat: Float[Array, "..."],
-    sim_dat_aux: Float[Array, "..."],
-    sim_dat_const: Float[Array, "..."],
-    sim_dat_const_aux: Float[Array, "..."],
-    masks: Integer[Array, "..."],
-    strides: Integer[Array, "..."],
-    edges: Integer[Array, "..."],
+    rho: ScalarFloat,
+    sim_dat: SimDat,
+    sim_dat_aux: SimDatAux,
+    sim_dat_const: SimDatConst,
+    sim_dat_const_aux: SimDatConstAux,
+    masks: Masks,
+    strides: StridesReduced,
+    edges: Edges,
 ) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
     """
     Solves the model equations for the vascular network.
@@ -140,7 +160,12 @@ def solve_model(
         )
     )
 
-    def set_outlet_or_junction(j, dat):
+    def set_outlet_or_junction(
+        j: ScalarInt,
+        dat: tuple[
+            SimDat, SimDatAux, SimDatConst, SimDatConstAux, Edges, ScalarFloat, Strides
+        ],
+    ):
         (
             sim_dat,
             sim_dat_aux,
@@ -152,7 +177,7 @@ def solve_model(
         ) = dat
         end = strides[j, 1]
 
-        def set_outlet_bc_wrapper(sim_dat, sim_dat_aux):
+        def set_outlet_bc_wrapper(sim_dat: SimDat, sim_dat_aux: SimDatAux):
             us = jnp.array([sim_dat[0, end - 1], sim_dat[0, end - 2]])
             q1 = sim_dat[1, end - 1]
             a1 = sim_dat[2, end - 1]
@@ -203,7 +228,7 @@ def solve_model(
             sim_dat_aux,
         )
 
-        def solve_bifurcation_wrapper(sim_dat):
+        def solve_bifurcation_wrapper(sim_dat: SimDat):
             d1_i = edges[j, 4]
             d2_i = edges[j, 5]
             d1_i_start = strides[d1_i, 0]
@@ -288,7 +313,7 @@ def solve_model(
             sim_dat,
         )
 
-        def solve_conjunction_wrapper(sim_dat, rho):
+        def solve_conjunction_wrapper(sim_dat: SimDat, rho: ScalarFloat):
             d_i = edges[j, 7]
             d_i_start = strides[d_i, 0]
             us = jnp.array([sim_dat[0, end - 1], sim_dat[0, d_i_start]])
@@ -348,7 +373,7 @@ def solve_model(
             rho,
         )
 
-        def solve_anastomosis_wrapper(sim_dat):
+        def solve_anastomosis_wrapper(sim_dat: SimDat):
             p1_i = edges[j, 7]
             p2_i = edges[j, 8]
             d = edges[j, 9]
@@ -486,18 +511,18 @@ def solve_model(
 
 @jaxtyped(typechecker=typechecker)
 def muscl(
-    dt: Float[Array, ""],
-    q: Float[Array, "..."],
-    a: Float[Array, "..."],
-    a0: Float[Array, "..."],
-    beta: Float[Array, "..."],
-    gamma: Float[Array, "..."],
-    wall_e: Float[Array, "..."],
-    dx: Float[Array, "..."],
-    p_ext: Float[Array, "..."],
-    visc_t: Float[Array, "..."],
-    masks: Integer[Array, "..."],
-) -> Float[Array, "..."]:
+    dt: ScalarFloat,
+    q: SimDatSingle,
+    a: SimDatSingle,
+    a0: SimDatSingle,
+    beta: SimDatSingle,
+    gamma: SimDatSingle,
+    wall_e: SimDatSingle,
+    dx: SimDatSingle,
+    p_ext: SimDatSingle,
+    visc_t: SimDatSingle,
+    masks: MasksPadded,
+) -> SimDat:
     """
     Applies the Monotonic Upstream-centered Scheme for Conservation Laws (MUSCL) method for numerical flux calculation.
 
@@ -640,8 +665,8 @@ def muscl(
 
 @jaxtyped(typechecker=typechecker)
 def compute_flux(
-    gamma_ghost: Float[Array, "..."], a: Float[Array, "..."], q: Float[Array, "..."]
-) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+    gamma_ghost: ScalarFloat, a: ScalarFloat, q: ScalarFloat
+) -> tuple[ScalarFloat, ScalarFloat]:
     """
     Computes the fluxes.
 
@@ -657,7 +682,7 @@ def compute_flux(
 
 
 @jaxtyped(typechecker=typechecker)
-def max_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "..."]:
+def max_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
     Applies the max mod function.
 
@@ -672,7 +697,7 @@ def max_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "...
 
 
 @jaxtyped(typechecker=typechecker)
-def min_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "..."]:
+def min_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
     Applies the min mod function.
 
@@ -687,7 +712,7 @@ def min_mod(a: Float[Array, "..."], b: Float[Array, "..."]) -> Float[Array, "...
 
 
 @jaxtyped(typechecker=typechecker)
-def super_bee(du: Float[Array, "..."]):
+def super_bee(du: SimDatDouble) -> SimDatSingle:
     """
     Applies the superbee flux limiter.
 
@@ -701,9 +726,7 @@ def super_bee(du: Float[Array, "..."]):
 
 
 @jaxtyped(typechecker=typechecker)
-def compute_limiter(
-    u: Float[Array, "..."], inv_dx: Float[Array, "..."]
-) -> Float[Array, "..."]:
+def compute_limiter(u: SimDatSingle, inv_dx: SimDatSingleReduced) -> SimDatSingle:
     """
     Computes the limiter for numerical fluxes.
 
@@ -727,8 +750,8 @@ def compute_limiter(
 
 @jaxtyped(typechecker=typechecker)
 def compute_limiter_idx(
-    u: Float[Array, "..."], idx: int, inv_dx: Float[Array, "..."]
-) -> Float[Array, "..."]:
+    u: SimDatDouble, idx: StaticScalarInt, inv_dx: SimDatSingleReduced
+) -> SimDatSingle:
     """
     Computes the limiter for numerical fluxes at a specified index.
 
