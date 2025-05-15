@@ -15,7 +15,7 @@ The module makes use of the following imported utilities:
 
 from jax import lax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped, Bool
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.types import (

@@ -20,7 +20,7 @@ from functools import partial
 
 import jax.numpy as jnp
 from jax import jit, lax, vmap
-from jaxtyping import Array, Float, jaxtyped, Integer
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.anastomosis import solve_anastomosis
@@ -41,7 +41,6 @@ from src.types import (
     SimDatDouble,
     SimDatSingle,
     SimDatSingleReduced,
-    StaticScalarFloat,
     StaticScalarInt,
     Strides,
     StridesReduced,
@@ -77,12 +76,11 @@ def compute_dt(
 @partial(jit, static_argnums=(0, 1))
 @jaxtyped(typechecker=typechecker)
 def solve_model(
-    n: int,
+    n: StaticScalarInt,
     b: StaticScalarInt,
     t: ScalarFloat,
     dt: ScalarFloat,
-    # TODO: correctly tpye input_data
-    input_data: Float[Array, "..."],
+    input_data: InputData,
     rho: ScalarFloat,
     sim_dat: SimDat,
     sim_dat_aux: SimDatAux,
