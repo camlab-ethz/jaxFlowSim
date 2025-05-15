@@ -15,37 +15,44 @@ The module makes use of the following imported utilities:
 """
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.newton import newton_raphson
 from src.utils import pressure, wave_speed
+from src.types import (
+    PairFloat,
+    TripleFloat,
+    QuadFloat,
+    DoubleJunctionReturn,
+    SmallJacobian,
+)
 
 
 @jaxtyped(typechecker=typechecker)
 def solve_conjunction(
-    us: Float[Array, " 2"],
-    a: Float[Array, " 2"],
-    a0s: Float[Array, " 2"],
-    betas: Float[Array, " 2"],
-    gammas: Float[Array, " 2"],
-    p_exts: Float[Array, " 2"],
+    us: PairFloat,
+    a: PairFloat,
+    a0s: PairFloat,
+    betas: PairFloat,
+    gammas: PairFloat,
+    p_exts: PairFloat,
     rho,
-) -> Float[Array, " 10"]:
+) -> DoubleJunctionReturn:
     """
     Solves the conjunction problem using the Newton-Raphson method.
 
     Parameters:
-    us (Float[Array, "2"]): Initial velocities for vessels 1 and 2.
-    a (Float[Array, "2"]): Initial cross-sectional areas for vessels 1 and 2.
-    a0s (Float[Array, "2"]): Reference cross-sectional areas for vessels 1 and 2.
-    betas (Float[Array, "2"]): Stiffness coefficients for vessels 1 and 2.
-    gammas (Float[Array, "2"]): Admittance coefficients for vessels 1 and 2.
-    p_exts (Float[Array, "2"]): External pressures for vessels 1 and 2.
+    us (PairFloat): Initial velocities for vessels 1 and 2.
+    a (PairFloat): Initial cross-sectional areas for vessels 1 and 2.
+    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
+    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
+    gammas (PairFloat): Admittance coefficients for vessels 1 and 2.
+    p_exts (PairFloat): External pressures for vessels 1 and 2.
     rho (Float): Blood density.
 
     Returns:
-    Float[Array, "10"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1 and 2.
+    DoubleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1 and 2.
     """
     u0 = jnp.concatenate((us, jnp.sqrt(jnp.sqrt(a))))
 
@@ -59,22 +66,22 @@ def solve_conjunction(
 
 @jaxtyped(typechecker=typechecker)
 def calculate_jacobian_conjunction(
-    u0: Float[Array, " 4"],
-    k: Float[Array, " 3"],
-    a0s: Float[Array, " 2"],
-    betas: Float[Array, " 2"],
-) -> Float[Array, "4 4"]:
+    u0: QuadFloat,
+    k: TripleFloat,
+    a0s: PairFloat,
+    betas: PairFloat,
+) -> SmallJacobian:
     """
     Calculates the Jacobian matrix for the conjunction problem.
 
     Parameters:
-    u0 (Float[Array, "4"]): Initial guess for the solution vector.
-    k (Float[Array, "3"]): Array of k parameters.
-    a0s (Float[Array, "2"]): Reference cross-sectional areas for vessels 1 and 2.
-    betas (Float[Array, "2"]): Stiffness coefficients for vessels 1 and 2.
+    u0 (QuadFloat): Initial guess for the solution vector.
+    k (TripleFloat): Array of k parameters.
+    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
+    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
 
     Returns:
-    Float[Array, "4 4"]: Jacobian matrix.
+    SmallJacobian: Jacobian matrix.
     """
     u33 = u0[2] * u0[2] * u0[2]
     u43 = u0[3] * u0[3] * u0[3]
@@ -102,18 +109,18 @@ def calculate_jacobian_conjunction(
 
 @jaxtyped(typechecker=typechecker)
 def calculate_f_conjunction(
-    u0: Float[Array, " 4"], a0s: Float[Array, " 2"], betas: Float[Array, " 2"]
-) -> Float[Array, " 4"]:
+    u0: QuadFloat, a0s: PairFloat, betas: PairFloat
+) -> QuadFloat:
     """
     Evaluates the function vector for the current state of the conjunction problem.
 
     Parameters:
-    u0 (Float[Array, "4"]): Solution vector.
-    a0s (Float[Array, "2"]): Reference cross-sectional areas for vessels 1 and 2.
-    betas (Float[Array, "2"]): Stiffness coefficients for vessels 1 and 2.
+    u0 (QuadFloat): Solution vector.
+    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
+    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
 
     Returns:
-    Float[Array, "4"]: Function values for the conjunction problem.
+    QuadFloat: Function values for the conjunction problem.
     """
 
     a01, a02 = a0s
@@ -138,24 +145,24 @@ def calculate_f_conjunction(
 
 @jaxtyped(typechecker=typechecker)
 def update_conjunction(
-    u0: Float[Array, " 4"],
-    a0s: Float[Array, " 2"],
-    betas: Float[Array, " 2"],
-    gammas: Float[Array, " 2"],
-    p_exts: Float[Array, " 2"],
-) -> Float[Array, " 10"]:
+    u0: QuadFloat,
+    a0s: PairFloat,
+    betas: PairFloat,
+    gammas: PairFloat,
+    p_exts: PairFloat,
+) -> DoubleJunctionReturn:
     """
     Updates the state of the conjunction problem based on the current state vector.
 
     Parameters:
-    u0 (Float[Array, "4"]): Solution vector.
-    a0s (Float[Array, "2"]): Reference cross-sectional areas for vessels 1 and 2.
-    betas (Float[Array, "2"]): Stiffness coefficients for vessels 1 and 2.
-    gammas (Float[Array, "2"]): Admittance coefficients for vessels 1 and 2.
-    p_exts (Float[Array, "2"]): External pressures for vessels 1 and 2.
+    u0 (QuadFloat): Solution vector.
+    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
+    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
+    gammas (PairFloat): Admittance coefficients for vessels 1 and 2.
+    p_exts (PairFloat): External pressures for vessels 1 and 2.
 
     Returns:
-    Float[Array, "10"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1 and 2.
+    DoubleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1 and 2.
     """
 
     a = jnp.array([u0[2] * u0[2] * u0[2] * u0[2], u0[3] * u0[3] * u0[3] * u0[3]])
