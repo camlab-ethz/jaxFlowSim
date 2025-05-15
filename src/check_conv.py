@@ -15,16 +15,23 @@ The module makes use of the following imported utilities:
 
 from jax import lax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped, Bool
+from jaxtyping import Array, Float, jaxtyped
 from beartype import beartype as typechecker
 
-from src.types import StaticScalarInt, ScalarFloat
+from src.types import (
+    PressureReturn,
+    SimDatAuxSingle,
+    SimDatSingle,
+    StaticScalarInt,
+    ScalarFloat,
+    Bool,
+)
 
 
 @jaxtyped(typechecker=typechecker)
 def calc_norms(
-    n: StaticScalarInt, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
-) -> Float[Array, "..."]:
+    n: StaticScalarInt, p_t: PressureReturn, p_l: PressureReturn
+) -> SimDatAuxSingle:
     """
     Calculates the norms between two sets of pressure data.
 
@@ -36,7 +43,7 @@ def calc_norms(
     Returns:
     Float[Array, ""]: Array of norms for each data point.
     """
-    norms = jnp.zeros(n)
+    norms: SimDatSingle = jnp.zeros(n)
 
     def body_fun(i, norms):
         err = p_l[:, i * 5 + 2] - p_t[:, i * 5 + 2]
@@ -49,7 +56,7 @@ def calc_norms(
 
 @jaxtyped(typechecker=typechecker)
 def compute_conv_error(
-    n: StaticScalarInt, p_t: Float[Array, "..."], p_l: Float[Array, "..."]
+    n: StaticScalarInt, p_t: PressureReturn, p_l: PressureReturn
 ) -> ScalarFloat:
     """
     Computes the maximum convergence error between two sets of pressure data.
@@ -62,13 +69,13 @@ def compute_conv_error(
     Returns:
     Float[Array, ""]: Maximum convergence error.
     """
-    current_norms = calc_norms(n, p_t, p_l)
-    maxnorm = jnp.max(current_norms)
+    current_norms: PressureReturn = calc_norms(n, p_t, p_l)
+    maxnorm: ScalarFloat = jnp.max(current_norms)
     return maxnorm
 
 
 @jaxtyped(typechecker=typechecker)
-def print_conv_error(err: Float[Array, ""]):
+def print_conv_error(err: ScalarFloat):
     """
     Prints the convergence error in mmHg.
 
@@ -83,7 +90,7 @@ def print_conv_error(err: Float[Array, ""]):
 
 
 @jaxtyped(typechecker=typechecker)
-def check_conv(err: Float[Array, ""], conv_toll) -> Bool[Array, ""]:
+def check_conv(err: ScalarFloat, conv_toll: ScalarFloat) -> Bool:
     """
     Checks if the convergence error is within the specified tolerance.
 

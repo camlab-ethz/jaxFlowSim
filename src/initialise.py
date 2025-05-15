@@ -26,7 +26,7 @@ from beartype import beartype as typechecker
 from src.components import Blood
 from src.utils import pressure_sa, wave_speed
 from src.types import (
-    Bool,
+    StaticBool,
     Dict,
     Dicts,
     StaticInputDataSingle,
@@ -964,7 +964,7 @@ def compute_viscous_term(vessel_data: Dict, blood: Blood) -> StaticScalarFloat:
 @jaxtyped(typechecker=typechecker)
 def build_heart(
     vessel_data: Dict,
-) -> tuple[Bool, StaticScalarFloat, StaticInputDataSingle]:
+) -> tuple[StaticBool, StaticScalarFloat, StaticInputDataSingle]:
     """
     Builds the heart data for the inlet vessel.
 

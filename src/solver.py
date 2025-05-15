@@ -55,7 +55,7 @@ def compute_dt(
     u: SimDatSingle,
     c: SimDatSingle,
     dx: SimDatSingle,
-) -> Float[Array, ""]:
+) -> ScalarFloat:
     """
     Computes the time step size based on the Courant–Friedrichs–Lewy (CFL) condition.
 
@@ -91,7 +91,7 @@ def solve_model(
     masks: Masks,
     strides: StridesReduced,
     edges: Edges,
-) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+) -> tuple[SimDat, SimDatAux]:
     """
     Solves the model equations for the vascular network.
 

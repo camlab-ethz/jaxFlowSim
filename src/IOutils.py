@@ -15,11 +15,19 @@ from jax import lax
 from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
-from src.types import SimDatSingle, StaticScalarInt, Strides
+from src.types import (
+    PressureReturnSingle,
+    SimDatSingle,
+    StaticScalarInt,
+    Strides,
+    PressureReturn,
+)
 
 
 @jaxtyped(typechecker=typechecker)
-def save_temp_data(n: StaticScalarInt, strides: Strides, p: SimDatSingle):
+def save_temp_data(
+    n: StaticScalarInt, strides: Strides, p: SimDatSingle
+) -> PressureReturnSingle:
     """
     Saves temporary pressure data at specified strides.
 

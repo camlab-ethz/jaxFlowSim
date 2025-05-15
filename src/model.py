@@ -60,7 +60,7 @@ from src.types import (
     StaticEdges,
     String,
     Strings,
-    Bool,
+    StaticBool,
     InputData,
     TimepointsReturn,
 )
@@ -75,7 +75,7 @@ numpyro.set_platform("cpu")
 
 @jaxtyped(typechecker=typechecker)
 def config_simulation(
-    input_filename: String, make_results_folder_bool: Bool = True
+    input_filename: String, make_results_folder_bool: StaticBool = True
 ) -> tuple[
     StaticScalarInt,
     StaticScalarInt,
@@ -190,10 +190,10 @@ def simulation_loop_unsafe(
     Returns:
     tuple: Updated simulation data, time steps, and pressure data.
     """
-    t = 0.0
-    dt = 1.0
-    p_t = jnp.zeros((upper, 5 * n))
-    t_t = jnp.zeros(upper)
+    t: Float = 0.0
+    dt: Float = 1.0
+    p_t: PressureReturn = jnp.zeros((upper, 5 * n))
+    t_t: TimepointsReturn = jnp.zeros(upper)
 
     def simulation_step(
         i: ScalarInt, args: SimulationStepArgsUnsafe
@@ -323,12 +323,12 @@ def simulation_loop(
     t: Float = 0.0
     passed_cycles: Integer = 0
     counter: Integer = 0
-    p_t = jnp.empty((num_snapshots, n * 5))
-    t_t = jnp.empty(num_snapshots)
-    p_l = jnp.empty((num_snapshots, n * 5))
+    p_t: PressureReturn = jnp.empty((num_snapshots, n * 5))
+    t_t: TimepointsReturn = jnp.empty(num_snapshots)
+    p_l: PressureReturn = jnp.empty((num_snapshots, n * 5))
     dt: Float = 1.0
 
-    def conv_error_condition(args: SimulationStepArgs) -> Bool:
+    def conv_error_condition(args: SimulationStepArgs) -> StaticBool:
         (
             _,
             _,
@@ -501,7 +501,7 @@ def simulation_loop(
 
 def run_simulation_unsafe(
     config_filename: String,
-    make_results_folder_bool: Bool = True,
+    make_results_folder_bool: StaticBool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the simulation without convergence checks.
@@ -561,7 +561,7 @@ def run_simulation_unsafe(
 
 def run_simulation(
     config_filename: String,
-    make_results_folder_bool: Bool = True,
+    make_results_folder_bool: StaticBool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
     Runs the simulation with convergence checks.
