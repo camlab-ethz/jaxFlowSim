@@ -15,35 +15,36 @@ The module makes use of the following imported utilities:
 """
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.newton import newton_raphson
 from src.utils import pressure, wave_speed
+from src.types import LargeJacobian, TripleFloat, HexaFloat, TripleJunctionReturn
 
 
 @jaxtyped(typechecker=typechecker)
 def solve_anastomosis(
-    us: Float[Array, " 3"],
-    a: Float[Array, " 3"],
-    a0s: Float[Array, " 3"],
-    betas: Float[Array, " 3"],
-    gammas: Float[Array, " 3"],
-    p_exts: Float[Array, " 3"],
-) -> Float[Array, " 15"]:
+    us: TripleFloat,
+    a: TripleFloat,
+    a0s: TripleFloat,
+    betas: TripleFloat,
+    gammas: TripleFloat,
+    p_exts: TripleFloat,
+) -> TripleJunctionReturn:
     """
     Solves the anastomosis problem using the Newton-Raphson method.
 
     Parameters:
-    us (Float[Array, "3"]): Initial velocities for vessels 1, 2, and 3.
-    a (Float[Array, "3"]): Initial cross-sectional areas for vessels 1, 2, and 3.
-    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (Float[Array, "3"]): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (Float[Array, "3"]): External pressures for vessels 1, 2, and 3.
+    us (TripleFloat): Initial velocities for vessels 1, 2, and 3.
+    a (TripleFloat): Initial cross-sectional areas for vessels 1, 2, and 3.
+    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
+    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
 
     Returns:
-    Float[Array, "15"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
     """
     u0 = jnp.concatenate(
         [
@@ -74,22 +75,22 @@ def solve_anastomosis(
 
 @jaxtyped(typechecker=typechecker)
 def calculate_jacobian_anastomosis(
-    u0: Float[Array, " 6"],
-    k: Float[Array, " 3"],
-    a0s: Float[Array, " 3"],
-    betas: Float[Array, " 3"],
-) -> Float[Array, "6 6"]:
+    u0: HexaFloat,
+    k: TripleFloat,
+    a0s: TripleFloat,
+    betas: TripleFloat,
+) -> LargeJacobian:
     """
     Calculates the Jacobian matrix for the anastomosis problem.
 
     Parameters:
-    u (Float[Array, "6"]): Current state vector.
-    k (Float[Array, "3"]): Array of constants derived from gamma values.
-    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
+    u (HexaFloat): Current state vector.
+    k (TripleFloat): Array of constants derived from gamma values.
+    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
 
     Returns:
-    Float[Array, "6 6"]: Jacobian matrix.
+    LargeJacobian: Jacobian matrix.
     """
     u43 = u0[3] * u0[3] * u0[3]
     u53 = u0[4] * u0[4] * u0[4]
@@ -128,18 +129,18 @@ def calculate_jacobian_anastomosis(
 
 @jaxtyped(typechecker=typechecker)
 def calculate_f_anastomosis(
-    u: Float[Array, " 6"], a0s: Float[Array, " 3"], betas: Float[Array, " 3"]
-) -> Float[Array, " 6"]:
+    u: HexaFloat, a0s: TripleFloat, betas: TripleFloat
+) -> HexaFloat:
     """
     Calculates the function vector for the anastomosis problem.
 
     Parameters:
-    u (Float[Array, "6"]): Current state vector.
-    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
+    u (HexaFloat): Current state vector.
+    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
 
     Returns:
-    Float[Array, "6"]: Function vector.
+    HexaFloat: Function vector.
     """
     a01, a02, a03 = a0s
     beta1, beta2, beta3 = betas
@@ -165,24 +166,24 @@ def calculate_f_anastomosis(
 
 @jaxtyped(typechecker=typechecker)
 def update_anastomosis(
-    u: Float[Array, " 6"],
-    a0s: Float[Array, " 3"],
-    betas: Float[Array, " 3"],
-    gammas: Float[Array, " 3"],
-    p_exts: Float[Array, " 3"],
-) -> Float[Array, " 15"]:
+    u: HexaFloat,
+    a0s: TripleFloat,
+    betas: TripleFloat,
+    gammas: TripleFloat,
+    p_exts: TripleFloat,
+) -> TripleJunctionReturn:
     """
     Updates the state of the anastomosis problem based on the current state vector.
 
     Parameters:
-    u (Float[Array, "6"]): Current state vector.
-    a0s (Float[Array, "3"]): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (Float[Array, "3"]): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (Float[Array, "3"]): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (Float[Array, "3"]): External pressures for vessels 1, 2, and 3.
+    u (HexaFloat): Current state vector.
+    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
+    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
+    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
 
     Returns:
-    Float[Array, "15"]: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
     """
 
     a = u[3:] ** 4
