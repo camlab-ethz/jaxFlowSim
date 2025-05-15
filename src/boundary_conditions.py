@@ -19,46 +19,54 @@ The module makes use of the following imported utilities:
 
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.utils import pressure
+from src.types import (
+    HexaFloat,
+    InputData,
+    QuadFloat,
+    ScalarFloat,
+    PairFloat,
+    TripleFloat,
+)
 
 
 @jaxtyped(typechecker=typechecker)
 def set_inlet_bc(
-    inlet: Float[Array, ""],
-    us: Float[Array, " 2"],
-    a: Float[Array, ""],
-    cs: Float[Array, " 2"],
-    t: Float[Array, ""],
-    dt: Float[Array, ""],
-    input_data: Float[Array, "..."],
-    cardiac_t: Float[Array, ""],
-    inv_dx: Float[Array, ""],
-    a0: Float[Array, ""],
-    beta: Float[Array, ""],
-    p_ext: Float[Array, ""],
+    inlet: ScalarFloat,
+    us: PairFloat,
+    a: ScalarFloat,
+    cs: PairFloat,
+    t: ScalarFloat,
+    dt: ScalarFloat,
+    input_data: InputData,
+    cardiac_t: ScalarFloat,
+    inv_dx: ScalarFloat,
+    a0: ScalarFloat,
+    beta: ScalarFloat,
+    p_ext: ScalarFloat,
 ):
     """
     Sets the inlet boundary condition.
 
     Parameters:
-    inlet (Float[Array, ""]): Indicator for inlet type (1 for flow, 0 for pressure).
-    us (Float[Array, "2"]): Velocities at the inlet.
-    a (Float[Array, ""]): Cross-sectional area at the inlet.
-    cs (Float[Array, "2"]): Wave speeds at the inlet.
-    t (Float[Array, ""]): Current time.
-    dt (Float[Array, ""]): Time step.
-    input_data (Float[Array, "..."]): Input data for boundary conditions.
-    cardiac_t (Float[Array, ""]): Cardiac cycle time.
-    inv_dx (Float[Array, ""]): Inverse spatial step size.
-    a0 (Float[Array, ""]): Reference cross-sectional area.
-    beta (Float[Array, ""]): Stiffness coefficient.
-    p_ext (Float[Array, ""]): External pressure.
+    inlet (ScalarFloat): Indicator for inlet type (1 for flow, 0 for pressure).
+    us (PairFloat): Velocities at the inlet.
+    a (ScalarFloat): Cross-sectional area at the inlet.
+    cs (PairFloat): Wave speeds at the inlet.
+    t (ScalarFloat): Current time.
+    dt (ScalarFloat): Time step.
+    input_data (InputData): Input data for boundary conditions.
+    cardiac_t (ScalarFloat): Cardiac cycle time.
+    inv_dx (ScalarFloat): Inverse spatial step size.
+    a0 (ScalarFloat): Reference cross-sectional area.
+    beta (ScalarFloat): Stiffness coefficient.
+    p_ext (ScalarFloat): External pressure.
 
     Returns:
-    Float[Array, ""]: Updated boundary conditions.
+    ScalarFloat: Updated boundary conditions.
     """
     q0, p0 = lax.cond(
         inlet == 1,
@@ -70,18 +78,18 @@ def set_inlet_bc(
 
 @jaxtyped(typechecker=typechecker)
 def input_from_data(
-    t: Float[Array, ""], input_data: Float[Array, "..."], cardiac_t: Float[Array, ""]
-) -> Float[Array, ""]:
+    t: ScalarFloat, input_data: InputData, cardiac_t: ScalarFloat
+) -> ScalarFloat:
     """
     Extracts input values from provided data.
 
     Parameters:
-    t (Float[Array, ""]): Current time.
-    input_data (Float[Array, "..."]): Input data array.
-    cardiac_t (Float[Array, ""]): Cardiac cycle time.
+    t (ScalarFloat): Current time.
+    input_data (InputData): Input data array.
+    cardiac_t (ScalarFloat): Cardiac cycle time.
 
     Returns:
-    Float[Array, ""]: Interpolated input value.
+    ScalarFloat: Interpolated input value.
     """
     idt = input_data[:, 0]
     idt1 = idt
@@ -108,36 +116,36 @@ def input_from_data(
 
 @jaxtyped(typechecker=typechecker)
 def inlet_compatibility(
-    inlet: Float[Array, ""],
-    us: Float[Array, " 2"],
-    q0: Float[Array, ""],
-    a: Float[Array, ""],
-    cs: Float[Array, " 2"],
-    p0: Float[Array, ""],
-    dt: Float[Array, ""],
-    inv_dx: Float[Array, ""],
-    a0: Float[Array, ""],
-    beta: Float[Array, ""],
-    p_ext: Float[Array, ""],
-) -> Float[Array, " 2"]:
+    inlet: ScalarFloat,
+    us: PairFloat,
+    q0: ScalarFloat,
+    a: ScalarFloat,
+    cs: PairFloat,
+    p0: ScalarFloat,
+    dt: ScalarFloat,
+    inv_dx: ScalarFloat,
+    a0: ScalarFloat,
+    beta: ScalarFloat,
+    p_ext: ScalarFloat,
+) -> PairFloat:
     """
     Ensures inlet compatibility by calculating updated boundary conditions.
 
     Parameters:
-    inlet (Float[Array, ""]): Indicator for inlet type (1 for flow, 0 for pressure).
-    us (Float[Array, "2"]): Velocities at the inlet.
-    q0 (Float[Array, ""]): Initial flow rate at the inlet.
-    a (Float[Array, ""]): Cross-sectional area at the inlet.
-    cs (Float[Array, "2"]): Wave speeds at the inlet.
-    p0 (Float[Array, ""]): Initial pressure at the inlet.
-    dt (Float[Array, ""]): Time step.
-    inv_dx (Float[Array, ""]): Inverse spatial step size.
-    a0 (Float[Array, ""]): Reference cross-sectional area.
-    beta (Float[Array, ""]): Stiffness coefficient.
-    p_ext (Float[Array, ""]): External pressure.
+    inlet (ScalarFloat): Indicator for inlet type (1 for flow, 0 for pressure).
+    us (PairFloat): Velocities at the inlet.
+    q0 (ScalarFloat): Initial flow rate at the inlet.
+    a (ScalarFloat): Cross-sectional area at the inlet.
+    cs (PairFloat): Wave speeds at the inlet.
+    p0 (ScalarFloat): Initial pressure at the inlet.
+    dt (ScalarFloat): Time step.
+    inv_dx (ScalarFloat): Inverse spatial step size.
+    a0 (ScalarFloat): Reference cross-sectional area.
+    beta (ScalarFloat): Stiffness coefficient.
+    p_ext (ScalarFloat): External pressure.
 
     Returns:
-    Float[Array, " 2"]: Updated boundary conditions.
+    PairFloat: Updated boundary conditions.
     """
     w11, w21 = riemann_invariants(us[0], cs[0])
     w12, _ = riemann_invariants(us[1], cs[1])
@@ -161,16 +169,16 @@ def inlet_compatibility(
 
 
 @jaxtyped(typechecker=typechecker)
-def riemann_invariants(u: Float[Array, ""], c: Float[Array, ""]) -> Float[Array, " 2"]:
+def riemann_invariants(u: ScalarFloat, c: ScalarFloat) -> PairFloat:
     """
     Calculates the Riemann invariants for given velocity and wave speed.
 
     Parameters:
-    u (Float[Array, ""]): Velocity.
-    c (Float[Array, ""]): Wave speed.
+    u (ScalarFloat): Velocity.
+    c (ScalarFloat): Wave speed.
 
     Returns:
-    Float[Array, " 2"]: Riemann invariants (w1, w2).
+    PairFloat: Riemann invariants (w1, w2).
     """
     w1 = u - 4.0 * c
     w2 = u + 4.0 * c
@@ -179,18 +187,16 @@ def riemann_invariants(u: Float[Array, ""], c: Float[Array, ""]) -> Float[Array,
 
 
 @jaxtyped(typechecker=typechecker)
-def inverse_riemann_invariants(
-    w1: Float[Array, ""], w2: Float[Array, ""]
-) -> Float[Array, " 2"]:
+def inverse_riemann_invariants(w1: ScalarFloat, w2: ScalarFloat) -> PairFloat:
     """
     Calculates velocity and wave speed from Riemann invariants.
 
     Parameters:
-    w1 (Float[Array, ""]): First Riemann invariant.
-    w2 (Float[Array, ""]): Second Riemann invariant.
+    w1 (ScalarFloat): First Riemann invariant.
+    w2 (ScalarFloat): Second Riemann invariant.
 
     Returns:
-    Float[Array, " 2"]: Velocity and wave speed.
+    PairFloat: Velocity and wave speed.
     """
     u = 0.5 * (w1 + w2)
     c = (w2 - w1) * 0.125
@@ -200,66 +206,66 @@ def inverse_riemann_invariants(
 
 @jaxtyped(typechecker=typechecker)
 def areaFromPressure(
-    p: Float[Array, ""],
-    a0: Float[Array, ""],
-    beta: Float[Array, ""],
-    p_ext: Float[Array, ""],
-) -> Float[Array, ""]:
+    p: ScalarFloat,
+    a0: ScalarFloat,
+    beta: ScalarFloat,
+    p_ext: ScalarFloat,
+) -> ScalarFloat:
     """
     Calculates cross-sectional area from pressure using reference area and stiffness coefficient.
 
     Parameters:
-    p (Float[Array, ""]): Pressure.
-    a0 (Float[Array, ""]): Reference cross-sectional area.
-    beta (Float[Array, ""]): Stiffness coefficient.
-    p_ext (Float[Array, ""]): External pressure.
+    p (ScalarFloat): Pressure.
+    a0 (ScalarFloat): Reference cross-sectional area.
+    beta (ScalarFloat): Stiffness coefficient.
+    p_ext (ScalarFloat): External pressure.
 
     Returns:
-    Float[Array, ""]: Cross-sectional area.
+    ScalarFloat: Cross-sectional area.
     """
     return a0 * ((p - p_ext) / beta + 1.0) * ((p - p_ext) / beta + 1.0)
 
 
 @jaxtyped(typechecker=typechecker)
 def set_outlet_bc(
-    dt: Float[Array, ""],
-    us: Float[Array, " 2"],
-    q1: Float[Array, ""],
-    a1: Float[Array, ""],
-    cs: Float[Array, " 2"],
-    ps: Float[Array, " 3"],
-    pc: Float[Array, ""],
-    ws: Float[Array, " 2"],
-    a0: Float[Array, ""],
-    beta: Float[Array, ""],
-    gamma: Float[Array, ""],
-    dx: Float[Array, ""],
-    p_ext: Float[Array, ""],
-    outlet: Float[Array, ""],
-    wks: Float[Array, " 4"],
-) -> Float[Array, " 6"]:
+    dt: ScalarFloat,
+    us: PairFloat,
+    q1: ScalarFloat,
+    a1: ScalarFloat,
+    cs: PairFloat,
+    ps: TripleFloat,
+    pc: ScalarFloat,
+    ws: PairFloat,
+    a0: ScalarFloat,
+    beta: ScalarFloat,
+    gamma: ScalarFloat,
+    dx: ScalarFloat,
+    p_ext: ScalarFloat,
+    outlet: ScalarFloat,
+    wks: QuadFloat,
+) -> HexaFloat:
     """
     Sets the outlet boundary condition.
 
     Parameters:
-    dt (Float[Array, ""]): Time step.
-    us (Float[Array, "2"]): Velocities at the outlet.
-    q1 (Float[Array, ""]): Initial flow rate at the outlet.
-    a1 (Float[Array, ""]): Cross-sectional area at the outlet.
-    cs (Float[Array, "2"]): Wave speeds at the outlet.
-    ps (Float[Array, "3"]): Pressures at the outlet.
-    pc (Float[Array, ""]): Compliance pressure.
-    ws (Float[Array, "2"]): Riemann invariants at the outlet.
-    a0 (Float[Array, ""]): Reference cross-sectional area.
-    beta (Float[Array, ""]): Stiffness coefficient.
-    gamma (Float[Array, ""]): Admittance coefficient.
-    dx (Float[Array, ""]): Spatial step size.
-    p_ext (Float[Array, ""]): External pressure.
-    outlet (Float[Array, ""]): Indicator for outlet type.
-    wks (Float[Array, "4"]): Windkessel model parameters.
+    dt (ScalarFloat): Time step.
+    us (PairFloat): Velocities at the outlet.
+    q1 (ScalarFloat): Initial flow rate at the outlet.
+    a1 (ScalarFloat): Cross-sectional area at the outlet.
+    cs (PairFloat): Wave speeds at the outlet.
+    ps (TripleFloat): Pressures at the outlet.
+    pc (ScalarFloat): Compliance pressure.
+    ws (PairFloat): Riemann invariants at the outlet.
+    a0 (ScalarFloat): Reference cross-sectional area.
+    beta (ScalarFloat): Stiffness coefficient.
+    gamma (ScalarFloat): Admittance coefficient.
+    dx (ScalarFloat): Spatial step size.
+    p_ext (ScalarFloat): External pressure.
+    outlet (ScalarFloat): Indicator for outlet type.
+    wks (QuadFloat): Windkessel model parameters.
 
     Returns:
-    Float[Array, " 6"]: Updated boundary conditions for the outlet.
+    HexaFloat: Updated boundary conditions for the outlet.
     """
 
     def outlet_compatibility_wrapper():
@@ -282,28 +288,28 @@ def set_outlet_bc(
 
 @jaxtyped(typechecker=typechecker)
 def outlet_compatibility(
-    us: Float[Array, " 2"],
-    a1: Float[Array, ""],
-    cs: Float[Array, " 2"],
-    ws: Float[Array, " 2"],
-    dt: Float[Array, ""],
-    dx: Float[Array, ""],
-    rt: Float[Array, ""],
-) -> Float[Array, " 3"]:
+    us: PairFloat,
+    a1: ScalarFloat,
+    cs: PairFloat,
+    ws: PairFloat,
+    dt: ScalarFloat,
+    dx: ScalarFloat,
+    rt: ScalarFloat,
+) -> TripleFloat:
     """
     Ensures outlet compatibility by calculating updated boundary conditions.
 
     Parameters:
-    us (Float[Array, "2"]): Velocities at the outlet.
-    a1 (Float[Array, ""]): Cross-sectional area at the outlet.
-    cs (Float[Array, "2"]): Wave speeds at the outlet.
-    ws (Float[Array, "2"]): Riemann invariants at the outlet.
-    dt (Float[Array, ""]): Time step.
-    dx (Float[Array, ""]): Spatial step size.
-    rt (Float[Array, ""]): Resistance term.
+    us (PairFloat): Velocities at the outlet.
+    a1 (ScalarFloat): Cross-sectional area at the outlet.
+    cs (PairFloat): Wave speeds at the outlet.
+    ws (PairFloat): Riemann invariants at the outlet.
+    dt (ScalarFloat): Time step.
+    dx (ScalarFloat): Spatial step size.
+    rt (ScalarFloat): Resistance term.
 
     Returns:
-    Float[Array, " 3"]: Updated velocity, flow rate, and wave speed at the outlet.
+    TripleFloat: Updated velocity, flow rate, and wave speed at the outlet.
     """
     _, w2m1 = riemann_invariants(us[1], cs[1])
     w1m, w2m = riemann_invariants(us[0], cs[0])
@@ -319,32 +325,32 @@ def outlet_compatibility(
 
 @jaxtyped(typechecker=typechecker)
 def three_element_windkessel(
-    dt: Float[Array, ""],
-    u1: Float[Array, ""],
-    a1: Float[Array, ""],
-    pc: Float[Array, ""],
-    wks: Float[Array, " 3"],
-    beta: Float[Array, ""],
-    gamma: Float[Array, ""],
-    a0: Float[Array, ""],
-    p_ext: Float[Array, ""],
-) -> Float[Array, " 3"]:
+    dt: ScalarFloat,
+    u1: ScalarFloat,
+    a1: ScalarFloat,
+    pc: ScalarFloat,
+    wks: TripleFloat,
+    beta: ScalarFloat,
+    gamma: ScalarFloat,
+    a0: ScalarFloat,
+    p_ext: ScalarFloat,
+) -> TripleFloat:
     """
     Handles the three-element Windkessel model for the outlet.
 
     Parameters:
-    dt (Float[Array, ""]): Time step.
-    u1 (Float[Array, ""]): Velocity at the outlet.
-    a1 (Float[Array, ""]): Cross-sectional area at the outlet.
-    pc (Float[Array, ""]): Compliance pressure.
-    wks (Float[Array, "3"]): Windkessel model parameters.
-    beta (Float[Array, ""]): Stiffness coefficient.
-    gamma (Float[Array, ""]): Admittance coefficient.
-    a0 (Float[Array, ""]): Reference cross-sectional area.
-    p_ext (Float[Array, ""]): External pressure.
+    dt (ScalarFloat): Time step.
+    u1 (ScalarFloat): Velocity at the outlet.
+    a1 (ScalarFloat): Cross-sectional area at the outlet.
+    pc (ScalarFloat): Compliance pressure.
+    wks (TripleFloat): Windkessel model parameters.
+    beta (ScalarFloat): Stiffness coefficient.
+    gamma (ScalarFloat): Admittance coefficient.
+    a0 (ScalarFloat): Reference cross-sectional area.
+    p_ext (ScalarFloat): External pressure.
 
     Returns:
-    Float[Array, " 3"]: Updated velocity, cross-sectional area, and compliance pressure at the outlet.
+    TripleFloat: Updated velocity, cross-sectional area, and compliance pressure at the outlet.
     """
     p_out = 0.0
 
