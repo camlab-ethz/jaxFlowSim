@@ -20,7 +20,6 @@ from src.types import (
     SimDatSingle,
     StaticScalarInt,
     Strides,
-    PressureReturn,
 )
 
 

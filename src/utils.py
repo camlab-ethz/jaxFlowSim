@@ -13,20 +13,26 @@ The module makes use of the following imported utilities:
 """
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
-from numpy.typing import NDArray
 
-from src.types import StaticScalarFloat
+from src.types import (
+    PairFloat,
+    ScalarFloat,
+    SimDatSingle,
+    StaticScalarFloat,
+    StaticSimDatSingle,
+    TripleFloat,
+)
 
 
 @jaxtyped(typechecker=typechecker)
 def pressure(
-    a: Float[Array, "..."],
-    a0: Float[Array, "..."],
-    beta: Float[Array, "..."],
-    p_ext: Float[Array, "..."],
-) -> Float[Array, "..."]:
+    a: ScalarFloat | SimDatSingle,
+    a0: ScalarFloat | SimDatSingle,
+    beta: ScalarFloat | SimDatSingle,
+    p_ext: ScalarFloat | SimDatSingle,
+) -> ScalarFloat | SimDatSingle:
     """
     Computes the pressure in a vessel given the cross-sectional area, reference area, stiffness coefficient, and external pressure.
 
@@ -44,10 +50,10 @@ def pressure(
 
 @jaxtyped(typechecker=typechecker)
 def pressure_sa(
-    s_a_over_a0: Float[Array, "..."] | NDArray,
-    beta: Float[Array, "..."] | NDArray,
-    p_ext: Float[Array, "..."] | float | StaticScalarFloat,
-) -> Float[Array, "..."] | NDArray:
+    s_a_over_a0: ScalarFloat | SimDatSingle | StaticSimDatSingle,
+    beta: ScalarFloat | SimDatSingle | StaticSimDatSingle,
+    p_ext: ScalarFloat | StaticScalarFloat,
+) -> ScalarFloat | SimDatSingle | StaticSimDatSingle:
     """
     Computes the pressure in a vessel given the square root of the area ratio, stiffness coefficient, and external pressure.
 
@@ -64,8 +70,9 @@ def pressure_sa(
 
 @jaxtyped(typechecker=typechecker)
 def wave_speed(
-    a: Float[Array, "..."] | NDArray, gamma: Float[Array, "..."] | NDArray
-) -> Float[Array, "..."]:
+    a: PairFloat | TripleFloat | StaticSimDatSingle,
+    gamma: PairFloat | TripleFloat | StaticSimDatSingle,
+) -> PairFloat | TripleFloat | SimDatSingle:
     """
     Calculates the wave speed in a vessel given the cross-sectional area and admittance coefficient.
 
@@ -81,8 +88,8 @@ def wave_speed(
 
 @jaxtyped(typechecker=typechecker)
 def wave_speed_sa(
-    sa: Float[Array, "..."], gamma: Float[Array, "..."]
-) -> Float[Array, "..."]:
+    sa: ScalarFloat | StaticScalarFloat, gamma: ScalarFloat | StaticScalarFloat
+) -> ScalarFloat:
     """
     Calculates the wave speed in a vessel given the square root of the area and admittance coefficient.
 
