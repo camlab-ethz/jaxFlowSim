@@ -15,7 +15,7 @@ The module makes use of the following imported utilities:
 
 from jax import lax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import Array, Float, jaxtyped, Bool
 from beartype import beartype as typechecker
 
 from src.types import (
@@ -24,7 +24,7 @@ from src.types import (
     SimDatSingle,
     StaticScalarInt,
     ScalarFloat,
-    Bool,
+    ScalarBool,
 )
 
 
@@ -90,7 +90,7 @@ def print_conv_error(err: ScalarFloat):
 
 
 @jaxtyped(typechecker=typechecker)
-def check_conv(err: ScalarFloat, conv_toll: ScalarFloat) -> Bool:
+def check_conv(err: ScalarFloat, conv_toll: ScalarFloat) -> ScalarBool:
     """
     Checks if the convergence error is within the specified tolerance.
 

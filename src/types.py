@@ -35,13 +35,14 @@ Edges: TypeAlias = Integer[Array, "N 10"]  # type: ignore
 StaticEdges: TypeAlias = np.ndarray
 TimepointsReturn: TypeAlias = Float[Array, " I"]
 StaticTimepointsReturn: TypeAlias = np.ndarray
+# TODO: implicitly implement M=5*N
 PressureReturn: TypeAlias = Float[Array, "I M"]
 PressureReturnSingle: TypeAlias = Float[Array, " I"]
 StaticPressureReturn: TypeAlias = np.ndarray
 String: TypeAlias = str
 Strings: TypeAlias = list[str]
 StaticBool: TypeAlias = bool
-Bool: TypeAlias = Bool[Array, ""]
+ScalarBool: TypeAlias = Bool[Array, ""]
 Dict: TypeAlias = dict
 Dicts: TypeAlias = list[dict]
 
