@@ -18,3 +18,5 @@ SciencePlots
 beartype
 arviz
 sphinx
+sphinx_rtd_theme
+myst-parser
