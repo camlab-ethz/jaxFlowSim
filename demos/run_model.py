@@ -94,6 +94,7 @@ STARTING_TIME = 0.0
 
 # If verbose mode is enabled, record the start time
 if VERBOSE:
+    print(f"Running model: {MODELNAME}")
     STARTING_TIME = time.time_ns()
 
 # Set up and execute the simulation loop using JIT compilation
@@ -122,8 +123,10 @@ sim_dat, t, P = block_until_ready(
 # If verbose mode is enabled, calculate and print the elapsed time
 if VERBOSE:
     ending_time = (time.time_ns() - STARTING_TIME) / 1.0e9
-    print(f"elapsed time = {ending_time} seconds")
+    print(f"Finished running models, elapsed time = {ending_time} seconds")
+    print("Plotting results into resluts directory")
 
+# Plotting setup starts here, uncomment lines as necessary to plot third-party data
 # Extract the network name from the configuration filename
 filename = CONFIG_FILENAME.split("/")[-1]
 network_name = filename.split(".")[0]
@@ -189,16 +192,16 @@ elif MODELNAME == "0029_H_ABAO_H":
 elif MODELNAME == "0053_H_CERE_H":
     vessel_names = vessel_names_0053
 
-# Loop through each vessel name and compare the simulation results with reference data
+# Loop through each vessel and plot the pressure data
 for index_vessel_name, vessel_name in enumerate(vessel_names):
-    P0 = np.loadtxt(
-        f"/home/diego/studies/uni/thesis_maths/openBF_bckp/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[index_vessel_name]}_P.last"
-    )
+    # P0 = np.loadtxt(
+    #     f"/home/diego/studies/uni/thesis_maths/openBF_bckp/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[index_vessel_name]}_P.last"
+    # )
     NODE = 2
     INDEX_JL = 1 + NODE
     index_jax = 5 * index_vessel_name + NODE
-    P0 = P0[:, INDEX_JL]
-    res = np.sqrt(((P[:, index_jax] - P0).dot(P[:, index_jax] - P0) / P0.dot(P0)))
+    # P0 = P0[:, INDEX_JL]
+    # res = np.sqrt(((P[:, index_jax] - P0).dot(P[:, index_jax] - P0) / P0.dot(P0)))
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
@@ -215,7 +218,7 @@ for index_vessel_name, vessel_name in enumerate(vessel_names):
     #    + "$",
     # )
     plt.plot(t % cardiac_T, P[:, index_jax] / 133.322)
-    plt.plot(t % cardiac_T, P0 / 133.322)
+    # plt.plot(t % cardiac_T, P0 / 133.322)
     plt.legend(["$P_{JAX}$", "$P_{jl}$"], loc="upper right")
     plt.tight_layout()
     plt.savefig(

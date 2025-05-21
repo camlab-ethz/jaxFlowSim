@@ -29,7 +29,6 @@ from functools import partial
 
 import jax
 import matplotlib.pyplot as plt
-import numpy as np
 from jax import block_until_ready, jit
 
 sys.path.insert(0, sys.path[0] + "/..")
@@ -54,6 +53,7 @@ else:
 
 # Set verbosity flag to control logging
 VERBOSE = True
+
 
 # Configure the simulation with the given configuration file
 (
@@ -80,32 +80,43 @@ VERBOSE = True
 t_t = []
 p_t = []
 
-# Run the simulation multiple times to collect data
-for i in range(1):
-    if VERBOSE:
-        starting_time = time.time_ns()
+# Set up and execute the simulation loop using JIT compilation
+SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+# Initialize timing variables
+STARTING_TIME = 0.0
 
-    # Set up and execute the simulation loop using JIT compilation
-    SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
-    sim_dat, t_t, p_t = block_until_ready(
-        SIM_LOOP_JIT(  # pylint: disable=E1102
-            N,
-            B,
-            sim_dat,
-            sim_dat_aux,
-            sim_dat_const,
-            sim_dat_const_aux,
-            Ccfl,
-            input_data,
-            rho,
-            masks,
-            strides,
-            edges,
-            upper=120000,
-        )
+# If verbose mode is enabled, record the start time
+if VERBOSE:
+    print(f"Running model: {MODELNAME}")
+    STARTING_TIME = time.time_ns()
+
+# Run the simulation loop with JIT compilation
+sim_dat, t_t, p_t = block_until_ready(
+    SIM_LOOP_JIT(  # pylint: disable=E1102
+        N,
+        B,
+        sim_dat,
+        sim_dat_aux,
+        sim_dat_const,
+        sim_dat_const_aux,
+        Ccfl,
+        input_data,
+        rho,
+        masks,
+        strides,
+        edges,
+        upper=120000,
     )
+)
+
+# If verbose mode is enabled, calculate and print the elapsed time
+if VERBOSE:
+    ending_time = (time.time_ns() - STARTING_TIME) / 1.0e9
+    print(f"Finished running models, elapsed time = {ending_time} seconds")
+    print("Plotting results into resluts directory")
 
 
+# Plotting setup starts here, uncomment lines as necessary to plot third-party data
 # Extract the network name from the configuration filename
 filename = CONFIG_FILENAME.split("/")[-1]
 network_name = filename.split(".")[0]
@@ -169,24 +180,24 @@ P_cycle = p_t[indices[-2] : indices[-1], :]  # type: ignore
 t_cycle = t_t[indices[-2] : indices[-1]]
 
 # Load reference pressure data for the first vessel
-P0_temp = np.loadtxt(
-    f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names[0]}_P.last"
-)
-t0 = P0_temp[:, 0] % cardiac_T
+# P0_temp = np.loadtxt(
+#     f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names[0]}_P.last"
+# )
+# t0 = P0_temp[:, 0] % cardiac_T
 
 # Initialize arrays to store the new interpolated time and pressure data
-COUNTER = 0
-t_new = np.zeros(len(timepoints))
-P_new = np.zeros((len(timepoints), 5 * N))
+# COUNTER = 0
+# t_new = np.zeros(len(timepoints))
+# P_new = np.zeros((len(timepoints), 5 * N))
 
 # Interpolate the pressure data to match the reference time points
-for i in range(len(t_cycle) - 1):
-    if t0[COUNTER] >= t_cycle[i] and t0[COUNTER] <= t_cycle[i + 1]:
-        P_new[COUNTER, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
-        COUNTER += 1
+# for i in range(len(t_cycle) - 1):
+#     if t0[COUNTER] >= t_cycle[i] and t0[COUNTER] <= t_cycle[i + 1]:
+#         P_new[COUNTER, :] = (P_cycle[i, :] + P_cycle[i + 1, :]) / 2
+#         COUNTER += 1
 
-t_new = t_new[:-1]
-P_new = P_new[:-1, :]
+# t_new = t_new[:-1]
+# P_new = P_new[:-1, :]
 
 vessel_names_jl = vessel_names
 if MODELNAME == "000/_H_A0_H":
@@ -196,32 +207,32 @@ elif MODELNAME == "0029_H_ABAO_H":
 elif MODELNAME == "0053_H_CERE_H":
     vessel_names = vessel_names_0053
 
-# Loop through each vessel and compare the simulated pressure with the reference data
+# Loop through each vessel and plot the pressure data
 for i, vessel_name in enumerate(vessel_names):
     index_vessel_name = vessel_names.index(vessel_name)
-    P0_temp = np.loadtxt(
-        f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
-    )
+    # P0_temp = np.loadtxt(
+    #     f"/home/diego/studies/uni/thesis_maths/openBF/test/{network_name}/{network_name}_results/{vessel_names_jl[i]}_P.last"
+    # )
     NODE = 2
     INDEX_JL = 1 + NODE
     index_jax = 5 * index_vessel_name + NODE
 
-    P0 = P0_temp[:-1, INDEX_JL]
-    t0 = P0_temp[:-1, 0] % cardiac_T
-    P1 = P_new[:, index_jax]
+    # P0 = P0_temp[:-1, INDEX_JL]
+    # t0 = P0_temp[:-1, 0] % cardiac_T
+    # P1 = P_new[:, index_jax]
 
     # Compute the relative error between the simulated and reference pressures
-    res = np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
+    # res = np.sqrt(((P1 - P0).dot(P1 - P0) / P0.dot(P0)))
 
     # Generate and save a plot comparing the simulated and reference pressures
     _, ax = plt.subplots()
     ax.set_xlabel("t[s]")
     ax.set_ylabel("P[mmHg]")
-    plt.title(
-        f"network: {network_name} # vessels: {N}, vessel name: {vessel_names[i]}, \n relative error = |P_JAX-P_jl|/|P_jl| = {res}"
-    )
-    plt.plot(t0, P0 / 133.322)
-    plt.plot(t0, P1 / 133.322)
+    # plt.title(
+    #     f"network: {network_name} # vessels: {N}, vessel name: {vessel_names[i]}, \n relative error = |P_JAX-P_jl|/|P_jl| = {res}"
+    # )
+    # plt.plot(t0, P0 / 133.322)
+    plt.plot(t_cycle, P_cycle / 133.322)
     plt.legend(["P_JAX", "P_jl"], loc="lower right")
     plt.tight_layout()
     plt.savefig(
