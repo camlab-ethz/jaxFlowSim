@@ -1,17 +1,36 @@
 """
-This module provides functionality to solve the anastomosis problem in vascular networks using the Newton-Raphson method.
+Module for solving vascular anastomosis junction problems using the Newton–Raphson method.
 
-It includes functions to:
-- Initialize and solve the anastomosis problem (`solve_anastomosis`).
-- Calculate the Jacobian matrix specific to the anastomosis problem (`calculate_jacobian_anastomosis`).
-- Evaluate the function vector for the current state of the anastomosis problem (`calculate_f_anastomosis`).
-- Update the state of the system after solving the equations (`update_anastomosis`).
+This module provides a complete workflow for assembling, solving, and post-processing
+the nonlinear system governing three-vessel anastomosis (junction) flows.
 
-The module makes use of the following imported utilities:
-- `newtonRaphson` from `src.newton` for solving the system of nonlinear equations.
-- `pressure` and `waveSpeed` from `src.utils` for calculating pressure and wave speed in the vessels.
-- `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
+Functions
+---------
+solve_anastomosis(us, a, a0s, betas, gammas, p_exts)
+    Initialize the state vector and solve for velocities and areas at the junction.
+calculate_jacobian_anastomosis(u0, k, a0s, betas)
+    Assemble the 6×6 Jacobian matrix of the nonlinear anastomosis equations.
+calculate_f_anastomosis(u, a0s, betas)
+    Evaluate the nonlinear residual vector for the current state.
+update_anastomosis(u, a0s, betas, gammas, p_exts)
+    Compute updated velocities, volumetric flows, cross-sectional areas,
+    wave speeds, and pressures from the solved state.
+
+Dependencies
+------------
+- `newton_raphson` from `src.newton`   : Custom Newton–Raphson solver for nonlinear systems.
+- `pressure`, `wave_speed` from `src.utils` : Utility functions for hemodynamic calculations.
+- `jax.numpy` (jnp)                   : Array operations and numeric routines.
+- `jaxtyping.jaxtyped`                : Static typing of JAX arrays.
+- `beartype.beartype`                 : Runtime type enforcement.
+
+Type Aliases
+------------
+- `TripleFloat`       : JAX array of shape (3,) for vessel parameters.
+- `HexaFloat`         : JAX array of shape (6,) representing the state vector.
+- `LargeJacobian`     : JAX array of shape (6, 6) for the Jacobian matrix.
+- `TripleJunctionReturn` : Concatenated result array [u, q, A, c, p] of length 15.
+
 """
 
 import jax.numpy as jnp
@@ -33,29 +52,44 @@ def solve_anastomosis(
     p_exts: TripleFloat,
 ) -> TripleJunctionReturn:
     """
-    Solves the anastomosis problem using the Newton-Raphson method.
+    Solve the three-vessel anastomosis junction problem using Newton–Raphson.
 
-    Parameters:
-    us (TripleFloat): Initial velocities for vessels 1, 2, and 3.
-    a (TripleFloat): Initial cross-sectional areas for vessels 1, 2, and 3.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
+    Parameters
+    ----------
+    us : TripleFloat
+        Initial velocities for vessels 1, 2, and 3.
+    a : TripleFloat
+        Initial cross-sectional areas for vessels 1, 2, and 3.
+    a0s : TripleFloat
+        Reference (unstressed) areas for vessels 1, 2, and 3.
+    betas : TripleFloat
+        Wall stiffness coefficients for vessels 1, 2, and 3.
+    gammas : TripleFloat
+        Admittance (compliance) coefficients for vessels 1, 2, and 3.
+    p_exts : TripleFloat
+        External pressures for vessels 1, 2, and 3.
 
-    Returns:
-    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Returns
+    -------
+    TripleJunctionReturn
+        Concatenation of:
+        - Velocities (u1, u2, u3)
+        - Flows (q1, q2, q3)
+        - Areas (A1, A2, A3)
+        - Wave speeds (c1, c2, c3)
+        - Pressures (p1, p2, p3)
     """
     u0 = jnp.concatenate(
         [
             us,
-            jnp.sqrt(jnp.sqrt(a)),
+            jnp.sqrt(jnp.sqrt(a)),  # initial sqrt-area state variables
         ]
     )
 
     k = jnp.sqrt(1.5 * gammas)
 
-    j = calculate_jacobian_anastomosis(u0, k, a0s, betas)  # pylint: disable=E1111
+    # Assemble Jacobian and solve nonlinear system
+    j = calculate_jacobian_anastomosis(u0, k, a0s, betas)
     u = newton_raphson(
         calculate_f_anastomosis,
         j,
@@ -64,6 +98,7 @@ def solve_anastomosis(
         betas,
     )
 
+    # Post-process solution into physical quantities
     return update_anastomosis(
         u,
         a0s,
@@ -81,20 +116,30 @@ def calculate_jacobian_anastomosis(
     betas: TripleFloat,
 ) -> LargeJacobian:
     """
-    Calculates the Jacobian matrix for the anastomosis problem.
+    Compute the Jacobian matrix of the anastomosis residuals.
 
-    Parameters:
-    u (HexaFloat): Current state vector.
-    k (TripleFloat): Array of constants derived from gamma values.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    The Jacobian is a 6×6 matrix combining continuity and wall-law equations
+    for a three-vessel junction.
 
-    Returns:
-    LargeJacobian: Jacobian matrix.
+    Parameters
+    ----------
+    u0 : HexaFloat
+        State vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    k : TripleFloat
+        Coefficient array derived from admittance values.
+    a0s : TripleFloat
+        Reference areas for vessels (unstressed state).
+    betas : TripleFloat
+        Wall stiffness coefficients.
+
+    Returns
+    -------
+    LargeJacobian
+        6×6 Jacobian matrix of partial derivatives.
     """
-    u43 = u0[3] * u0[3] * u0[3]
-    u53 = u0[4] * u0[4] * u0[4]
-    u63 = u0[5] * u0[5] * u0[5]
+    u43 = u0[3] ** 3
+    u53 = u0[4] ** 3
+    u63 = u0[5] ** 3
 
     j14 = 4.0 * k[0]
     j25 = 4.0 * k[1]
@@ -132,15 +177,23 @@ def calculate_f_anastomosis(
     u: HexaFloat, a0s: TripleFloat, betas: TripleFloat
 ) -> HexaFloat:
     """
-    Calculates the function vector for the anastomosis problem.
+    Evaluate the residual vector of the anastomosis equations.
 
-    Parameters:
-    u (HexaFloat): Current state vector.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    Residuals combine mass continuity at the junction and wall-law balances.
 
-    Returns:
-    HexaFloat: Function vector.
+    Parameters
+    ----------
+    u : HexaFloat
+        Current state vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    a0s : TripleFloat
+        Reference (unstressed) cross-sectional areas.
+    betas : TripleFloat
+        Wall stiffness coefficients.
+
+    Returns
+    -------
+    HexaFloat
+        6-element residual vector [f1, f2, f3, f4, f5, f6].
     """
     a01, a02, a03 = a0s
     beta1, beta2, beta3 = betas
@@ -149,16 +202,16 @@ def calculate_f_anastomosis(
     u52 = u[4] ** 2
     u62 = u[5] ** 2
 
-    f1 = 0
-    f2 = 0
-    f3 = 0
+    f1 = 0.0
+    f2 = 0.0
+    f3 = 0.0
     f4 = u[0] * u42**2 + u[1] * u52**2 - u[2] * u62**2
 
-    f5 = beta1 * (u42 * jnp.sqrt(1 / a01) - 1.0) - (
-        beta3 * (u62 * jnp.sqrt(1 / a03) - 1.0)
+    f5 = beta1 * (u42 * jnp.sqrt(1 / a01) - 1.0) - beta3 * (
+        u62 * jnp.sqrt(1 / a03) - 1.0
     )
-    f6 = beta2 * (u52 * jnp.sqrt(1 / a02) - 1.0) - (
-        beta3 * (u62 * jnp.sqrt(1 / a03) - 1.0)
+    f6 = beta2 * (u52 * jnp.sqrt(1 / a02) - 1.0) - beta3 * (
+        u62 * jnp.sqrt(1 / a03) - 1.0
     )
 
     return jnp.array([f1, f2, f3, f4, f5, f6])
@@ -173,25 +226,39 @@ def update_anastomosis(
     p_exts: TripleFloat,
 ) -> TripleJunctionReturn:
     """
-    Updates the state of the anastomosis problem based on the current state vector.
+    Post-process solved state to physical output variables.
 
-    Parameters:
-    u (HexaFloat): Current state vector.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
+    Converts the optimized state vector into velocities, flows, areas,
+    wave speeds, and pressures for each vessel.
 
-    Returns:
-    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Parameters
+    ----------
+    u : HexaFloat
+        Solved state vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    a0s : TripleFloat
+        Reference (unstressed) cross-sectional areas.
+    betas : TripleFloat
+        Wall stiffness coefficients.
+    gammas : TripleFloat
+        Admittance (compliance) coefficients.
+    p_exts : TripleFloat
+        External pressures for each vessel.
+
+    Returns
+    -------
+    TripleJunctionReturn
+        Concatenated array [u, q, A, c, p] for vessels 1–3.
     """
-
+    # Recover cross-sectional areas
     a = u[3:] ** 4
 
+    # Volumetric flows
     qs = u[:3] * a
 
+    # Wave speeds via utility function
     cs = wave_speed(a, gammas)
 
+    # Pressures via wall law
     ps = pressure(a, a0s, betas, p_exts)
 
     return jnp.concatenate([u[:3], qs, a, cs, ps])
