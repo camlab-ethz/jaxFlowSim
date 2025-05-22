@@ -1,16 +1,37 @@
 """
-This module provides functions to calculate norms, compute convergence errors, print error messages, and check for convergence in a vascular network model using JAX.
+Convergence diagnostics for vascular network simulations using JAX.
 
-It includes functions to:
-- Calculate norms between two sets of pressure data (`calc_norms`).
-- Compute the maximum convergence error (`compute_conv_error`).
-- Print the convergence error (`print_conv_error`).
-- Check if the convergence error is within a specified tolerance (`check_conv`).
+This module provides utilities to measure and verify convergence of iterative
+pressure solutions. It computes pointwise L₂ norms of the difference between
+target and learned pressure fields, extracts the worst-case error, reports it
+in physiological units (mmHg), and checks against a user-defined tolerance.
 
-The module makes use of the following imported utilities:
-- `jax.lax` for control flow operations.
-- `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
+Available functions
+-------------------
+calc_norms(n, p_target, p_learned)
+    Compute an array of L₂ norms of pressure differences at each spatial point.
+compute_conv_error(n, p_target, p_learned)
+    Return the maximum L₂ norm as the overall convergence error.
+print_conv_error(err)
+    Convert a convergence error from Pascals to mmHg and display it.
+check_conv(err, conv_tol)
+    Determine whether the error (in mmHg) meets the convergence criterion.
+
+Dependencies
+------------
+- jax.lax               Control-flow primitives for efficient looping in JAX.
+- jax.numpy (jnp)       Array operations and numerical routines.
+- jaxtyping.jaxtyped     Static type annotations for JAX arrays.
+- beartype.beartype      Runtime type enforcement of function signatures.
+
+Type aliases (from src.types)
+------------------------------
+- StaticScalarInt  : Integer index for loop bounds.
+- PressureReturn   : 2D array of pressure values, shape (num_signals, num_points*5).
+- SimDatAuxSingle  : 1D array to store computed norms, length = num_points.
+- SimDatSingle     : Alias for a single-sample data array (same as SimDatAuxSingle).
+- ScalarFloat      : Scalar floating-point value.
+- ScalarBool       : Scalar boolean value.
 """
 
 from jax import lax
@@ -33,23 +54,38 @@ def calc_norms(
     n: StaticScalarInt, p_t: PressureReturn, p_l: PressureReturn
 ) -> SimDatAuxSingle:
     """
-    Calculates the norms between two sets of pressure data.
+    Compute L₂ norms of pointwise pressure differences.
 
-    Parameters:
-    n (Float[Array, ""]): Number of data points.
-    p_t (Float[Array, ""]): Target pressure data.
-    p_l (Float[Array, ""]): Learned pressure data.
+    For each of the `n` points, extract the pressure signal at the third
+    channel (index 2) from both target and learned datasets, compute the
+    difference vector, and calculate its Euclidean norm.
 
-    Returns:
-    Float[Array, ""]: Array of norms for each data point.
+    Parameters
+    ----------
+    n : StaticScalarInt
+        Number of spatial points to evaluate.
+    p_target : PressureReturn
+        Reference pressure data array of shape (num_signals, n*5).
+    p_learned : PressureReturn
+        Learned pressure data array (same shape as `p_target`).
+
+    Returns
+    -------
+    SimDatAuxSingle
+        1D array of length `n`, where each entry is the L₂ norm
+        of the difference at that point.
     """
+    # Initialize an array of zeros to hold the norms for each point
     norms: SimDatSingle = jnp.zeros(n)
 
     def body_fun(i, norms):
+        # Extract the pressure trace for point i from both datasets
         err = p_l[:, i * 5 + 2] - p_t[:, i * 5 + 2]
         norms = norms.at[i].set(jnp.sqrt(jnp.sum(err**2)))
+        # Compute Euclidean (L2) norm and store
         return norms
 
+    # Loop over all points in a JAX-compatible manner
     norms = lax.fori_loop(0, n, body_fun, norms)
     return norms
 
@@ -59,17 +95,27 @@ def compute_conv_error(
     n: StaticScalarInt, p_t: PressureReturn, p_l: PressureReturn
 ) -> ScalarFloat:
     """
-    Computes the maximum convergence error between two sets of pressure data.
+    Determine the maximum convergence error across all spatial points.
 
-    Parameters:
-    n (Float[Array, ""]): Number of data points.
-    p_t (Float[ArrayTraced<ShapedArray(float64[100,5])>with<DynamicJaxprTrace(level=2/0)>, ""]): Target pressure data.
-    p_l (Float[Array, ""]): Learned pressure data.
+    Computes the L₂ norm at each point via `calc_norms`, then returns
+    the maximum norm as the overall convergence metric.
 
-    Returns:
-    Float[Array, ""]: Maximum convergence error.
+    Parameters
+    ----------
+    n : StaticScalarInt
+        Number of spatial points to evaluate.
+    p_target : PressureReturn
+        Reference pressure data array.
+    p_learned : PressureReturn
+        Learned pressure data array.
+
+    Returns
+    -------
+    ScalarFloat
+        The maximum L₂ norm across all `n` points (in Pascals).
     """
     current_norms: PressureReturn = calc_norms(n, p_t, p_l)
+    # Maximum norm indicates the worst-case pressure discrepancy
     maxnorm: ScalarFloat = jnp.max(current_norms)
     return maxnorm
 
@@ -77,28 +123,40 @@ def compute_conv_error(
 @jaxtyped(typechecker=typechecker)
 def print_conv_error(err: ScalarFloat):
     """
-    Prints the convergence error in mmHg.
+    Convert and display the convergence error in mmHg.
 
-    Parameters:
-    err (Float[Array, ""]): Convergence error.
+    Parameters
+    ----------
+    err : ScalarFloat
+        Convergence error in Pascals.
 
-    Returns:
+    Returns
+    -------
     None
     """
-    err /= 133.332
+    mmhg = err / 133.332  # 1 mmHg ≈ 133.332 Pa
+    # Print or log the error in physiological units
     # debug.print("error norm = {x} mmHg", x=err)
 
 
 @jaxtyped(typechecker=typechecker)
 def check_conv(err: ScalarFloat, conv_toll: ScalarFloat) -> ScalarBool:
     """
-    Checks if the convergence error is within the specified tolerance.
+    Verify if the convergence error meets the specified tolerance.
 
-    Parameters:
-    err (Float[Array, ""]): Convergence error.
-    conv_toll (Float[Array, ""]): Convergence tolerance.
+    Converts the error from Pascals to mmHg, then checks whether it is
+    less than or equal to the tolerance threshold.
 
-    Returns:
-    Float[Array, ""]: Boolean value indicating if the error is within the tolerance.
+    Parameters
+    ----------
+    err : ScalarFloat
+        Convergence error in Pascals.
+    conv_tol : ScalarFloat
+        Allowed error tolerance in mmHg.
+
+    Returns
+    -------
+    ScalarBool
+        `True` if error (in mmHg) ≤ `conv_tol`, else `False`.
     """
     return err / 133.332 <= conv_toll
