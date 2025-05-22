@@ -1,19 +1,31 @@
 """
-This module provides functionality for simulating blood flow in vascular networks.
+Numerical solver for blood flow in vascular networks using JAX.
 
-It includes functions to:
-- Compute the time step size based on the Courant–Friedrichs–Lewy (CFL) condition (`compute_dt`).
-- Solve the model equations for the vascular network (`solve_model`).
-- Apply the Monotonic Upstream-centered Scheme for Conservation Laws (MUSCL) method for numerical flux calculation (`muscl`).
-- Compute fluxes (`compute_flux`).
-- Apply the superbee flux limiter (`super_bee`).
-- Compute limiters for numerical fluxes (`compute_limiter` and `compute_limiter_idx`).
+This module implements the core finite-volume scheme for 1D blood flow in
+arterial networks. It provides functions to:
 
-The module makes use of the following imported utilities:
-- `jax.numpy` for numerical operations and array handling.
-- `jax` for just-in-time compilation and loop constructs.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
-- Various utility functions and solvers for boundary conditions and flow solutions from the `src` package.
+- compute_dt:       Determine the stable time step via the CFL condition.
+- solve_model:      Advance the solution by one time step, applying inlet,
+                    interior (MUSCL), and outlet/junction boundary updates.
+- muscl:            Apply the MUSCL reconstruction and flux computation.
+- compute_flux:     Compute physical fluxes for conserved variables.
+- super_bee and helpers:
+                    Apply the Superbee limiter to ensure monotonicity.
+- compute_limiter / compute_limiter_idx:
+                    Compute slope limiters for each cell or along a specified row.
+
+Dependencies
+------------
+- jax.numpy (jnp)           : Array operations and linear algebra.
+- jax (jit, lax, vmap)      : JIT compilation and loop/vectorization primitives.
+- jaxtyping.jaxtyped        : Static typing for JAX arrays.
+- beartype.beartype          : Runtime type checking.
+- src.anastomosis
+- src.bifurcations
+- src.boundary_conditions
+- src.conjunctions
+- src.utils: pressure_sa, wave_speed_sa
+- src.types: domain-specific array shapes and type aliases
 """
 
 from functools import partial
@@ -55,7 +67,8 @@ def compute_dt(
     c: SimDatSingle,
     dx: SimDatSingle,
 ) -> ScalarFloat:
-    """
+    (
+        """
     Computes the time step size based on the Courant–Friedrichs–Lewy (CFL) condition.
 
     Parameters:
@@ -67,8 +80,34 @@ def compute_dt(
     Returns:
     Float[Array, ""]: Computed time step size.
     """
+        """
+    Compute stable time step via the CFL condition.
+
+    Uses the maximum wave speed |u| + c on each vessel segment to ensure
+    numerical stability: dt = min(ccfl * dx / max_wave_speed).
+
+    Parameters
+    ----------
+    ccfl
+        Courant–Friedrichs–Lewy number (dimensionless).
+    u
+        Velocity array for each segment (m/s).
+    c
+        Wave speed array for each segment (m/s).
+    dx
+        Spatial step size for each segment (m).
+
+    Returns
+    -------
+    dt : ScalarFloat
+        Time step size (s) satisfying the CFL constraint.
+    """
+    )
+
     smax = vmap(lambda a, b: jnp.abs(a + b))(u, c)
+    # Compute candidate dt per segment
     vessel_dt = vmap(lambda a, b: a * ccfl / b)(dx, smax)
+    # Compute local max wave speed per segment
     dt = jnp.min(vessel_dt)
     return dt
 
@@ -91,28 +130,55 @@ def solve_model(
     edges: Edges,
 ) -> tuple[SimDat, SimDatAux]:
     """
-    Solves the model equations for the vascular network.
+    Advance the blood flow solution by one time step.
 
-    Parameters:
-    n (int): Number of vessels.
-    b (int): Boundary size.
-    t (Float[Array, ""]): Current time.
-    dt (Float[Array, ""]): Time step size.
-    input_data (Float[Array, "..."]): Input data array.
-    rho (Float[Array, ""]): Blood density.
-    sim_dat (Float[Array, "..."]): Simulation data array.
-    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
-    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
-    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
-    masks (Integer[Array, "..."]): Masks for boundary conditions.
-    strides (Integer[Array, "..."]): Strides array.
-    edges (Integer[Array, "..."]): Edges array.
+    1) Apply inlet boundary condition.
+    2) Update interior cells using MUSCL scheme.
+    3) For each vessel outlet or junction, apply the appropriate condition:
+       - outlet BC
+       - bifurcation
+       - conjunction
+       - anastomosis
 
-    Returns:
-    tuple[Float[Array, "..."], Float[Array, "..."]]: Updated simulation data and auxiliary simulation data.
+    Parameters
+    ----------
+    n
+        Number of vessels in the network.
+    b
+        Number of ghost or buffer cells per vessel.
+    t
+        Current simulation time (s).
+    dt
+        Time step size (s).
+    input_data
+        External boundary input signals (e.g., inlet flow waveform).
+    rho
+        Blood density (kg/m³).
+    sim_dat
+        State array [u, q, a, c, p] with shape (5, total_nodes).
+    sim_dat_aux
+        Auxiliary state array for boundary conditions.
+    sim_dat_const
+        Per-node constant parameters array.
+    sim_dat_const_aux
+        Per-vessel constant parameters array.
+    masks
+        Boolean masks indicating domain interior for flux limiting.
+    strides
+        Start/end indices for each vessel’s interior segment.
+    edges
+        Connectivity matrix defining graph topology.
+
+    Returns
+    -------
+    sim_dat_updated
+        Updated state array after one time step.
+    sim_dat_aux_updated
+        Updated auxiliary array for boundary conditions.
     """
-
+    # --- 1) Inlet boundary condition at upstream end ---
     inlet = sim_dat_const_aux[0, 1]
+    # Extract local inlet state: velocities, reference area, wave speeds
     us = jnp.array([sim_dat[0, b], sim_dat[0, b + 1]])
     a0 = sim_dat[2, b]
     cs = jnp.array([sim_dat[3, b], sim_dat[3, b + 1]])
@@ -122,6 +188,7 @@ def solve_model(
     beta0 = sim_dat_const[1, b]
     p_ext = sim_dat_const[4, b]
 
+    # Compute inlet updates and broadcast to ghost cells
     sim_dat = sim_dat.at[1:3, 0 : b + 1].set(
         jnp.array(
             set_inlet_bc(
@@ -142,6 +209,7 @@ def solve_model(
         * jnp.ones(b + 1)[jnp.newaxis, :]
     )
 
+    # --- 2) Interior update via MUSCL scheme over valid nodes ---
     sim_dat = sim_dat.at[:, b:-b].set(
         muscl(
             dt,
@@ -158,6 +226,7 @@ def solve_model(
         )
     )
 
+    # --- 3) Outlet/junction updates for each vessel ---
     def set_outlet_or_junction(
         j: ScalarInt,
         dat: tuple[
@@ -175,6 +244,7 @@ def solve_model(
         ) = dat
         end = strides[j, 1]
 
+        # Outlet boundary for terminal vessels
         def set_outlet_bc_wrapper(sim_dat: SimDat, sim_dat_aux: SimDatAux):
             us = jnp.array([sim_dat[0, end - 1], sim_dat[0, end - 2]])
             q1 = sim_dat[1, end - 1]
@@ -192,6 +262,7 @@ def solve_model(
                     sim_dat_const_aux[j, 6],
                 ]
             )
+            # Compute outlet BC updates
             u, q, a, c, pl, pc = set_outlet_bc(
                 dt,
                 us,
@@ -209,12 +280,14 @@ def solve_model(
                 sim_dat_const_aux[j, 2],
                 wks,
             )
+            # Write back new state into ghost cells
             temp = jnp.array((u, q, a, c, pl))
             sim_dat = lax.dynamic_update_slice(
                 sim_dat,
                 temp[:, jnp.newaxis] * jnp.ones(b + 1)[jnp.newaxis, :],
                 (0, end - 1),
             )
+            # Update auxiliary pressure for next cycle
             sim_dat_aux = sim_dat_aux.at[j, 2].set(pc)
             return sim_dat, sim_dat_aux
 
@@ -226,6 +299,7 @@ def solve_model(
             sim_dat_aux,
         )
 
+        # Bifurcation junction
         def solve_bifurcation_wrapper(sim_dat: SimDat):
             d1_i = edges[j, 4]
             d2_i = edges[j, 5]
@@ -265,6 +339,7 @@ def solve_model(
                     sim_dat_const[4, d2_i_start],
                 ]
             )
+            # Solve junction equations
             (
                 u1,
                 u2,
@@ -284,6 +359,7 @@ def solve_model(
             ) = solve_bifurcation(  # pylint: disable=E1111
                 us, a, a0s, betas, gammas, p_exts
             )  # pylint: disable=E1111  # pylint: disable=E1111
+            # Update state arrays for each branch
             temp1 = jnp.array((u1, q1, a1, c1, p1))
             temp2 = jnp.array((u2, q2, a2, c2, p2))
             temp3 = jnp.array((u3, q3, a3, c3, p3))
@@ -311,6 +387,7 @@ def solve_model(
             sim_dat,
         )
 
+        # Conjunction junction
         def solve_conjunction_wrapper(sim_dat: SimDat, rho: ScalarFloat):
             d_i = edges[j, 7]
             d_i_start = strides[d_i, 0]
@@ -371,6 +448,7 @@ def solve_model(
             rho,
         )
 
+        # Anastomosis junction
         def solve_anastomosis_wrapper(sim_dat: SimDat):
             p1_i = edges[j, 7]
             p2_i = edges[j, 8]
@@ -440,6 +518,7 @@ def solve_model(
                     sim_dat_const[4, d_start],
                 ]
             )
+            # Only solve if branch index matches
             u1, u2, u3, q1, q2, q3, a1, a2, a3, c1, c2, c3, p1, p2, p3 = lax.cond(
                 jnp.maximum(p1_i, p2_i) == j,
                 lambda: solve_anastomosis(
@@ -497,6 +576,7 @@ def solve_model(
             strides,
         )
 
+    # Loop over all vessels for junction handling
     (sim_dat, sim_dat_aux, _, _, _, _, _) = lax.fori_loop(
         0,
         n,
@@ -522,30 +602,47 @@ def muscl(
     masks: MasksPadded,
 ) -> SimDat:
     """
-    Applies the Monotonic Upstream-centered Scheme for Conservation Laws (MUSCL) method for numerical flux calculation.
+    Apply MUSCL scheme for high-resolution flux computation.
 
-    Parameters:
-    dt (Float[Array, ""]): Time step size.
-    q (Float[Array, "..."]): Flow rate array.
-    a (Float[Array, "..."]): Cross-sectional area array.
-    a0 (Float[Array, "..."]): Reference cross-sectional area array.
-    beta (Float[Array, "..."]): Stiffness coefficient array.
-    gamma (Float[Array, "..."]): Admittance coefficient array.
-    wall_e (Float[Array, "..."]): Wall elasticity array.
-    dx (Float[Array, "..."]): Spatial step size array.
-    p_ext (Float[Array, "..."]): External pressure array.
-    visc_t (Float[Array, "..."]): Viscosity term array.
-    masks (Integer[Array, "..."]): Masks for boundary conditions.
+    1) Reconstruct left/right states with slope limiters.
+    2) Compute numerical fluxes using Lax–Friedrichs type formula.
+    3) Update conserved variables via finite-volume update.
+    4) Apply boundary masks to prevent unphysical updates.
 
-    Returns:
-    Float[Array, "..."]: Updated simulation data array.
+    Parameters
+    ----------
+    dt
+        Time step (s).
+    q
+        Flow rate array for interior cells.
+    a
+        Cross-sectional area array.
+    a0
+        Reference area for computing pressure.
+    beta, gamma, wall_e
+        Vessel stiffness and wall elasticity parameters.
+    dx
+        Spatial step size.
+    p_ext
+        External pressure.
+    visc_t
+        Viscous term modifier.
+    masks
+        Ghost‐cell masks to preserve boundary values.
+
+    Returns
+    -------
+    sim_dat_updated : SimDat
+        Stack [u, q, a, c, p] after one MUSCL update on interior cells.
     """
+    # Number of total cells including ghost points
     k = len(q) + 2
 
     s_a0 = vmap(jnp.sqrt)(a0)
     s_inv_a0 = vmap(lambda a: 1 / jnp.sqrt(a))(a0)
     half_dx = 0.5 * dx
     inv_dx = 1 / dx
+    # Prepare ghost‐extended arrays for reconstruction
     gamma_ghost = jnp.zeros(k)
     gamma_ghost = gamma_ghost.at[1:-1].set(gamma)
     gamma_ghost = gamma_ghost.at[0].set(gamma[0])
@@ -560,9 +657,12 @@ def muscl(
     va = va.at[1:-1].set(a)
     vq = vq.at[1:-1].set(q)
 
+    # Compute limited slopes for area and flow
     inv_dx_temp = jnp.concatenate((inv_dx, jnp.array([inv_dx[-1]])))
     limiter_a = compute_limiter(va, inv_dx_temp)
     limiter_q = compute_limiter(vq, inv_dx_temp)
+
+    # Reconstruct left and right states at cell faces
     half_dx_temp = jnp.concatenate(
         (jnp.array([half_dx[0]]), half_dx, jnp.array([half_dx[-1]]))
     )
@@ -574,9 +674,11 @@ def muscl(
     ql = vmap(lambda a, b: a + b)(vq, slope_q_half_dx)
     qr = vmap(lambda a, b: a - b)(vq, slope_q_half_dx)
 
+    # Compute physical fluxes f = [q, q^2/a + gamma a sqrt(a)]
     fl = jnp.array(vmap(compute_flux)(gamma_ghost, al, ql))
     fr = jnp.array(vmap(compute_flux)(gamma_ghost, ar, qr))
 
+    # Compute numerical flux via Rusanov/Lax–Friedrichs splitting
     dx_dt = dx / dt
 
     inv_dx_dt = dt / dx
@@ -596,6 +698,7 @@ def muscl(
         )
     )
 
+    # Update conserved variables u* = u - dt/dx * (f_i+1/2 - f_i-1/2)
     u_star = jnp.empty((2, k))
     u_star = u_star.at[0, 1:-1].set(
         vmap(lambda a, b, c, d: a + d * (b - c))(
@@ -614,6 +717,7 @@ def muscl(
     u_star2 = u_star1.at[:, 1:-1].set(u_star)
     u_star3 = jnp.zeros((2, k + 2))
     u_star3 = u_star1.at[:, 2:].set(u_star)
+    # Apply masks to preserve boundary ghost cells
     u_star2 = jnp.where(masks[0, :], u_star1, u_star2)
     u_star2 = jnp.where(masks[1, :], u_star3, u_star2)
     u_star = u_star2[:, 1:-1]
@@ -643,6 +747,7 @@ def muscl(
         )
     )
 
+    # Final update: compute physical primitives
     a = vmap(lambda a, b, c, d, e: 0.5 * (a + b + e * (c - d)))(
         a[:], u_star[0, 1:-1], flux[0, 0:-1], flux[0, 1:], inv_dx_dt
     )
@@ -666,30 +771,42 @@ def compute_flux(
     gamma_ghost: ScalarFloat, a: ScalarFloat, q: ScalarFloat
 ) -> tuple[ScalarFloat, ScalarFloat]:
     """
-    Computes the fluxes.
+    Physical flux function for 1D blood flow.
 
-    Parameters:
-    gamma_ghost (Float[Array, "..."]): Ghost cell admittance coefficient.
-    a (Float[Array, "..."]): Cross-sectional area array.
-    q (Float[Array, "..."]): Flow rate array.
+    f1 = q
+    f2 = q^2 / a + gamma * a * sqrt(a)
 
-    Returns:
-    tuple[Float[Array, "..."], Float[Array, "..."]]: Computed fluxes.
+    Parameters
+    ----------
+    gamma_ghost
+        Admittance coefficient (ghost cell).
+    a
+        Cross-sectional area.
+    q
+        Flow rate.
+
+    Returns
+    -------
+    (f1, f2)
+        Tuple of flux components for continuity and momentum equations.
     """
+
     return q, q * q / a + gamma_ghost * a * jnp.sqrt(a)
 
 
 @jaxtyped(typechecker=typechecker)
 def max_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
-    Applies the max mod function.
+    Maximum modulus limiter helper: max(a, b).
 
-    Parameters:
-    a (Float[Array, "..."]): First array.
-    b (Float[Array, "..."]): Second array.
+    Parameters
+    ----------
+    a, b
+        Arrays of candidate slope ratios.
 
-    Returns:
-    Float[Array, "..."]: Result of the max mod function.
+    Returns
+    -------
+    elementwise maximum of a and b.
     """
     return jnp.where(a > b, a, b)
 
@@ -697,14 +814,16 @@ def max_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
 @jaxtyped(typechecker=typechecker)
 def min_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
-    Applies the min mod function.
+    Minmod limiter helper: returns 0 if signals change sign, else min(|a|,|b|).
 
-    Parameters:
-    a (Float[Array, "..."]): First array.
-    b (Float[Array, "..."]): Second array.
+    Parameters
+    ----------
+    a, b
+        Arrays of forward/backward differences scaled by dx.
 
-    Returns:
-    Float[Array, "..."]: Result of the min mod function.
+    Returns
+    -------
+    elementwise minmod of a and b.
     """
     return jnp.where((a <= 0.0) | (b <= 0.0), 0.0, jnp.where(a < b, a, b))
 
@@ -712,13 +831,16 @@ def min_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
 @jaxtyped(typechecker=typechecker)
 def super_bee(du: SimDatDouble) -> SimDatSingle:
     """
-    Applies the superbee flux limiter.
+    Superbee flux limiter combining min_mod and max_mod for sharp resolution.
 
-    Parameters:
-    du (Float[Array, "..."]): Array of differences.
+    Parameters
+    ----------
+    du
+        2×N array where du[0] = forward diff, du[1] = backward diff.
 
-    Returns:
-    Float[Array, "..."]: Result of the superbee flux limiter.
+    Returns
+    -------
+    limited slopes for each cell interface.
     """
     return max_mod(min_mod(du[0, :], 2 * du[1, :]), min_mod(2 * du[0, :], du[1, :]))
 
@@ -726,16 +848,22 @@ def super_bee(du: SimDatDouble) -> SimDatSingle:
 @jaxtyped(typechecker=typechecker)
 def compute_limiter(u: SimDatSingle, inv_dx: SimDatSingleReduced) -> SimDatSingle:
     """
-    Computes the limiter for numerical fluxes.
+    Compute slope limiter values for all cell faces.
 
-    Parameters:
-    u (Float[Array, "..."]): Array of values.
-    inv_dx (Float[Array, "..."]): Array of inverse spatial step sizes.
+    Parameters
+    ----------
+    u
+        Extended array of primitive variable (with ghost points).
+    inv_dx
+        Array of inverse spatial steps for each interval.
 
-    Returns:
-    Float[Array, "..."]: Computed limiter values.
+    Returns
+    -------
+    limiter values for each cell face.
     """
+    # Compute forward/backward scaled differences
     du = vmap(lambda a, b: a * b)(jnp.diff(u), inv_dx)
+    # Stack for minmod/superbee
     return super_bee(
         jnp.stack(
             (
@@ -751,15 +879,20 @@ def compute_limiter_idx(
     u: SimDatDouble, idx: StaticScalarInt, inv_dx: SimDatSingleReduced
 ) -> SimDatSingle:
     """
-    Computes the limiter for numerical fluxes at a specified index.
+    Compute slope limiter for a specific row of a multi-variable array.
 
-    Parameters:
-    u (Float[Array, "..."]): Array of values.
-    idx (int): Index for which to compute the limiter.
-    inv_dx (Float[Array, "..."]): Array of inverse spatial step sizes.
+    Parameters
+    ----------
+    u
+        2×N array of primitive variables (with ghost points).
+    idx
+        Row index (0 for q, 1 for a).
+    inv_dx
+        Inverse spatial steps.
 
-    Returns:
-    Float[Array, "..."]: Computed limiter values at the specified index.
+    Returns
+    -------
+    limiter values for each cell face of the specified variable.
     """
     du = vmap(lambda a, b: a * b)(jnp.diff(u[idx, :]), inv_dx)
     return super_bee(
