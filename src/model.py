@@ -1,18 +1,37 @@
 """
-This module provides functions to configure and run vascular network simulations using JAX.
+Simulation configuration and execution for vascular network models using JAX.
 
-It includes functions to:
-- Configure the simulation (`config_simulation`).
-- Run the main simulation loop with and without safety checks (`simulation_loop`, `simulation_loop_unsafe`).
-- Execute the simulation with JIT compilation for performance optimization (`run_simulation_unsafe`, `run_simulation`).
+This module handles:
+- Loading user configurations and building the arterial network.
+- Setting up blood rheology and numerical solver parameters.
+- Running time-stepping simulations with optional convergence checks.
+- Providing both "unsafe" (no convergence monitoring) and "safe" (with convergence
+  diagnostics) execution paths, each JIT-compiled for performance.
 
-The module makes use of the following imported utilities:
-- Functions from `src.check_conv` for convergence checks and error computations.
-- Functions from `src.initialise` for building the network and blood properties, and loading configurations.
-- `save_temp_data` from `src.IOutils` for saving temporary data.
-- Functions from `src.solver` for time-step computation and solving the model.
-- `jax.numpy` and `jax.lax` for numerical operations and control flow.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
+Key functions
+-------------
+config_simulation
+    Load configuration, build network and blood properties, and prepare simulation data.
+simulation_loop_unsafe
+    Execute the main time-stepping loop without convergence checks, capturing pressure snapshots.
+simulation_loop
+    Execute the main time-stepping loop with convergence diagnostics and early stopping.
+run_simulation_unsafe
+    High-level entry point for unsafe simulation: loads config, JIT-compiles, and runs.
+run_simulation
+    High-level entry point for safe simulation: loads config, JIT-compiles, and runs.
+
+Dependencies
+------------
+- JAX (jax.numpy, jax.lax)                 : Array operations and control flow
+- NumPy                                    : Configuration utilities and timepoint generation
+- NumPyro                                  : Platform configuration
+- jaxtyping.jaxtyped, beartype.beartype     : Static and runtime type enforcement
+- src.check_conv                           : Convergence error computation and reporting
+- src.initialise                           : Network and blood setup, configuration loading
+- src.IOutils                              : Pressure data sampling utilities
+- src.solver                               : Time-step computation and blood flow solver
+- src.types                                : Data type aliases for simulation arrays
 """
 
 from functools import partial
@@ -65,8 +84,9 @@ from src.types import (
     TimepointsReturn,
 )
 
-
+# Use CPU platform for JAX-NumPyro computations
 numpyro.set_platform("cpu")
+# To force multiple CPU devices, uncomment and adjust as needed:
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 32 CPU devices
 # jax.devices("cpu")[0]
@@ -96,21 +116,61 @@ def config_simulation(
     StaticScalarFloat,
 ]:
     """
-    Configures the simulation by loading the configuration, building the blood properties, and arterial network.
+    Load config, build network and blood, and initialize simulation data arrays.
 
-    Parameters:
-    input_filename (str): Path to the YAML configuration file.
-    verbose (bool): Whether to print verbose output.
-    make_results_folder_bool (bool): Whether to create a results folder.
+    Parameters
+    ----------
+    input_filename : String
+        Path to the YAML configuration file defining network, solver, and I/O.
+    make_results_folder_bool : StaticBool, optional
+        If True, create a timestamped results folder alongside config (default: True).
 
-    Returns:
-    tuple: Configuration parameters for the simulation.
+    Returns
+    -------
+    n : StaticScalarInt
+        Number of vessels in the arterial network.
+    b : StaticScalarInt
+        Buffer size for time-stepping history.
+    j : StaticScalarInt
+        Number of snapshots/timepoints to record.
+    sim_dat : StaticSimDat
+        Initial simulation state array (e.g., [area, velocity, pressure...]).
+    sim_dat_aux : StaticSimDatAux
+        Auxiliary state variables for the solver.
+    sim_dat_const : StaticSimDatConst
+        Constant parameters per vessel (e.g., compliance coefficients).
+    sim_dat_const_aux : StaticSimDatConstAux
+        Global constants (e.g., cardiac period).
+    timepoints : StaticTimepoints
+        Linearly spaced timepoints over one cardiac cycle.
+    init_snapshot_index : StaticScalarInt
+        Starting index for snapshots (always 1).
+    ccfl : StaticScalarFloat
+        CFL number controlling time-step size.
+    input_data : StaticInputData
+        External inflow/outflow boundary data.
+    rho : StaticScalarFloat
+        Blood density (kg/m³).
+    masks : StaticMasks
+        Node masks for boundary condition enforcement.
+    strides : StaticStrides
+        Stride indices for sampling pressure along vessels.
+    edges : StaticEdges
+        Connectivity matrix of the arterial graph.
+    vessel_names : Strings
+        List of vessel identifiers corresponding to `edges`.
+    cardiac_period : StaticScalarFloat
+        Duration of one cardiac cycle (seconds).
     """
+    # Load YAML configuration
     data = load_config(input_filename)
+    # Build blood properties object
     blood = build_blood(data["blood"])
 
+    # Number of pressure snapshots to record
     j = data["solver"]["num_snapshots"]
 
+    # Construct arterial network and retrieve simulation arrays
     (
         sim_dat,
         sim_dat_aux,
@@ -124,12 +184,17 @@ def config_simulation(
         vessel_names,
         input_data,
     ) = build_arterial_network(data["network"], blood)
+
+    # Optionally create results directory for output files
     if make_results_folder_bool:
         make_results_folder(data, input_filename)
 
+    # Extract cardiac cycle duration from constants
     cardiac_t = sim_dat_const_aux[0, 0]
+    # CFL condition coefficient
     ccfl = float(data["solver"]["Ccfl"])
 
+    # Create evenly spaced timepoints over one cycle
     timepoints = np.linspace(0, cardiac_t, j)
 
     return (
@@ -170,26 +235,52 @@ def simulation_loop_unsafe(
     upper: StaticScalarInt = 100000,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
-    Runs the simulation loop without convergence checks.
+    Run time-stepping loop without convergence monitoring.
 
-    Parameters:
-    n (int): Number of vessels.
-    b (int): Buffer size.
-    sim_dat (Float[Array, "..."]): Simulation data array.
-    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
-    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
-    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
-    ccfl (Float[Array, ""]): CFL condition value.
-    input_data (Float[Array, "..."]): Input data array.
-    rho (Float[Array, ""]): Blood density.
-    masks (Integer[Array, "..."]): Masks array.
-    strides (Integer[Array, "..."]): Strides array.
-    edges (Integer[Array, "..."]): Edges array.
-    upper (int): Upper limit for the loop.
+    At each step:
+      1. Compute dt via CFL condition.
+      2. Advance states via `solve_model`.
+      3. Update simulation time and record snapshot of pressures.
 
-    Returns:
-    tuple: Updated simulation data, time steps, and pressure data.
+    Parameters
+    ----------
+    n : StaticScalarInt
+        Number of vessels.
+    b : StaticScalarInt
+        Buffer size for history arrays.
+    sim_dat : SimDat
+        Current simulation state.
+    sim_dat_aux : SimDatAux
+        Auxiliary state variables.
+    sim_dat_const : SimDatConst
+        Constant per-vessel parameters.
+    sim_dat_const_aux : SimDatConstAux
+        Global constant parameters.
+    ccfl : ScalarFloat
+        CFL number for dt selection.
+    input_data : InputData
+        External boundary condition data.
+    rho : ScalarFloat
+        Blood density.
+    masks : Masks
+        Boolean masks for boundary enforcement.
+    strides : Strides
+        Sampling strides for pressure snapshots.
+    edges : Edges
+        Connectivity graph of vessels.
+    upper : StaticScalarInt, optional
+        Maximum number of time steps (default: 100000).
+
+    Returns
+    -------
+    sim_dat : SimDat
+        Final simulation state.
+    t_t : TimepointsReturn
+        Recorded times of each snapshot (shape: [upper]).
+    p_t : PressureReturn
+        Recorded pressure snapshots (shape: [upper, 5*n]).
     """
+    # Initialize loop variables
     t: Float = 0.0
     dt: Float = 1.0
     p_t: PressureReturn = jnp.zeros((upper, 5 * n))
@@ -198,6 +289,9 @@ def simulation_loop_unsafe(
     def simulation_step(
         i: ScalarInt, args: SimulationStepArgsUnsafe
     ) -> SimulationStepArgsUnsafe:
+        """
+        Single time step without convergence check.
+        """
         (
             sim_dat,
             sim_dat_aux,
@@ -211,7 +305,10 @@ def simulation_loop_unsafe(
             rho,
             p_t,
         ) = args
+
+        # 1) Compute time-step based on current wave speeds and CFL
         dt = compute_dt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
+        # 2) Advance flow model one step
         sim_dat, sim_dat_aux = solve_model(
             n,
             b,
@@ -227,7 +324,9 @@ def simulation_loop_unsafe(
             strides[:, :2],
             edges,
         )
+        # 3) Update simulation time (wrap around cardiac cycle)
         t = (t + dt) % sim_dat_const_aux[0, 0]
+        # 4) Record time and sample pressures
         t_t = t_t.at[i].set(t)
         p_t = p_t.at[i, :].set(save_temp_data(n, strides, sim_dat[4, :]))
 
@@ -245,6 +344,7 @@ def simulation_loop_unsafe(
             p_t,
         )
 
+    # Execute fixed-number loop
     (
         sim_dat,
         sim_dat_aux,
@@ -298,28 +398,55 @@ def simulation_loop(
     edges: Edges,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
-    Runs the main simulation loop with convergence checks.
+    Run time-stepping loop with convergence checks and early exit.
 
-    Parameters:
-    n (int): Number of vessels.
-    b (int): Buffer size.
-    num_snapshots (int): Number of snapshots to capture.
-    sim_dat (Float[Array, "..."]): Simulation data array.
-    sim_dat_aux (Float[Array, "..."]): Auxiliary simulation data array.
-    sim_dat_const (Float[Array, "..."]): Constant simulation data array.
-    sim_dat_const_aux (Float[Array, "..."]): Auxiliary constant simulation data array.
-    timepoints (Float[Array, "..."]): Timepoints array.
-    conv_tol (Float[Array, ""]): Convergence tolerance.
-    ccfl (Float[Array, ""]): CFL condition value.
-    input_data (Float[Array, "..."]): Input data array.
-    rho (Float[Array, ""]): Blood density.
-    masks (Integer[Array, "..."]): Masks array.
-    strides (Integer[Array, "..."]): Strides array.
-    edges (Integer[Array, "..."]): Edges array.
+    Iterates until the computed error between successive cardiac cycles
+    falls below `conv_tol`, or until sufficient cycles have passed.
+    Captures pressure snapshots at specified `timepoints`.
 
-    Returns:
-    tuple: Updated simulation data, time steps, and pressure data.
+    Parameters
+    ----------
+    n : StaticScalarInt
+        Number of vessels.
+    b : StaticScalarInt
+        Buffer size for history arrays.
+    num_snapshots : StaticScalarInt
+        Number of timepoints per cycle to record.
+    sim_dat : SimDat
+        Current simulation state.
+    sim_dat_aux : SimDatAux
+        Auxiliary state variables.
+    sim_dat_const : SimDatConst
+        Constant per-vessel parameters.
+    sim_dat_const_aux : SimDatConstAux
+        Global constants (e.g., cycle period).
+    timepoints : Timepoints
+        Array of times at which to sample pressures.
+    conv_tol : ScalarFloat
+        Convergence tolerance in mmHg.
+    ccfl : ScalarFloat
+        CFL number for dt selection.
+    input_data : InputData
+        External boundary condition data.
+    rho : ScalarFloat
+        Blood density.
+    masks : Masks
+        Boolean masks for boundary enforcement.
+    strides : Strides
+        Sampling strides for pressure snapshots.
+    edges : Edges
+        Connectivity graph of vessels.
+
+    Returns
+    -------
+    sim_dat : SimDat
+        Final simulation state.
+    t_t : TimepointsReturn
+        Recorded times of snapshots (shape: [num_snapshots]).
+    p_t : PressureReturn
+        Recorded pressure snapshots (shape: [num_snapshots, 5*n]).
     """
+    # Initialize loop state
     t: Float = 0.0
     passed_cycles: Integer = 0
     counter: Integer = 0
@@ -329,6 +456,9 @@ def simulation_loop(
     dt: Float = 1.0
 
     def conv_error_condition(args: SimulationStepArgs) -> StaticBool:
+        """
+        Continue looping while convergence criteria not met.
+        """
         (
             _,
             _,
@@ -348,6 +478,8 @@ def simulation_loop(
             _,
             _,
         ) = args
+
+        # Compute maximum L2 error between this cycle and last cycle
         err = compute_conv_error(n, p_t_i, p_l_i)
 
         def print_conv_error_wrapper():
@@ -369,6 +501,9 @@ def simulation_loop(
     def simulation_step(
         args: SimulationStepArgs,
     ) -> SimulationStepArgs:
+        """
+        Single time step with convergence bookkeeping and snapshot logic.
+        """
         (
             sim_dat,
             sim_dat_aux,
@@ -388,6 +523,8 @@ def simulation_loop(
             input_data,
             rho,
         ) = args
+
+        # 1) Compute dt and advance solution
         dt = compute_dt(ccfl, sim_dat[0, :], sim_dat[3, :], sim_dat_const[-1, :])
         sim_dat, sim_dat_aux = solve_model(
             n,
@@ -405,6 +542,7 @@ def simulation_loop(
             edges,
         )
 
+        # 2) If we've reached next snapshot time, record pressure
         (p_t_temp, counter_temp) = lax.cond(
             t >= timepoints[counter],
             lambda: (save_temp_data(n, strides, sim_dat[4, :]), counter + 1),
@@ -414,7 +552,9 @@ def simulation_loop(
         t_t = t_t.at[counter].set(t)
         counter = counter_temp
 
+        # 3) At end of cardiac cycle, shift snapshots into p_l and reset
         def print_conv_error_wrapper():
+            # Print diagnostics at cycle boundary
             err = compute_conv_error(n, p_t, p_l)
             print_conv_error(err)
 
@@ -432,6 +572,7 @@ def simulation_loop(
             lambda: (p_l, counter, timepoints, passed_cycles),
         )
 
+        # 4) Advance time
         t += dt
 
         return (
@@ -454,6 +595,7 @@ def simulation_loop(
             rho,
         )
 
+    # Run while-loop until convergence condition returns False
     (
         sim_dat,
         sim_dat_aux,
@@ -504,17 +646,28 @@ def run_simulation_unsafe(
     make_results_folder_bool: StaticBool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
-    Runs the simulation without convergence checks.
+    Execute an "unsafe" simulation (no convergence checks) from configuration.
 
-    Parameters:
-    config_filename (str): Path to the YAML configuration file.
-    verbose (bool): Whether to print verbose output.
-    make_results_folder_bool (bool): Whether to create a results folder.
+    This function loads the configuration, sets up the model, JIT-compiles
+    `simulation_loop_unsafe`, and runs it to completion.
 
-    Returns:
-    tuple: Updated simulation data, time steps, and pressure data.
+    Parameters
+    ----------
+    config_filename : String
+        Path to the YAML configuration file.
+    make_results_folder_bool : StaticBool, optional
+        If True, create results folder (default: True).
+
+    Returns
+    -------
+    sim_dat : SimDat
+        Final simulation state.
+    t_t : TimepointsReturn
+        Recorded times for each snapshot.
+    p   : PressureReturn
+        Recorded pressure snapshots.
     """
-
+    # Load and configure simulation
     (
         n,
         b,
@@ -535,9 +688,12 @@ def run_simulation_unsafe(
         _,
     ) = config_simulation(config_filename, make_results_folder_bool)
 
+    # JIT-compile the unsafe loop (n, b, and upper bound are static)
     sim_loop_unsafe_jit = partial(jit, static_argnums=(0, 1, 12))(
         simulation_loop_unsafe
     )
+
+    # Execute and block until GPU/CPU finish
     sim_dat, t, p = block_until_ready(
         sim_loop_unsafe_jit(  # pylint: disable=E1102
             n,
@@ -564,16 +720,28 @@ def run_simulation(
     make_results_folder_bool: StaticBool = True,
 ) -> tuple[SimDat, TimepointsReturn, PressureReturn]:
     """
-    Runs the simulation with convergence checks.
+    Execute a "safe" simulation (with convergence monitoring) from configuration.
 
-    Parameters:
-    config_filename (str): Path to the YAML configuration file.
-    verbose (bool): Whether to print verbose output.
-    make_results_folder_bool (bool): Whether to create a results folder.
+    Loads configuration, builds model, JIT-compiles `simulation_loop`, and runs
+    until convergence criteria are met.
 
-    Returns:
-    tuple: Updated simulation data, time steps, and pressure data.
+    Parameters
+    ----------
+    config_filename : String
+        Path to the YAML configuration file.
+    make_results_folder_bool : StaticBool, optional
+        If True, create results folder (default: True).
+
+    Returns
+    -------
+    sim_dat : SimDat
+        Final simulation state.
+    t_t : TimepointsReturn
+        Recorded times for each snapshot.
+    p   : PressureReturn
+        Recorded pressure snapshots.
     """
+    # Load and configure simulation
     (
         n,
         b,
@@ -594,6 +762,7 @@ def run_simulation(
         _,
     ) = config_simulation(config_filename, make_results_folder_bool)
 
+    # JIT-compile the safe loop (n, b, j static)
     simulation_loop_jit = partial(jit, static_argnums=(0, 1, 2))(simulation_loop)
     sim_dat, t, p = block_until_ready(
         simulation_loop_jit(
