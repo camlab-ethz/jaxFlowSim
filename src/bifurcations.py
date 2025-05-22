@@ -1,17 +1,36 @@
 """
-This module provides functionality to solve the bifurcation problem in vascular networks using the Newton-Raphson method.
+Module for solving vascular bifurcation junction problems using the Newton–Raphson method.
 
-It includes functions to:
-- Initialize and solve the bifurcation problem (`solve_bifurcation`).
-- Calculate the Jacobian matrix specific to the bifurcation problem (`calculate_jacobian_bifurcation`).
-- Evaluate the function vector for the current state of the bifurcation problem (`calculate_f_bifurcation`).
-- Update the state of the system after solving the equations (`update_bifurcation`).
+This module provides a complete workflow for assembling, solving, and post-processing
+the nonlinear system governing three-vessel bifurcation flows.
 
-The module makes use of the following imported utilities:
-- `newtonRaphson` from `src.newton` for solving the system of nonlinear equations.
-- `pressure` and `waveSpeed` from `src.utils` for calculating pressure and wave speed in the vessels.
-- `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
+Functions
+---------
+solve_bifurcation(us, a, a0s, betas, gammas, p_exts)
+    Initialize the state vector and solve for velocities and areas at the bifurcation.
+calculate_jacobian_bifurcation(u0, k, a0s, betas)
+    Assemble the 6×6 Jacobian matrix of the nonlinear bifurcation equations.
+calculate_f_bifurcation(u, a0s, betas)
+    Evaluate the nonlinear residual vector for the current state.
+update_bifurcation(u, a0s, betas, gammas, p_exts)
+    Compute updated velocities, volumetric flows, cross-sectional areas,
+    wave speeds, and pressures from the solved state.
+
+Dependencies
+------------
+- `newton_raphson` from `src.newton`   : Custom Newton–Raphson solver for nonlinear systems.
+- `pressure`, `wave_speed` from `src.utils` : Utility functions for hemodynamic calculations.
+- `jax.numpy` (jnp)                   : Array operations and numeric routines.
+- `jaxtyping.jaxtyped`                : Static typing of JAX arrays.
+- `beartype.beartype`                 : Runtime type enforcement.
+
+Type Aliases
+------------
+- `TripleFloat`       : JAX array of shape (3,) for vessel parameters.
+- `HexaFloat`         : JAX array of shape (6,) representing the state vector.
+- `LargeJacobian`     : JAX array of shape (6, 6) for the Jacobian matrix.
+- `TripleJunctionReturn` : Concatenated result array [u, q, A, c, p] of length 15.
+
 """
 
 import jax.numpy as jnp
@@ -33,18 +52,32 @@ def solve_bifurcation(
     p_exts: TripleFloat,
 ) -> TripleJunctionReturn:
     """
-    Solves the bifurcation problem using the Newton-Raphson method.
+    Solve the three-vessel bifurcation junction problem using Newton–Raphson.
 
-    Parameters:
-    us (TripleFloat): Initial velocities for vessels 1, 2, and 3.
-    a (TripleFloat): Initial cross-sectional areas for vessels 1, 2, and 3.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
+    Parameters
+    ----------
+    us : TripleFloat
+        Initial velocities for vessels 1, 2, and 3.
+    a : TripleFloat
+        Initial cross-sectional areas for vessels 1, 2, and 3.
+    a0s : TripleFloat
+        Reference (unstressed) areas for vessels 1, 2, and 3.
+    betas : TripleFloat
+        Wall stiffness coefficients for vessels 1, 2, and 3.
+    gammas : TripleFloat
+        Admittance (compliance) coefficients for vessels 1, 2, and 3.
+    p_exts : TripleFloat
+        External pressures for vessels 1, 2, and 3.
 
-    Returns:
-    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Returns
+    -------
+    TripleJunctionReturn
+        Concatenation of:
+        - Velocities (u1, u2, u3)
+        - Flows (q1, q2, q3)
+        - Areas (A1, A2, A3)
+        - Wave speeds (c1, c2, c3)
+        - Pressures (p1, p2, p3)
     """
     u0 = jnp.concatenate([us, jnp.sqrt(jnp.sqrt(a))])
 
@@ -64,16 +97,26 @@ def calculate_jacobian_bifurcation(
     betas: TripleFloat,
 ) -> LargeJacobian:
     """
-    Calculates the Jacobian matrix for the bifurcation problem.
+    Compute the Jacobian matrix of the bifurcation residuals.
 
-    Parameters:
-    u0 (HexaFloat): Initial guess for the solution vector.
-    k (TripleFloat): Array of k parameters.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    The Jacobian is a 6×6 matrix combining continuity and wall-law equations
+    for a three-vessel junction.
 
-    Returns:
-    LargeJacobian: Jacobian matrix.
+    Parameters
+    ----------
+    u0 : HexaFloat
+        State vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    k : TripleFloat
+        Coefficient array derived from admittance values.
+    a0s : TripleFloat
+        Reference areas for vessels (unstressed state).
+    betas : TripleFloat
+        Wall stiffness coefficients.
+
+    Returns
+    -------
+    LargeJacobian
+        6×6 Jacobian matrix of partial derivatives.
     """
     u43 = u0[3] ** 3
     u53 = u0[4] ** 3
@@ -113,15 +156,23 @@ def calculate_f_bifurcation(
     u0s: HexaFloat, a0s: TripleFloat, betas: TripleFloat
 ) -> HexaFloat:
     """
-    Evaluates the function vector for the current state of the bifurcation problem.
+    Evaluate the residual vector of the bifurcation equations.
 
-    Parameters:
-    u0s (HexaFloat): Solution vector.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
+    Residuals combine mass continuity at the junction and wall-law balances.
 
-    Returns:
-    HexaFloat: Function values for the bifurcation problem.
+    Parameters
+    ----------
+    u : HexaFloat
+        Current state vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    a0s : TripleFloat
+        Reference (unstressed) cross-sectional areas.
+    betas : TripleFloat
+        Wall stiffness coefficients.
+
+    Returns
+    -------
+    HexaFloat
+        6-element residual vector [f1, f2, f3, f4, f5, f6].
     """
 
     u42 = u0s[3] * u0s[3]
@@ -152,17 +203,28 @@ def update_bifurcation(
     p_exts: TripleFloat,
 ) -> TripleJunctionReturn:
     """
-    Updates the state of the bifurcation problem based on the current state vector.
+    Post-process solved state to physical output variables.
 
-    Parameters:
-    u0s (HexaFloat): Solution vector.
-    a0s (TripleFloat): Reference cross-sectional areas for vessels 1, 2, and 3.
-    betas (TripleFloat): Stiffness coefficients for vessels 1, 2, and 3.
-    gammas (TripleFloat): Admittance coefficients for vessels 1, 2, and 3.
-    p_exts (TripleFloat): External pressures for vessels 1, 2, and 3.
+    Converts the optimized state vector into velocities, flows, areas,
+    wave speeds, and pressures for each vessel.
 
-    Returns:
-    TripleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1, 2, and 3.
+    Parameters
+    ----------
+    u : HexaFloat
+        Solved state vector [u1, u2, u3, A1^(1/4), A2^(1/4), A3^(1/4)].
+    a0s : TripleFloat
+        Reference (unstressed) cross-sectional areas.
+    betas : TripleFloat
+        Wall stiffness coefficients.
+    gammas : TripleFloat
+        Admittance (compliance) coefficients.
+    p_exts : TripleFloat
+        External pressures for each vessel.
+
+    Returns
+    -------
+    TripleJunctionReturn
+        Concatenated array [u, q, A, c, p] for vessels 1–3.
     """
 
     a = u0s[3:] * u0s[3:] * u0s[3:] * u0s[3:]
