@@ -1,17 +1,35 @@
 """
-This module provides functions to solve the conjunction problem in a vascular network model using JAX.
+Module for solving vascular conjunction (two-vessel junction) problems using the Newton–Raphson method.
 
-It includes functions to:
-- Initialize and solve the conjunction problem (`solve_conjunction`).
-- Calculate the Jacobian matrix specific to the conjunction problem (`calculate_jacobian_conjunction`).
-- Evaluate the function vector for the current state of the conjunction problem (`calculate_f_conjunction`).
-- Update the state of the system after solving the equations (`update_conjunction`).
+This module provides a complete workflow for assembling, solving, and post-processing
+the nonlinear system governing two-vessel conjunction flows.
 
-The module makes use of the following imported utilities:
-- `newtonRaphson` from `src.newton` for solving the system of nonlinear equations.
-- `pressure` and `waveSpeed` from `src.utils` for calculating pressure and wave speed in the vessels.
-- `jax.numpy` for numerical operations and array handling.
-- `jaxtyping` and `beartype` for type checking and ensuring type safety in the functions.
+Functions
+---------
+solve_conjunction(us, a, a0s, betas, gammas, p_exts, rho)
+    Initialize the state vector (including density) and solve for velocities and areas at the conjunction.
+calculate_jacobian_conjunction(u0, k, a0s, betas)
+    Assemble the 4×4 Jacobian matrix of the nonlinear conjunction equations.
+calculate_f_conjunction(u, a0s, betas)
+    Evaluate the nonlinear residual vector for the current state.
+update_conjunction(u, a0s, betas, gammas, p_exts)
+    Compute updated velocities, volumetric flows, cross-sectional areas,
+    wave speeds, and pressures from the solved state.
+
+Dependencies
+------------
+- `newton_raphson` from `src.newton`   : Custom Newton–Raphson solver for nonlinear systems.
+- `pressure`, `wave_speed` from `src.utils` : Utility functions for hemodynamic calculations.
+- `jax.numpy` (jnp)                   : Array operations and numeric routines.
+- `jaxtyping.jaxtyped`                : Static typing of JAX arrays.
+- `beartype.beartype`                 : Runtime type enforcement.
+
+Type Aliases
+------------
+- `PairFloat`         : JAX array of shape (2,) for vessel parameters.
+- `QuadFloat`         : JAX array of shape (4,) representing the state vector.
+- `SmallJacobian`     : JAX array of shape (4,4) for the Jacobian matrix.
+- `DoubleJunctionReturn` : Concatenated result array [u, q, A, c, p] of length 10.
 """
 
 import jax.numpy as jnp
@@ -56,11 +74,14 @@ def solve_conjunction(
     """
     u0 = jnp.concatenate((us, jnp.sqrt(jnp.sqrt(a))))
 
+    # include density as third k-entry
     k = jnp.append(jnp.sqrt(1.5 * gammas), rho)
 
+    # assemble Jacobian and solve nonlinear system
     j = calculate_jacobian_conjunction(u0, k, a0s, betas)
     u = newton_raphson(calculate_f_conjunction, j, u0, a0s, betas)
 
+    # post-process to physical variables
     return update_conjunction(u, a0s, betas, gammas, p_exts)
 
 
@@ -72,16 +93,23 @@ def calculate_jacobian_conjunction(
     betas: PairFloat,
 ) -> SmallJacobian:
     """
-    Calculates the Jacobian matrix for the conjunction problem.
+    Compute the Jacobian matrix of the conjunction residuals.
 
-    Parameters:
-    u0 (QuadFloat): Initial guess for the solution vector.
-    k (TripleFloat): Array of k parameters.
-    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
-    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
+    Parameters
+    ----------
+    u0 : QuadFloat
+        State vector [u1, u2, A1^(1/4), A2^(1/4)].
+    k : array_like
+        Coefficients derived from admittance and density [k1, k2, rho].
+    a0s : PairFloat
+        Reference areas for vessels (unstressed state).
+    betas : PairFloat
+        Wall stiffness coefficients.
 
-    Returns:
-    SmallJacobian: Jacobian matrix.
+    Returns
+    -------
+    SmallJacobian
+        4×4 Jacobian matrix of partial derivatives.
     """
     u33 = u0[2] * u0[2] * u0[2]
     u43 = u0[3] * u0[3] * u0[3]
@@ -112,15 +140,16 @@ def calculate_f_conjunction(
     u0: QuadFloat, a0s: PairFloat, betas: PairFloat
 ) -> QuadFloat:
     """
-    Evaluates the function vector for the current state of the conjunction problem.
+    Calculates the Jacobian matrix for the conjunction problem.
 
     Parameters:
-    u0 (QuadFloat): Solution vector.
+    u0 (QuadFloat): Initial guess for the solution vector.
+    k (TripleFloat): Array of k parameters.
     a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
     betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
 
     Returns:
-    QuadFloat: Function values for the conjunction problem.
+    SmallJacobian: Jacobian matrix.
     """
 
     a01, a02 = a0s
@@ -152,17 +181,28 @@ def update_conjunction(
     p_exts: PairFloat,
 ) -> DoubleJunctionReturn:
     """
-    Updates the state of the conjunction problem based on the current state vector.
+    Post-process solved state to physical output variables.
 
-    Parameters:
-    u0 (QuadFloat): Solution vector.
-    a0s (PairFloat): Reference cross-sectional areas for vessels 1 and 2.
-    betas (PairFloat): Stiffness coefficients for vessels 1 and 2.
-    gammas (PairFloat): Admittance coefficients for vessels 1 and 2.
-    p_exts (PairFloat): External pressures for vessels 1 and 2.
+    Converts the optimized state vector into velocities, flows, areas,
+    wave speeds, and pressures for each vessel.
 
-    Returns:
-    DoubleJunctionReturn: Updated values of velocities, flow rates, cross-sectional areas, wave speeds, and pressures for vessels 1 and 2.
+    Parameters
+    ----------
+    u : QuadFloat
+        Solved state vector [u1, u2, A1^(1/4), A2^(1/4)].
+    a0s : PairFloat
+        Reference (unstressed) cross-sectional areas.
+    betas : PairFloat
+        Wall stiffness coefficients.
+    gammas : PairFloat
+        Admittance (compliance) coefficients.
+    p_exts : PairFloat
+        External pressures for each vessel.
+
+    Returns
+    -------
+    DoubleJunctionReturn
+        Concatenated array [u, q, A, c, p] for vessels 1 and 2.
     """
 
     a = jnp.array([u0[2] * u0[2] * u0[2] * u0[2], u0[3] * u0[3] * u0[3] * u0[3]])
