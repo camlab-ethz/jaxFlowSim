@@ -15,15 +15,24 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, jaxtyped
 from beartype import beartype as typechecker
 
+from src.types import (
+    HexaFloat,
+    QuadFloat,
+    SmallJacobian,
+    LargeJacobian,
+    PairFloat,
+    TripleFloat,
+)
+
 
 @jaxtyped(typechecker=typechecker)
 def newton_raphson(
     fun_f: Callable,
-    j: Float[Array, "..."],
-    u: Float[Array, "..."],
-    a0s: Float[Array, "..."],
-    betas: Float[Array, "..."],
-) -> Float[Array, "..."]:
+    j: SmallJacobian | LargeJacobian,
+    u: QuadFloat | HexaFloat,
+    a0s: PairFloat | TripleFloat,
+    betas: PairFloat | TripleFloat,
+) -> QuadFloat | HexaFloat:
     """
     Solves a system of nonlinear equations using the Newton-Raphson method.
 
