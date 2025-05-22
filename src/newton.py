@@ -19,10 +19,8 @@ Dependencies
 - src.types: Domain-specific type aliases for state and Jacobian shapes.
 """
 
-from typing import Callable
-
 import jax.numpy as jnp
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 from beartype import beartype as typechecker
 
 from src.types import (
@@ -32,12 +30,13 @@ from src.types import (
     LargeJacobian,
     PairFloat,
     TripleFloat,
+    ScalarCallable,
 )
 
 
 @jaxtyped(typechecker=typechecker)
 def newton_raphson(
-    fun_f: Callable[
+    fun_f: ScalarCallable[
         [QuadFloat | HexaFloat, PairFloat | TripleFloat, PairFloat | TripleFloat],
         QuadFloat | HexaFloat,
     ],
