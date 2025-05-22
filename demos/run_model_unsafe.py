@@ -112,7 +112,7 @@ sim_dat, t_t, p_t = block_until_ready(
 # If verbose mode is enabled, calculate and print the elapsed time
 if VERBOSE:
     ending_time = (time.time_ns() - STARTING_TIME) / 1.0e9
-    print(f"Finished running models, elapsed time = {ending_time} seconds")
+    print(f"Finished running model, elapsed time = {ending_time} seconds")
     print("Plotting results into resluts directory")
 
 
