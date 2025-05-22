@@ -3,7 +3,6 @@ import jax
 import sys
 
 sys.path.append("/home/diego/studies/uni/thesis_maths/jaxFlowSim")
-print("Updated sys.path:", sys.path)
 from src.model import run_simulation, run_simulation_unsafe
 import time
 import os
@@ -17,9 +16,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 class TestModels(unittest.TestCase):
-
     def test_models(self):
-
         modelnames = [
             "single-artery",
             "tapering",
@@ -47,7 +44,6 @@ class TestModels(unittest.TestCase):
             np.testing.assert_almost_equal(t, t_base)
 
     def test_models_unsafe(self):
-
         modelnames = [
             "single-artery",
             "tapering",
