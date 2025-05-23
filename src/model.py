@@ -2,6 +2,7 @@
 Simulation configuration and execution for vascular network models using JAX.
 
 This module handles:
+
 - Loading user configurations and building the arterial network.
 - Setting up blood rheology and numerical solver parameters.
 - Running time-stepping simulations with optional convergence checks.

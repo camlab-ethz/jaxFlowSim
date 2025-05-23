@@ -83,6 +83,7 @@ def save_temp_data(
     >>> # and p a length-20 array,
     >>> # save_temp_data(2, strides, p) returns:
     >>> # [p[0], p[2], p[5], p[8], p[9],  p[10], p[13], p[16], p[19], p[19]]
+
     """
     # Initialize output array: 5 samples per vessel
     p_t = jnp.zeros(5 * n)

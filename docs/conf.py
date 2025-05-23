@@ -34,7 +34,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-latex_engine = "pdflatex"  # pdflatex is default; alternatives: 'xelatex', 'lualatex'
+latex_engine = "xelatex"  # pdflatex is default; alternatives: 'xelatex', 'lualatex'
 latex_elements = {
     "classoptions": ",oneside",
 }

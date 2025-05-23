@@ -67,23 +67,10 @@ def compute_dt(
     c: SimDatSingle,
     dx: SimDatSingle,
 ) -> ScalarFloat:
-    (
-        """
-    Computes the time step size based on the Courant–Friedrichs–Lewy (CFL) condition.
-
-    Parameters:
-    ccfl (Float[Array, ""]): CFL number.
-    u (Float[Array, "..."]): Velocity array.
-    c (Float[Array, "..."]): Wave speed array.
-    dx (Float[Array, "..."]): Spatial step size array.
-
-    Returns:
-    Float[Array, ""]: Computed time step size.
     """
-        """
     Compute stable time step via the CFL condition.
 
-    Uses the maximum wave speed |u| + c on each vessel segment to ensure
+    Uses the maximum wave speed \|u\| + c on each vessel segment to ensure
     numerical stability: dt = min(ccfl * dx / max_wave_speed).
 
     Parameters
@@ -102,7 +89,6 @@ def compute_dt(
     dt : ScalarFloat
         Time step size (s) satisfying the CFL constraint.
     """
-    )
 
     smax = vmap(lambda a, b: jnp.abs(a + b))(u, c)
     # Compute candidate dt per segment
@@ -814,7 +800,7 @@ def max_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
 @jaxtyped(typechecker=typechecker)
 def min_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
-    Minmod limiter helper: returns 0 if signals change sign, else min(|a|,|b|).
+    Minmod limiter helper: returns 0 if signals change sign, else min(\|a\|,\|b\|).
 
     Parameters
     ----------
