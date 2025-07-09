@@ -34,7 +34,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpyro  # type: ignore
 from jax import jit, lax, jacfwd
 from jax.test_util import check_grads
 from jax.tree_util import Partial
@@ -45,7 +44,6 @@ from src.model import config_simulation, simulation_loop_unsafe
 os.chdir(os.path.dirname(__file__) + "/..")
 jax.config.update("jax_enable_x64", True)
 
-numpyro.set_host_device_count(1)
 
 CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
 

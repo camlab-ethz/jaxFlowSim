@@ -39,7 +39,6 @@ from functools import partial
 
 import jax.numpy as jnp
 import numpy as np
-import numpyro  # type: ignore
 from jax import block_until_ready, jit, lax
 from jaxtyping import Float, Integer, jaxtyped
 from beartype import beartype as typechecker
@@ -86,7 +85,6 @@ from src.types import (
 )
 
 # Use CPU platform for JAX-NumPyro computations
-numpyro.set_platform("cpu")
 # To force multiple CPU devices, uncomment and adjust as needed:
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8' # Use 8 CPU devices
 # os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=32' # Use 32 CPU devices
