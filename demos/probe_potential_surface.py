@@ -34,9 +34,9 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import jit, lax, jacfwd
-from jax.test_util import check_grads
-from jax.tree_util import Partial
+from jax import jit, jacfwd
+import matplotlib.pyplot as plt
+# from jax.test_util import check_grads
 
 sys.path.insert(0, sys.path[0] + "/..")
 from src.model import config_simulation, simulation_loop_unsafe
@@ -125,23 +125,14 @@ def sim_loop_wrapper(params):
         edges,
         50000,
     )
-    # return jnp.sqrt(jnp.sum(jnp.square((p - P_obs)))) / jnp.sqrt(
-    #     jnp.sum(jnp.square((P_obs)))
-    # )
-
-    # mse = jnp.sqrt(jnp.mean((p - P_obs) ** 2))
-    # normalization_factor = (
-    #     jnp.sqrt(jnp.mean(P_obs**2)) + 1e-8
-    # )  # Adding epsilon for numerical stability
-    # return jnp.log(mse / normalization_factor + 1)
     return jnp.mean(
         jnp.power(jnp.linalg.norm(p - P_obs, ord=None, axis=0), 2)
         / jnp.power(jnp.linalg.norm(P_obs, ord=None, axis=0), 2)
     )
 
 
-TOTAL_NUM_POINTS = int(1e3)
-R_scales = np.linspace(0.8, 10, int(TOTAL_NUM_POINTS))
+TOTAL_NUM_POINTS = int(10)
+R_scales = jnp.linspace(0.8, 1.2, int(TOTAL_NUM_POINTS))
 
 
 SIM_LOOP_WRAPPER_JIT = partial(jit)(sim_loop_wrapper)
@@ -164,34 +155,43 @@ if len(sys.argv) > 1:
 else:
     RANGE = range(slices)
 
+# vectorized evaluation of all gradients
+print("Evaluating gradients...")
+gradients = jax.jit(jax.vmap(jax.jacfwd(sim_loop_wrapper), in_axes=(0,)))(R_scales)
+jax.block_until_ready(gradients)
+print("Gradients evaluated.")
+
+# vectorized evaluation of values
+print("Evaluating values...")
+values = jax.jit(jax.vmap(sim_loop_wrapper, in_axes=(0,)))(R_scales)
+jax.block_until_ready(values)
+print("Values evaluated.")
+
+# print("Checking gradients...")
+# jax.vmap(
+#    lambda x: check_grads(
+#        sim_loop_wrapper, x, order=1, atol=1e-2, rtol=1e-2, modes="fwd"
+#    ),
+#    in_axes=(0,),
+# )(R_scales)
+# print out gradients
+# check_grads(
+#    sim_loop_wrapper, tuple(R_scales), order=1, atol=1e-2, rtol=1e-2, modes="fwd"
+# )
+# print("All gradients checked.")
+
+# plot values and gradients
+fig, ax = plt.subplots()
+ax2 = ax.twinx()
+ax.plot(R_scales, values, label="loss", color="blue")
+# create second y-axis for gradients
+ax2.set_ylabel("gradient")
+ax2.plot(R_scales, gradients, label="gradient", color="orange")
+ax.set_xlabel("resistance scale of windkessel model")
+ax.set_ylabel("loss")
+plt.title("Potential Surface Analysis")
+fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax.transAxes)
+plt.show()
+print("Gradients:")
 for i in RANGE:
-    RESULTS_FILE = RESULTS_FOLDER + "/potential_surface_new.txt"
-    R = R_scales[i]
-    loss = SIM_LOOP_WRAPPER_JIT(R)  # pylint: disable=E1102
-
-    def f(x):
-        return x**2
-
-    if len(sys.argv) > 1:
-        gradient_index = i - int(sys.argv[1]) * slices
-    else:
-        gradient_index = i
-    # gradients[gradient_index] = SIM_LOOP_WRAPPER_GRAD_JIT(  # pylint: disable=E1102
-    gradients[gradient_index] = jax.grad(sim_loop_wrapper)(  # pylint: disable=E1102
-        R,
-    )
-
-    print(jax.jvp(sim_loop_wrapper, (R,), (1.0,)))
-    print(
-        sim_loop_wrapper(
-            R,
-        )
-    )
-    # print(jax.jvp(f, (R,), (1.0,)))
-    print(R, gradients[gradient_index])
-    # check_grads(sim_loop_wrapper, (R,), order=1, atol=1e-2, rtol=1e-2, modes="fwd")
-    check_grads(sim_loop_wrapper, (R,), order=1)
-
-    file = open(RESULTS_FILE, "a", encoding="utf-8")
-    file.write(str(R) + " " + str(loss) + " " + str(gradients[gradient_index]) + "\n")
-    file.close()
+    print(f"R: {R_scales[i]}, Gradient: {gradients[i]}")
