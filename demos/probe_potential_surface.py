@@ -1,30 +1,46 @@
 """
-This script configures and runs a JAX-based simulation of bifurcation, evaluates the results,
-and computes gradients for potential surface analysis.
+Potential Surface Analysis Demo for Vascular Network Simulations
 
-The script performs the following steps:
-1. Sets up the simulation environment and loads the configuration.
-2. Runs the simulation for a specified number of iterations.
-3. Defines and runs a wrapper for the simulation loop to evaluate and compute gradients.
-4. Saves the results and gradients to a file.
+This script performs a “potential surface” exploration by varying a key model
+parameter (a Windkessel resistance) and measuring its effect on the simulation
+output. We compute both the loss (normalized pressure deviation) and its
+gradient with respect to the parameter scale, over a specified range.
 
-Constants:
-- `CONFIG_FILENAME`: Path to the configuration file for the simulation.
-- `RESULTS_FOLDER`: Directory to store the results.
-- `RESULTS_FILE`: File to store the results.
-- `NUM_ITERATIONS`: Number of iterations for the simulation.
-- `TOTAL_NUM_POINTS`: Total number of points for potential surface analysis.
+Workflow
+--------
+1. **Configure** the simulation environment and load network & blood properties.
+2. **Run** a baseline (unsafe) simulation to obtain reference pressure data.
+3. **Define** a loss function that rescales one parameter in the cardiac model,
+   reruns the simulation, and measures deviation from the baseline.
+4. **Determine** the subset of parameter scales to evaluate based on command‐line arguments (for distributed runs)
+5. **Vectorize** and JIT‐compile both the loss and its gradient over a grid of
+   parameter scaling factors.
+6. **Plot** the resulting potential surface (loss vs. scale) and its gradient.
 
-Functions:
-- `config_simulation`: Configures the simulation environment.
-- `simulation_loop_unsafe`: Runs the simulation loop.
-- `sim_loop_wrapper`: Wrapper for the simulation loop to evaluate results.
-- `sin_loop_wrapper1`: Alternate wrapper for the simulation loop.
-- `check_grads`: Checks the gradients for correctness.
-- `partial`: Partially applies arguments to a function.
-- `jit`: Compiles a function using Just-In-Time compilation.
-- `jacfwd`: Computes forward-mode Jacobian of a function.
+Usage
+-----
+    python potential_surface_demo.py [slice_index num_slices]
 
+- *slice_index* (int, optional): zero‐based index of the current task slice.
+- *num_slices* (int, optional): number of equally‐sized slices to split the
+  TOTAL_NUM_POINTS across for distributed evaluation.
+
+Dependencies
+------------
+- JAX (jax, jax.numpy, jacfwd, jit, vmap)
+- Matplotlib
+- src.model.config_simulation, simulation_loop_unsafe
+
+Constants
+---------
+CONFIG_FILENAME : str
+    Path to the YAML file defining the bifurcation network and solver settings.
+RESULTS_FOLDER : str
+    Directory to save any outputs (if expanded in future).
+NUM_TIME_STEPS : int
+    Number of time‐steps to run in the simulation loop.
+TOTAL_NUM_POINTS : int
+    Number of parameter scales to sample in the potential surface.
 """
 
 import os
@@ -33,22 +49,34 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
-from jax import jit, jacfwd
+from jax import jacfwd, jit, vmap
 import matplotlib.pyplot as plt
-# from jax.test_util import check_grads
+import scienceplots  # prettier scientific plot styles
 
+# -----------------------------------------------------------------------------
+# Project setup: ensure we can import the simulation code and enable 64‐bit JAX
+# -----------------------------------------------------------------------------
 sys.path.insert(0, sys.path[0] + "/..")
+jax.config.update("jax_enable_x64", True)
+os.chdir(os.path.dirname(__file__) + "/..")
+
 from src.model import config_simulation, simulation_loop_unsafe
 
-os.chdir(os.path.dirname(__file__) + "/..")
-jax.config.update("jax_enable_x64", True)
+# Use the "science" style for publication‐ready figures
+plt.style.use("science")
 
+# -----------------------------------------------------------------------------
+# Configuration constants
+# -----------------------------------------------------------------------------
+CONFIG_FILE = "test/bifurcation/bifurcation.yml"  # YAML defining network & solver
+NUM_TIME_STEPS = 50_000  # total steps per simulation run
+TOTAL_NUM_POINTS = 10  # number of scale factors to sample
+SCALE_MIN, SCALE_MAX = 0.8, 1.2  # range of resistance scales
+RESULTS_DIR = "results/potential_surface"  # where to save outputs
 
-CONFIG_FILENAME = "test/bifurcation/bifurcation.yml"
-
-
-VERBOSE = True
+# -----------------------------------------------------------------------------
+# 1) Load and configure the simulation environment
+# -----------------------------------------------------------------------------
 (
     N,
     B,
@@ -66,13 +94,19 @@ VERBOSE = True
     strides,
     edges,
     vessel_names,
-    cardiac_T,
-) = config_simulation(CONFIG_FILENAME)
+    cardiac_period,
+) = config_simulation(CONFIG_FILE)
 
+# For numerical stability, pick a moderate CFL number
 Ccfl = 0.5
-NUM_ITERATIONS = 1000
-SIM_LOOP_JIT = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
-sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
+
+# JIT‐compile the "unsafe" simulation loop; treat N, B, and time‐slice as static
+SIM_LOOP = partial(jit, static_argnums=(0, 1, 12))(simulation_loop_unsafe)
+
+# -----------------------------------------------------------------------------
+# 2) Run baseline simulation to get reference pressures
+# -----------------------------------------------------------------------------
+_, _, P_ref = SIM_LOOP(
     N,
     B,
     sim_dat,
@@ -85,113 +119,119 @@ sim_dat_obs, t_obs, P_obs = SIM_LOOP_JIT(  # pylint: disable=E1102
     masks,
     strides,
     edges,
-    50000,
+    NUM_TIME_STEPS,
 )
 
-# Indices for selecting specific parts of the simulation data
-VESSEL_INDEX_1 = 1
-VAR_INDEX_1 = 4
-R_INDEX = 4
 
-# Extract a specific value from the simulation data constants
-R1_1 = sim_dat_const_aux[VESSEL_INDEX_1, VAR_INDEX_1]
+# -----------------------------------------------------------------------------
+# 3) Define our loss function
+# -----------------------------------------------------------------------------
+# We'll scale the Windkessel resistance at (vessel_index, param_index)
+VESSEL_INDEX = 1
+PARAM_INDEX = 4
+R_base = sim_dat_const_aux[VESSEL_INDEX, PARAM_INDEX]
+
+sim_dat_const_aux = jnp.asarray(sim_dat_const_aux)
 
 
-def sim_loop_wrapper(params):
+def loss(scale: jnp.ndarray) -> jnp.ndarray:
     """
-    Wrapper function for running the simulation loop with a modified R value.
+    Compute the normalized mean‐squared pressure error when scaling R.
 
-    Args:
-        r (float): Scaling factor for the selected simulation constant.
+    Parameters
+    ----------
+    scale : jnp.ndarray, shape=()
+        Multiplicative factor applied to the baseline resistance.
 
-    Returns:
-        Array: Pressure values from the simulation with the modified R value.
+    Returns
+    -------
+    jnp.ndarray, shape=()
+        Mean of (‖P_scaled − P_ref‖² / ‖P_ref‖²) across all time points and vessels.
     """
-    r = params * R1_1
-    sim_dat_const_aux_new = jnp.array(sim_dat_const_aux)
-    sim_dat_const_aux_new = sim_dat_const_aux_new.at[VESSEL_INDEX_1, VAR_INDEX_1].set(r)
-    _, t, p = SIM_LOOP_JIT(  # pylint: disable=E1102
+    # 1) Modify the auxiliary constant array for the chosen resistance
+    R_new = scale * R_base
+    sim_const_aux_new = sim_dat_const_aux.at[VESSEL_INDEX, PARAM_INDEX].set(R_new)
+
+    # 2) Rerun the simulation with the scaled resistance
+    _, _, P_mod = SIM_LOOP(
         N,
         B,
         sim_dat,
         sim_dat_aux,
         sim_dat_const,
-        sim_dat_const_aux_new,
+        sim_const_aux_new,
         Ccfl,
         input_data,
         rho,
         masks,
         strides,
         edges,
-        50000,
-    )
-    return jnp.mean(
-        jnp.power(jnp.linalg.norm(p - P_obs, ord=None, axis=0), 2)
-        / jnp.power(jnp.linalg.norm(P_obs, ord=None, axis=0), 2)
+        NUM_TIME_STEPS,
     )
 
+    # 3) Compute normalized L2 error: mean of sum((P_mod − P_ref)²) / sum(P_ref²)
+    numerator = jnp.sum((P_mod - P_ref) ** 2, axis=0)
+    denominator = jnp.sum(P_ref**2, axis=0)
+    return jnp.mean(numerator / denominator)
 
-TOTAL_NUM_POINTS = int(10)
-R_scales = jnp.linspace(0.8, 1.2, int(TOTAL_NUM_POINTS))
 
+# -----------------------------------------------------------------------------
+# 4) Determine which subset of scales to evaluate (for distributed runs)
+# -----------------------------------------------------------------------------
+all_scales = jnp.linspace(SCALE_MIN, SCALE_MAX, TOTAL_NUM_POINTS)
 
-SIM_LOOP_WRAPPER_JIT = partial(jit)(sim_loop_wrapper)
-SIM_LOOP_WRAPPER_GRAD_JIT = partial(jit)(jacfwd(sim_loop_wrapper, 0))
-
-RESULTS_FOLDER = "results/potential_surface"
-if not os.path.isdir(RESULTS_FOLDER):
-    os.makedirs(RESULTS_FOLDER, mode=0o777)
-
-if len(sys.argv) > 1:
-    slices = int(TOTAL_NUM_POINTS / int(sys.argv[2]))
+if len(sys.argv) >= 3:
+    idx = int(sys.argv[1])
+    n_slices = int(sys.argv[2])
+    per_slice = TOTAL_NUM_POINTS // n_slices
+    start = idx * per_slice
+    end = start + per_slice
+    scales = all_scales[start:end]
+    SAVEFILENAME = "potential_surface_" + str(idx) + ".eps"
 else:
-    slices = TOTAL_NUM_POINTS
-gradients = np.zeros(slices)
-gradients_averaged = np.zeros(slices)
-GRADIENT = 1
+    scales = all_scales
+    SAVEFILENAME = "potential_surface.eps"
 
-if len(sys.argv) > 1:
-    RANGE = range(int(sys.argv[1]) * slices, (int(sys.argv[1]) + 1) * slices)
-else:
-    RANGE = range(slices)
+# -----------------------------------------------------------------------------
+# 5) Vectorized & JIT‐compiled gradient and loss evaluations
+# -----------------------------------------------------------------------------
+print("Computing gradients d(loss)/d(scale)...")
+grad_fn = jit(vmap(jacfwd(loss)))
+grad_vals = grad_fn(scales)
+jax.block_until_ready(grad_vals)
+print("Gradients computed.")
 
-# vectorized evaluation of all gradients
-print("Evaluating gradients...")
-gradients = jax.jit(jax.vmap(jax.jacfwd(sim_loop_wrapper), in_axes=(0,)))(R_scales)
-jax.block_until_ready(gradients)
-print("Gradients evaluated.")
+print("Computing loss values...")
+loss_fn = jit(vmap(loss))
+loss_vals = loss_fn(scales)
+jax.block_until_ready(loss_vals)
+print("Loss values computed.")
 
-# vectorized evaluation of values
-print("Evaluating values...")
-values = jax.jit(jax.vmap(sim_loop_wrapper, in_axes=(0,)))(R_scales)
-jax.block_until_ready(values)
-print("Values evaluated.")
+# -----------------------------------------------------------------------------
+# 6) Plot the potential surface and its derivative
+# -----------------------------------------------------------------------------
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# print("Checking gradients...")
-# jax.vmap(
-#    lambda x: check_grads(
-#        sim_loop_wrapper, x, order=1, atol=1e-2, rtol=1e-2, modes="fwd"
-#    ),
-#    in_axes=(0,),
-# )(R_scales)
-# print out gradients
-# check_grads(
-#    sim_loop_wrapper, tuple(R_scales), order=1, atol=1e-2, rtol=1e-2, modes="fwd"
-# )
-# print("All gradients checked.")
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
 
-# plot values and gradients
-fig, ax = plt.subplots()
-ax2 = ax.twinx()
-ax.plot(R_scales, values, label="loss", color="blue")
-# create second y-axis for gradients
-ax2.set_ylabel("gradient")
-ax2.plot(R_scales, gradients, label="gradient", color="orange")
-ax.set_xlabel("resistance scale of windkessel model")
-ax.set_ylabel("loss")
-plt.title("Potential Surface Analysis")
-fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax.transAxes)
+# Loss vs. scale on primary y‐axis
+ax1.plot(scales, loss_vals, marker="o", label="Loss", color="C0")
+ax1.set_xlabel("Resistance scale factor")
+ax1.set_ylabel("Normalized Loss")
+
+# Gradient vs. scale on secondary y‐axis
+ax2.plot(scales, grad_vals, linestyle="--", label="Gradient", color="C1")
+ax2.set_ylabel("d(Loss)/d(Scale)")
+
+plt.title("Potential Surface Analysis for Windkessel Resistance")
+fig.legend(loc="upper right")
+plt.tight_layout()
+
+# Save as high‐resolution PNG
+out_path = os.path.join(RESULTS_DIR, SAVEFILENAME)
+fig.savefig(out_path)
+print(f"Figure saved to {out_path}")
+
 plt.show()
-print("Gradients:")
-for i in RANGE:
-    print(f"R: {R_scales[i]}, Gradient: {gradients[i]}")
+plt.close(fig)
