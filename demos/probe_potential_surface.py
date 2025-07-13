@@ -131,7 +131,17 @@ VESSEL_INDEX = 1
 PARAM_INDEX = 4
 R_base = sim_dat_const_aux[VESSEL_INDEX, PARAM_INDEX]
 
+# Convert numpy arrays to JAX arrays for loss wrapper
+sim_dat = jnp.asarray(sim_dat)
+sim_dat_aux = jnp.asarray(sim_dat_aux)
+sim_dat_const = jnp.asarray(sim_dat_const)
 sim_dat_const_aux = jnp.asarray(sim_dat_const_aux)
+Ccfl = jnp.float64(Ccfl)
+input_data = jnp.asarray(input_data)
+rho = jnp.asarray(rho)
+masks = jnp.asarray(masks)
+strides = jnp.asarray(strides)
+edges = jnp.asarray(edges)
 
 
 def loss(scale: jnp.ndarray) -> jnp.ndarray:
@@ -153,7 +163,7 @@ def loss(scale: jnp.ndarray) -> jnp.ndarray:
     sim_const_aux_new = sim_dat_const_aux.at[VESSEL_INDEX, PARAM_INDEX].set(R_new)
 
     # 2) Rerun the simulation with the scaled resistance
-    _, _, P_mod = SIM_LOOP(
+    _, _, P_mod = simulation_loop_unsafe(
         N,
         B,
         sim_dat,
