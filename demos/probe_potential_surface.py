@@ -205,17 +205,17 @@ else:
 # -----------------------------------------------------------------------------
 # 5) Vectorized & JIT‐compiled gradient and loss evaluations
 # -----------------------------------------------------------------------------
-print("Computing gradients d(loss)/d(scale)...")
-grad_fn = jit(vmap(jacfwd(loss)))
-grad_vals = grad_fn(scales)
-jax.block_until_ready(grad_vals)
-print("Gradients computed.")
-
 print("Computing loss values...")
 loss_fn = jit(vmap(loss))
 loss_vals = loss_fn(scales)
 jax.block_until_ready(loss_vals)
 print("Loss values computed.")
+
+print("Computing gradients d(loss)/d(scale)...")
+grad_fn = jit(vmap(jacfwd(loss)))
+grad_vals = grad_fn(scales)
+jax.block_until_ready(grad_vals)
+print("Gradients computed.")
 
 # -----------------------------------------------------------------------------
 # 6) Plot the potential surface and its derivative
