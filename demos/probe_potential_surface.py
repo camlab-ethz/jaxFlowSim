@@ -58,6 +58,8 @@ import scienceplots  # prettier scientific plot styles
 # -----------------------------------------------------------------------------
 sys.path.insert(0, sys.path[0] + "/..")
 jax.config.update("jax_enable_x64", True)
+
+# Change working directory to base directory of repository
 os.chdir(os.path.dirname(__file__) + "/..")
 
 from src.model import config_simulation, simulation_loop_unsafe

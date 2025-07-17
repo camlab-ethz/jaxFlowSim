@@ -26,7 +26,6 @@ Dependencies
 ------------
 - JAX (jax.numpy, jax.lax)                 : Array operations and control flow
 - NumPy                                    : Configuration utilities and timepoint generation
-- NumPyro                                  : Platform configuration
 - jaxtyping.jaxtyped, beartype.beartype     : Static and runtime type enforcement
 - src.check_conv                           : Convergence error computation and reporting
 - src.initialise                           : Network and blood setup, configuration loading
