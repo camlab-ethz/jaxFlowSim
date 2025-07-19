@@ -65,12 +65,12 @@ MODEL_NAMES = [
 # -----------------------------------------------------------------------------
 # Helper function to save arrays with informative filenames
 # -----------------------------------------------------------------------------
-def save_array(prefix: str, model: str, suffix: str, arr: np.ndarray):
+def save_array(model: str, suffix: str, arr: np.ndarray):
     """
     Save a NumPy array to disk under TEST_DATA_DIR with naming convention:
-        {prefix}_{model}_{suffix}.dat
+        {model}_{suffix}.dat
     """
-    filename = f"{prefix}_{model}_{suffix}.dat"
+    filename = f"{model}_{suffix}.dat"
     path = os.path.join(TEST_DATA_DIR, filename)
     np.savetxt(path, arr)
     print(f"    → Saved '{filename}' ({arr.shape}, dtype={arr.dtype})")
@@ -94,9 +94,9 @@ for idx, model in enumerate(MODEL_NAMES, start=1):
     print(f" done in {elapsed:.2f}s")
 
     # Save safe outputs
-    save_array("safe_sim_dat", model, "sim_dat", np.array(sim_dat))
-    save_array("safe_t", model, "t", np.array(t))
-    save_array("safe_P", model, "P", np.array(P))
+    save_array(model, "sim_dat", np.array(sim_dat))
+    save_array(model, "t", np.array(t))
+    save_array(model, "P", np.array(P))
 
     # -- Unsafe simulation --
     print("  Running unsafe simulation...", end="", flush=True)
@@ -106,9 +106,9 @@ for idx, model in enumerate(MODEL_NAMES, start=1):
     print(f" done in {elapsed:.2f}s")
 
     # Save unsafe outputs
-    save_array("unsafe_sim_dat", model, "sim_dat", np.array(sim_dat_u))
-    save_array("unsafe_t", model, "t", np.array(t_u))
-    save_array("unsafe_P", model, "P", np.array(P_u))
+    save_array(model, "sim_dat_unsafe", np.array(sim_dat_u))
+    save_array(model, "t_unsafe", np.array(t_u))
+    save_array(model, "P_unsafe", np.array(P_u))
 
     print("")  # blank line between models
 
