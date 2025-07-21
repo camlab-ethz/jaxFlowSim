@@ -18,7 +18,7 @@ TestModels.test_models_unsafe
 
 Usage
 -----
-    python -m unittest path/to/test_models.py
+    python path/to/test_models.py [path/to/test_data]
 
 Baseline data directory: `test/test_data/`
 """
@@ -62,7 +62,10 @@ class TestModels(unittest.TestCase):
             "0029_H_ABAO_H",
             "0053_H_CERE_H",
         ]
-        self.baseline_dir = "test/test_data"
+        if len(sys.argv) > 1:
+            self.baseline_dir = sys.argv[1]
+        else:
+            self.baseline_dir = "test/test_data"
         # Ensure baseline directory exists
         self.assertTrue(
             os.path.isdir(self.baseline_dir),
@@ -136,4 +139,13 @@ class TestModels(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    if len(sys.argv) > 1 and sys.argv[1] == "--help":
+        print(
+            "Usage: python path/to/test_models.py [path/to/test_data]\n"
+            "Baseline data directory defaults to 'test/test_data/' if not specified."
+        )
+        sys.exit(0)
+    elif len(sys.argv) > 1:
+        unittest.main(argv=sys.argv[1:])
+    else:
+        unittest.main()
