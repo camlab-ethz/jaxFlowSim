@@ -15,6 +15,5 @@ jaxFlowSim documentation
    :maxdepth: 2
    :caption: Contents:
 
-   ../README.md
    source/modules
 
