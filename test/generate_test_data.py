@@ -79,37 +79,38 @@ def save_array(model: str, suffix: str, arr: np.ndarray):
 # -----------------------------------------------------------------------------
 # Main loop: run safe and unsafe simulations for each model
 # -----------------------------------------------------------------------------
-total_models = len(MODEL_NAMES)
-print(f"Starting test data generation for {total_models} models...\n")
-
-for idx, model in enumerate(MODEL_NAMES, start=1):
-    config_file = f"test/{model}/{model}.yml"
-    print(f"[{idx}/{total_models}] Model '{model}'")
-
-    # -- Safe simulation --
-    print("  Running safe simulation...", end="", flush=True)
-    start_time = time.perf_counter()
-    sim_dat, t, P = run_simulation(config_file)
-    elapsed = time.perf_counter() - start_time
-    print(f" done in {elapsed:.2f}s")
-
-    # Save safe outputs
-    save_array(model, "sim_dat", np.array(sim_dat))
-    save_array(model, "t", np.array(t))
-    save_array(model, "P", np.array(P))
-
-    # -- Unsafe simulation --
-    print("  Running unsafe simulation...", end="", flush=True)
-    start_time = time.perf_counter()
-    sim_dat_u, t_u, P_u = run_simulation_unsafe(config_file)
-    elapsed = time.perf_counter() - start_time
-    print(f" done in {elapsed:.2f}s")
-
-    # Save unsafe outputs
-    save_array(model, "sim_dat_unsafe", np.array(sim_dat_u))
-    save_array(model, "t_unsafe", np.array(t_u))
-    save_array(model, "P_unsafe", np.array(P_u))
-
-    print("")  # blank line between models
-
-print("All test data generated successfully.")
+if __name__ == "__main__":
+    total_models = len(MODEL_NAMES)
+    print(f"Starting test data generation for {total_models} models...\n")
+    
+    for idx, model in enumerate(MODEL_NAMES, start=1):
+        config_file = f"test/{model}/{model}.yml"
+        print(f"[{idx}/{total_models}] Model '{model}'")
+    
+        # -- Safe simulation --
+        print("  Running safe simulation...", end="", flush=True)
+        start_time = time.perf_counter()
+        sim_dat, t, P = run_simulation(config_file)
+        elapsed = time.perf_counter() - start_time
+        print(f" done in {elapsed:.2f}s")
+    
+        # Save safe outputs
+        save_array(model, "sim_dat", np.array(sim_dat))
+        save_array(model, "t", np.array(t))
+        save_array(model, "P", np.array(P))
+    
+        # -- Unsafe simulation --
+        print("  Running unsafe simulation...", end="", flush=True)
+        start_time = time.perf_counter()
+        sim_dat_u, t_u, P_u = run_simulation_unsafe(config_file)
+        elapsed = time.perf_counter() - start_time
+        print(f" done in {elapsed:.2f}s")
+    
+        # Save unsafe outputs
+        save_array(model, "sim_dat_unsafe", np.array(sim_dat_u))
+        save_array(model, "t_unsafe", np.array(t_u))
+        save_array(model, "P_unsafe", np.array(P_u))
+    
+        print("")  # blank line between models
+    
+    print("All test data generated successfully.")
