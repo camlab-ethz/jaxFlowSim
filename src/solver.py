@@ -70,7 +70,7 @@ def compute_dt(
     """
     Compute stable time step via the CFL condition.
 
-    Uses the maximum wave speed \|u\| + c on each vessel segment to ensure
+    Uses the maximum wave speed \\|u\\| + c on each vessel segment to ensure
     numerical stability: dt = min(ccfl * dx / max_wave_speed).
 
     Parameters
@@ -800,7 +800,7 @@ def max_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
 @jaxtyped(typechecker=typechecker)
 def min_mod(a: SimDatSingle, b: SimDatSingle) -> SimDatSingle:
     """
-    Minmod limiter helper: returns 0 if signals change sign, else min(\|a\|,\|b\|).
+    Minmod limiter helper: returns 0 if signals change sign, else min(\\|a\\|,\\|b\\|).
 
     Parameters
     ----------
