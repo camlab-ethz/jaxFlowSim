@@ -86,18 +86,20 @@ network:
 
 ## Documentation
 To generate the docs, run 
-'''
+```
 make latexpdf
-'''
+```
 or 
-'''
+```
 make html
-'''
+```
+```
+```
 in the docs directory. The files will be generated in the docs/_build directory. 
 In order to add new modules to the docs, add a __init__.py file to the modules directory, add the directory name to the index.rst file, and run
-'''
+```
 sphinx-apidoc -o source/ path/to/module.
-'''
+```
 
 
 
