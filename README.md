@@ -1,6 +1,5 @@
 ```{only} never
 ![](param_inference.gif)
-
 ```
 # jaxFlowSim
 
