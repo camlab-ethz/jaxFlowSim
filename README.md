@@ -1,3 +1,7 @@
+```{only} never
+![](param_inference.gif)
+
+```
 # jaxFlowSim
 
 jaxFlowSim is a differentiable 1D-haemodynamics solver. It can infer it's own parameters from data as demonstrated in the animation above. 
@@ -89,13 +93,11 @@ To generate the docs, run
 ```
 make latexpdf
 ```
-or 
+(twice if necessary) or 
 ```
 make html
 ```
-```
-```
-in the docs directory. The files will be generated in the docs/_build directory. 
+in the docs directory. The files will be generated in docs/_build. 
 In order to add new modules to the docs, add a __init__.py file to the modules directory, add the directory name to the index.rst file, and run
 ```
 sphinx-apidoc -o source/ path/to/module.
