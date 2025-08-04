@@ -1,6 +1,7 @@
-```{only} html
-![](param_inference.gif)
-```
+<!-- sphinx-exclude-start -->
+![Animated gif](param_inference.gif)
+<!-- sphinx-exclude-end -->
+
 # jaxFlowSim
 
 jaxFlowSim is a differentiable 1D-haemodynamics solver. It can infer it's own parameters from data as demonstrated in the animation above. 
