@@ -1,4 +1,4 @@
-```{only} never
+```{only} html
 ![](param_inference.gif)
 ```
 # jaxFlowSim
