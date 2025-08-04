@@ -1,6 +1,4 @@
-<!-- sphinx-exclude-start -->
-![Animated gif](param_inference.gif)
-<!-- sphinx-exclude-end -->
+![](param_inference.gif)
 
 # jaxFlowSim
 

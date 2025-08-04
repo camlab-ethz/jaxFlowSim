@@ -7,6 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import os
 import sys
+from docutils import nodes
 
 # Add the project root directory to PYTHONPATH:
 sys.path.insert(0, os.path.abspath("../"))
@@ -38,3 +39,12 @@ latex_engine = "xelatex"  # pdflatex is default; alternatives: 'xelatex', 'luala
 latex_elements = {
     "classoptions": ",oneside",
 }
+
+def remove_gifs_in_latex(app, doctree, docname):
+    if app.builder.format == 'latex':
+        for node in doctree.traverse(nodes.image):
+            if node['uri'].endswith('.gif'):
+                node.parent.remove(node)
+
+def setup(app):
+    app.connect('doctree-resolved', remove_gifs_in_latex)
