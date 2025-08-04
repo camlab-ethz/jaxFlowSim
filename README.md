@@ -96,7 +96,7 @@ make latexpdf
 make html
 ```
 in the docs directory. The files will be generated in docs/_build. 
-In order to add new modules to the docs, add a __init__.py file to the module's directory, add the name of the module to the docs/source/modules.rst file, and then run
+In order to add new modules to the docs, add a \_\_init\_\_.py file to the module's directory, add the name of the module to the docs/source/modules.rst file, and then run
 ```
 sphinx-apidoc -o source/ path/to/module.
 ```
