@@ -34,7 +34,7 @@ Then solve the network as follows:
 ```
 python demos/run_model.py <modelname>
 ```
-or if you are feeling lucky pass it to the run_model_unsafe.py script for faster but potentially inaccurate results:
+or if you are feeling lucky pass it to the run_model_unsafe.py script for faster but potentially inaccurate (no convergence checks) results:
 ```
 python demos/run_model_unsafe.py <modelname>.
 ```
