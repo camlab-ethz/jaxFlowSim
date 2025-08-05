@@ -1,5 +1,3 @@
-![](param_inference.gif)
-
 # jaxFlowSim
 
 jaxFlowSim is a differentiable 1D-haemodynamics solver. It can infer it's own parameters from data as demonstrated in the animation above. 
@@ -39,7 +37,7 @@ python demos/run_model_unsafe.py <modelname>
 .
 ## YML Structure
 
-```yml
+```yaml
 proj_name: <project_name>
 blood:
   rho: <blood density [g/L]>

@@ -32,11 +32,11 @@ class Blood:
 
     Attributes
     ----------
-    mu : StaticScalarFloat
+    :no-index:`mu` : StaticScalarFloat
         Dynamic (shear) viscosity of blood, in Pascal-seconds (Pa·s).
-    rho : StaticScalarFloat
+    :no-index:`rho` : StaticScalarFloat
         Density of blood, in kilograms per cubic meter (kg/m³).
-    rho_inv : StaticScalarFloat
+    :no-index:`rho_inv` : StaticScalarFloat
         Reciprocal of blood density (1/ρ), in cubic meters per kilogram (m³/kg).
 
     Notes
@@ -62,11 +62,11 @@ class Blood:
         Parameters
         ----------
         mu : StaticScalarFloat
-            Dynamic viscosity of blood (Pa·s).
+            Dynamic (shear) viscosity of blood, in Pascal-seconds (Pa·s).
         rho : StaticScalarFloat
-            Density of blood (kg/m³).
+            Density of blood, in kilograms per cubic meter (kg/m³).
         rho_inv : StaticScalarFloat
-            Reciprocal of the density (m³/kg). Must equal 1.0 / rho.
+            Reciprocal of blood density (1/ρ), in cubic meters per kilogram (m³/kg).
 
         Raises
         ------

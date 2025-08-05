@@ -9,8 +9,7 @@ checkpointing, or convergence checks.
 Functions
 ---------
 save_temp_data(n, strides, p)
-    Sample and return pressure values at five key points along each of the `n`
-    vessels, according to the provided stride indices.
+    Sample and return pressure values at five key points along each of the `n` vessels, according to the provided stride indices.
 
 Dependencies
 ------------
@@ -22,8 +21,7 @@ Dependencies
 Type Aliases (from `src.types`)
 -------------------------------
 - `StaticScalarInt`    : Integer type for fixed-size loop bounds.
-- `Strides`            : Integer array of shape (n, 5), where each row
-                        encodes [start, end, offset1, offset2, offset3].
+- `Strides`            : Integer array of shape (n, 5), where each row encodes [start, end, offset1, offset2, offset3].
 - `SimDatSingle`       : 1D float array of length n, used internally for norms.
 - `PressureReturnSingle`: 1D float array of length 5*n, holding sampled pressures.
 """
@@ -54,6 +52,7 @@ def save_temp_data(
          `start + strides[i,2]`, `start + strides[i,3]`, and
          `start + strides[i,4]`.
       3. Reads the ending pressure at index `end = strides[i,1] - 1`.
+
     The sampled pressures are concatenated into a single 1D array `p_t` of
     length 5*n, with vessel i’s values stored at positions
     `[5*i, 5*i+1, 5*i+2, 5*i+3, 5*i+4]`.
@@ -68,8 +67,7 @@ def save_temp_data(
           - strides[i,1]: end index (exclusive) for vessel i
           - strides[i,2..4]: offsets for the three intermediate sample points
     p : SimDatSingle
-        1D array of raw pressure data for all spatial nodes; length must
-        exceed max(strides[:,1]).
+        1D array of raw pressure data for all spatial nodes; length must exceed max(strides[:,1]).
 
     Returns
     -------
