@@ -176,3 +176,4 @@ plotting/*.eps
 SA_test*
 .vscode/*
 **.zip
+**.pdf
