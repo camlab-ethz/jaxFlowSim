@@ -6,7 +6,7 @@ STAMP_GPU   := $(VENV_GPU)/.touchfile
 REQ         := ../requirements.txt
 REQ_GPU     := ../requirements_gpu.txt
 
-.PHONY: venv venv_gpu test clean
+.PHONY: docs venv venv_gpu test clean
 
 # “venv” target now depends on the .venv/.touchfile
 venv: $(STAMP)
@@ -42,7 +42,15 @@ test: venv
 	# run tests
 	. $(VENV)/bin/activate && python ../test/test_models.py publication_materials/test_data
 
+# generate demos
+docs: venv
+	. $(VENV)/bin/activate && cd ../docs/ && make latexpdf; make latexpdf
+	echo "copy generated docs pdf to working directory"
+	cp ../docs/_build/latex/jaxflowsim.pdf .
+
 # clean working directory
 clean:
 	rm -rf $(VENV)
+	rm -rf jaxflowsim.pdf
 	find . -iname "*.pyc" -delete
+	cd ../docs/ && make clean
