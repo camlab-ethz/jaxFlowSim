@@ -41,7 +41,7 @@ python demos/run_model_unsafe.py <modelname>.
 
 ## YML Structure
 ```yaml
-proj_name: <project_name>
+proj_name: <project name>
 blood:
   rho: <blood density [g/L]>
   mu: <blood viscosity [Pa*s]>
